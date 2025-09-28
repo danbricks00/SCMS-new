@@ -5,18 +5,23 @@
     "skipLibCheck": true,
     "noImplicitAny": false,
     "paths": {
-      "@/*": ["./"],
-      "app/*": ["./app/*"]
+      "@/*": [
+        "./"
+      ],
+      "app/*": [
+        "./app/*"
+      ]
     },
-    "typeRoots": ["./node_modules/@types", "./"]
+    "typeRoots": [
+      "./node_modules/@types",
+      "./"
+    ]
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     "**/*.js",
     "**/*.jsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
     "minimatch.d.ts"
   ]
 }
