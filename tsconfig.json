@@ -4,24 +4,59 @@
     "strict": true,
     "skipLibCheck": true,
     "noImplicitAny": false,
+    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./"
+        "*"
+      ],
+      "app": [
+        "./app"
       ],
       "app/*": [
         "./app/*"
+      ],
+      "assets/*": [
+        "./assets/*"
+      ],
+      "components/*": [
+        "./components/*"
+      ],
+      "hooks/*": [
+        "./hooks/*"
+      ],
+      "constants/*": [
+        "./constants/*"
+      ],
+      "src/*": [
+        "./src/*"
       ]
     },
     "typeRoots": [
       "./node_modules/@types",
-      "./"
-    ]
+      "./types"
+    ],
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "module": "esnext"
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     "**/*.js",
     "**/*.jsx",
-    "minimatch.d.ts"
+    "minimatch.d.ts",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "babel.config.js",
+    "metro.config.js"
   ]
 }

@@ -1,7 +1,6 @@
 import { Redirect } from 'expo-router';
-import React from 'react';
 
 export default function Index() {
-  // Redirect to an existing route
-  return <Redirect href="/student" />;
+  // Redirect to the landing page instead of student portal
+  return <Redirect href="/landing" />;
 }
