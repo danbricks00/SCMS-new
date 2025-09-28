@@ -1,11 +1,5 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import AdminPortal from '../src/screens/AdminPortal';
 
-// You can replace this with a proper AdminPortal component when ready
 export default function Admin() {
-  return (
-    <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-      <Text>Admin Portal</Text>
-    </View>
-  );
+  return <AdminPortal />;
 }

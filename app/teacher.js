@@ -1,11 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import TeacherPortal from '../src/screens/TeacherPortal';
 
-// You can replace this with a proper TeacherPortal component when ready
 export default function Teacher() {
-  return (
-    <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-      <Text>Teacher Portal</Text>
-    </View>
-  );
+  return <TeacherPortal />;
 }
