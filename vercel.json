@@ -4,7 +4,10 @@
     {
       "src": "package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "config": { 
+        "distDir": "dist",
+        "buildCommand": "npm run build:web"
+      }
     }
   ],
   "routes": [
@@ -29,7 +32,7 @@
     {
       "src": "/(.*)",
       "headers": { 
-        "cache-control": "s-maxage=0",
+        "cache-control": "no-cache, no-store",
         "X-SCMS-Version": "1.0.0"
       },
       "dest": "/index.html"
@@ -38,6 +41,7 @@
   "env": {
     "EXPO_ROUTER_APP_ROOT": "./app",
     "EXPO_ROUTER_IMPORT_MODE": "sync",
-    "EXPO_DEBUG": "true"
+    "EXPO_DEBUG": "true",
+    "NODE_ENV": "production"
   }
 }

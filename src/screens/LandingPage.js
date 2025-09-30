@@ -5,13 +5,15 @@ import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 
 const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dimensions, setDimensions] = useState(null);
 
   useEffect(() => {
     console.log('[SCMS] LandingPage mounted');
     console.log('[SCMS] Environment:', process.env.NODE_ENV);
     
-    // Log window dimensions if available
+    // Set window dimensions after component mounts (client-side only)
     if (typeof window !== 'undefined') {
+      setDimensions({ width: window.innerWidth, height: window.innerHeight });
       console.log('[SCMS] Window dimensions:', window.innerWidth, window.innerHeight);
     }
     

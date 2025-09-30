@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "cross-env EXPO_ROUTER_APP_ROOT=./app EXPO_ROUTER_IMPORT_MODE=sync expo start --web",
     "lint": "expo lint",
-    "build:web": "cross-env EXPO_ROUTER_APP_ROOT=./app EXPO_ROUTER_IMPORT_MODE=sync expo export --platform web --output-dir dist",
+    "build:web": "cross-env NODE_ENV=production EXPO_ROUTER_APP_ROOT=./app EXPO_ROUTER_IMPORT_MODE=sync expo export --platform web --output-dir dist",
     "build": "npm run build:web"
   },
   "dependencies": {

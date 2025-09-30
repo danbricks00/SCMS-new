@@ -14,33 +14,35 @@ export const unstable_settings = {
 // Debug component to show loading status
 const DebugInfo = () => {
   const [info, setInfo] = React.useState({
-    loadTime: new Date().toISOString(),
-    windowDimensions: typeof window !== 'undefined' ? 
-      `${window.innerWidth}x${window.innerHeight}` : 'N/A',
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'
+    loadTime: '',
+    windowDimensions: 'Loading...',
+    userAgent: 'Loading...'
   });
 
   useEffect(() => {
+    // Only set these values on the client side
+    setInfo({
+      loadTime: new Date().toISOString(),
+      windowDimensions: typeof window !== 'undefined' ? 
+        `${window.innerWidth}x${window.innerHeight}` : 'N/A',
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'
+    });
+    
     console.log('[SCMS] Root layout mounted');
     console.log('[SCMS] Environment:', process.env.NODE_ENV);
+    console.log('[SCMS] Platform:', process.env.EXPO_OS || 'unknown');
     
     // Log when components mount
     return () => console.log('[SCMS] Root layout unmounted');
   }, []);
 
-  // Only show in development or with debug flag
-  if (process.env.NODE_ENV !== 'development' && 
-      typeof window !== 'undefined' && 
-      !window.location.search.includes('debug=true')) {
-    return null;
-  }
-
+  // Always show in development and production for debugging
   return (
     <View style={styles.debugContainer}>
       <Text style={styles.debugText}>SCMS Debug Info</Text>
       <Text style={styles.debugText}>Load Time: {info.loadTime}</Text>
       <Text style={styles.debugText}>Dimensions: {info.windowDimensions}</Text>
-      <Text style={styles.debugText}>User Agent: {info.userAgent.substring(0, 50)}...</Text>
+      <Text style={styles.debugText}>User Agent: {info.userAgent && info.userAgent.substring(0, 50)}...</Text>
     </View>
   );
 };
