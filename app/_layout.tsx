@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -13,6 +13,8 @@ export const unstable_settings = {
 
 // Debug component to show loading status
 const DebugInfo = () => {
+  // Use state to track client-side rendering
+  const [mounted, setMounted] = useState(false);
   const [info, setInfo] = React.useState({
     loadTime: '',
     windowDimensions: 'Loading...',
@@ -20,22 +22,28 @@ const DebugInfo = () => {
   });
 
   useEffect(() => {
-    // Only set these values on the client side
-    setInfo({
-      loadTime: new Date().toISOString(),
-      windowDimensions: typeof window !== 'undefined' ? 
-        `${window.innerWidth}x${window.innerHeight}` : 'N/A',
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'
-    });
+    // Mark as mounted to prevent hydration mismatch
+    setMounted(true);
     
-    console.log('[SCMS] Root layout mounted');
-    console.log('[SCMS] Environment:', process.env.NODE_ENV);
-    console.log('[SCMS] Platform:', process.env.EXPO_OS || 'unknown');
+    // Only run on client-side after component is mounted
+    if (typeof window !== 'undefined') {
+      setInfo({
+        loadTime: new Date().toISOString(),
+        windowDimensions: `${window.innerWidth} ${window.innerHeight}`,
+        userAgent: navigator.userAgent
+      });
+      
+      console.log('[SCMS] Root layout mounted');
+      console.log('[SCMS] Environment:', process.env.NODE_ENV);
+      console.log('[SCMS] Platform:', process.env.EXPO_OS || 'unknown');
+    }
     
-    // Log when components mount
     return () => console.log('[SCMS] Root layout unmounted');
   }, []);
 
+  // Only render when mounted (client-side)
+  if (!mounted) return null;
+  
   // Always show in development and production for debugging
   return (
     <View style={styles.debugContainer}>
@@ -49,8 +57,12 @@ const DebugInfo = () => {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  // Track client-side rendering
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Mark as mounted after initial render
+    setMounted(true);
     console.log('[SCMS] RootLayout rendered with colorScheme:', colorScheme);
   }, [colorScheme]);
 
@@ -61,7 +73,8 @@ export default function RootLayout() {
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
-      <DebugInfo />
+      {/* Only render debug info on client-side */}
+      {mounted && <DebugInfo />}
     </ThemeProvider>
   );
 }

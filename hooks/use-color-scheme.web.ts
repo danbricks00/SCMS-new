@@ -9,9 +9,14 @@ export function useColorScheme() {
   const [colorSchemeValue, setColorSchemeValue] = useState('light');
 
   useEffect(() => {
-    setHasHydrated(true);
-    const scheme = useRNColorScheme();
-    setColorSchemeValue(scheme || 'light');
+    // Small delay to ensure we're fully client-side
+    const timer = setTimeout(() => {
+      setHasHydrated(true);
+      const scheme = useRNColorScheme();
+      setColorSchemeValue(scheme || 'light');
+    }, 0);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   return hasHydrated ? colorSchemeValue : 'light';

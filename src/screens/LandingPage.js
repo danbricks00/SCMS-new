@@ -7,18 +7,23 @@ const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dimensions, setDimensions] = useState(null);
 
+  // At the top of your component
+  const [mounted, setMounted] = useState(false);
+  
   useEffect(() => {
+    // Mark as mounted after initial render
+    setMounted(true);
     console.log('[SCMS] LandingPage mounted');
     console.log('[SCMS] Environment:', process.env.NODE_ENV);
     
     // Set window dimensions after component mounts (client-side only)
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && mounted) {
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
       console.log('[SCMS] Window dimensions:', window.innerWidth, window.innerHeight);
     }
     
     return () => console.log('[SCMS] LandingPage unmounted');
-  }, []);
+  }, [mounted]);
 
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);

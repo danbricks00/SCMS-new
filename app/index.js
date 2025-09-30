@@ -1,8 +1,13 @@
 import { Redirect } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 export default function Index() {
+  // Add client-side detection
+  const [mounted, setMounted] = useState(false);
+  
   useEffect(() => {
+    // Mark as mounted after initial render
+    setMounted(true);
     console.log('[SCMS] Index component mounted');
     console.log('[SCMS] Redirecting to /landing');
     
@@ -19,6 +24,11 @@ export default function Index() {
     };
   }, []);
   
-  // Redirect to the landing page instead of student portal
-  return <Redirect href="/landing" />;
+  // Only redirect on the client side
+  if (mounted) {
+    return <Redirect href="/landing" />;
+  }
+  
+  // Return null during server rendering to avoid hydration mismatch
+  return null;
 }

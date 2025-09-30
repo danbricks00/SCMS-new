@@ -30,6 +30,10 @@
       "dest": "/manifest.json"
     },
     {
+      "src": "/(.+\\.[a-zA-Z0-9]+)$",
+      "dest": "/$1"
+    },
+    {
       "src": "/(.*)",
       "headers": { 
         "cache-control": "no-cache, no-store",
