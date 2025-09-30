@@ -28,8 +28,16 @@
     },
     {
       "src": "/(.*)",
-      "headers": { "cache-control": "s-maxage=0" },
+      "headers": { 
+        "cache-control": "s-maxage=0",
+        "X-SCMS-Version": "1.0.0"
+      },
       "dest": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "EXPO_ROUTER_APP_ROOT": "./app",
+    "EXPO_ROUTER_IMPORT_MODE": "sync",
+    "EXPO_DEBUG": "true"
+  }
 }
