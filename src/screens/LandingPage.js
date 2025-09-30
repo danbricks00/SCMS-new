@@ -1,10 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    console.log('[SCMS] LandingPage mounted');
+    console.log('[SCMS] Environment:', process.env.NODE_ENV);
+    
+    // Log window dimensions if available
+    if (typeof window !== 'undefined') {
+      console.log('[SCMS] Window dimensions:', window.innerWidth, window.innerHeight);
+    }
+    
+    return () => console.log('[SCMS] LandingPage unmounted');
+  }, []);
 
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
