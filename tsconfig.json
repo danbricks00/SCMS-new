@@ -1,62 +1,22 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "@tsconfig/react-native/tsconfig.json",
   "compilerOptions": {
     "strict": true,
     "skipLibCheck": true,
     "noImplicitAny": false,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "*"
-      ],
-      "app": [
-        "./app"
-      ],
-      "app/*": [
-        "./app/*"
-      ],
-      "assets/*": [
-        "./assets/*"
-      ],
-      "components/*": [
-        "./components/*"
-      ],
-      "hooks/*": [
-        "./hooks/*"
-      ],
-      "constants/*": [
-        "./constants/*"
-      ],
-      "src/*": [
-        "./src/*"
-      ]
+      "@/*": ["*"],
+      "app": ["./app"],
+      "app/*": ["./app/*"],
+      "assets/*": ["./assets/*"],
+      "components/*": ["./components/*"],
+      "hooks/*": ["./hooks/*"],
+      "constants/*": ["./constants/*"],
+      "src/*": ["./src/*"]
     },
-    "typeRoots": [
-      "./node_modules/@types",
-      "./types"
-    ],
-    "jsx": "react-jsx",
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "moduleResolution": "bundler",
-    "target": "esnext",
-    "module": "esnext"
+    "types": ["node", "react", "react-native"] // Specify only the types you're using
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "**/*.js",
-    "**/*.jsx",
-    "minimatch.d.ts",
-    "types/**/*.d.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "babel.config.js",
-    "metro.config.js"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+  "exclude": ["node_modules"]
 }
