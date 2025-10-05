@@ -1,6 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
+// Import Firebase configuration
+import './src/config/firebase';
 
 export default function App() {
   useEffect(() => {
