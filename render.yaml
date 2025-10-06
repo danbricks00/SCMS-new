@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: scms-new
+    env: node
+    buildCommand: npm install && npm run build:web
+    startCommand: npx serve -s dist
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: EXPO_ROUTER_APP_ROOT
+        value: ./app
+      - key: EXPO_ROUTER_IMPORT_MODE
+        value: sync
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: "s-maxage=31536000, immutable"
+      - path: /static/*
+        name: Cache-Control
+        value: "s-maxage=31536000, immutable"
