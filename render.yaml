@@ -2,8 +2,6 @@ services:
   - type: web
     name: scms-new
     runtime: static
-    env: node
-    nodeVersion: 18
     buildCommand: |
       npm cache clean --force && 
       rm -rf node_modules package-lock.json && 

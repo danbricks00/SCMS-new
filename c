@@ -1,10 +1,16 @@
-# render.yaml
+
 services:
   - type: web
     name: scms-new
-    runtime: node
-    buildCommand: npm rebuild lightningcss --platform=linux --arch=x64 && npm install && npm run build:web
-    startCommand: npx serve -s dist
+    runtime: static
+    buildCommand: |
+      npm cache clean --force && 
+      rm -rf node_modules package-lock.json && 
+      npm install && 
+      npm install lightningcss-linux-x64-gnu && 
+      npm rebuild lightningcss --platform=linux --arch=x64 && 
+      npm run build:web
+    staticPublishPath: ./dist
     envVars:
       - key: NODE_ENV
         value: production
@@ -12,6 +18,10 @@ services:
         value: ./app
       - key: EXPO_ROUTER_IMPORT_MODE
         value: sync
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     headers:
       - path: /assets/*
         name: Cache-Control
