@@ -1,19 +1,12 @@
+
 services:
   - type: web
     name: scms-new
     runtime: static
     buildCommand: |
-      export NODE_VERSION=20.18.3 && 
-      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && 
-      export NVM_DIR="$HOME/.nvm" && 
-      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && 
-      nvm install $NODE_VERSION && 
-      nvm use $NODE_VERSION && 
       npm cache clean --force && 
       rm -rf node_modules package-lock.json && 
       npm install && 
-      npm list lightningcss && 
-      npm dedupe && 
       npm install lightningcss-linux-x64-gnu && 
       npm rebuild lightningcss --platform=linux --arch=x64 && 
       npm run build:web
