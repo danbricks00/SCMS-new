@@ -24,11 +24,6 @@ export default function Index() {
     };
   }, []);
   
-  // Only redirect on the client side
-  if (mounted) {
-    return <Redirect href="/landing" />;
-  }
-  
-  // Return null during server rendering to avoid hydration mismatch
-  return null;
+  // Always redirect, but with a fallback for SSR
+  return <Redirect href="/landing" />;
 }

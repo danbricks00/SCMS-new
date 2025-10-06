@@ -12,11 +12,24 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase with error handling
+let app, db, auth;
 
-// Initialize Firebase services
-const db = getFirestore(app);
-const auth = getAuth(app);
+try {
+  // Check if all required config values are present
+  const hasAllConfig = Object.values(firebaseConfig).every(value => 
+    value && value !== 'your_api_key' && value !== 'undefined');
+  
+  if (hasAllConfig) {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    console.log('[Firebase] Successfully initialized');
+  } else {
+    console.error('[Firebase] Missing configuration values');
+  }
+} catch (error) {
+  console.error('[Firebase] Initialization error:', error);
+}
 
 export { app, db, auth };
