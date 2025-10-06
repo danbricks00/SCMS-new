@@ -1,29 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Dimensions, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dimensions, setDimensions] = useState(null);
 
-  // At the top of your component
-  const [mounted, setMounted] = useState(false);
-  
   useEffect(() => {
-    // Mark as mounted after initial render
-    setMounted(true);
     console.log('[SCMS] LandingPage mounted');
     console.log('[SCMS] Environment:', process.env.NODE_ENV);
-    
-    // Set window dimensions after component mounts (client-side only)
-    if (typeof window !== 'undefined' && mounted) {
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
-      console.log('[SCMS] Window dimensions:', window.innerWidth, window.innerHeight);
-    }
-    
+
+    const screenDimensions = Dimensions.get('window');
+    console.log('[SCMS] Window dimensions:', screenDimensions.width, screenDimensions.height);
+
     return () => console.log('[SCMS] LandingPage unmounted');
-  }, [mounted]);
+  }, []);
 
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
