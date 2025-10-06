@@ -1,3 +1,4 @@
+# render.yaml
 services:
   - type: web
     name: scms-new
@@ -11,10 +12,6 @@ services:
         value: ./app
       - key: EXPO_ROUTER_IMPORT_MODE
         value: sync
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
     headers:
       - path: /assets/*
         name: Cache-Control
