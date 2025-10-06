@@ -2,7 +2,7 @@ services:
   - type: web
     name: scms-new
     runtime: static
-    buildCommand: npm rebuild lightningcss --platform=linux --arch=x64 && npm install && npm run build:web
+    buildCommand: npm install lightningcss-linux-x64-gnu && npm dedupe && npm rebuild lightningcss --platform=linux --arch=x64 && npm install && npm run build:web
     staticPublishPath: ./dist
     envVars:
       - key: NODE_ENV
