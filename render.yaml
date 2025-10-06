@@ -2,7 +2,7 @@ services:
   - type: web
     name: scms-new
     env: node
-    buildCommand: npm install && npm run build:web
+    buildCommand: npm rebuild lightningcss --platform=linux --arch=x64 && npm install && npm run build:web
     startCommand: npx serve -s dist
     envVars:
       - key: NODE_ENV
