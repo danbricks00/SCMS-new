@@ -36,3 +36,12 @@ services:
       - path: /static/*
         name: Cache-Control
         value: "s-maxage=31536000, immutable"
+      - path: /*
+        name: expo-platform
+        value: "web"
+      - path: /*
+        name: X-Content-Type-Options
+        value: "nosniff"
+      - path: /*
+        name: X-Frame-Options
+        value: "SAMEORIGIN"

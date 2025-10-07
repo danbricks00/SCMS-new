@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import ErrorBoundary from './components/ErrorBoundary';
 // Import Firebase configuration
 import './src/config/firebase';
@@ -7,6 +8,18 @@ import './src/config/firebase';
 export default function App() {
   useEffect(() => {
     console.log('[SCMS] App component mounted');
+    console.log('[SCMS] Platform:', Platform.OS);
+    console.log('[SCMS] User Agent:', navigator.userAgent);
+    
+    // Set platform header for web
+    if (Platform.OS === 'web') {
+      document.documentElement.setAttribute('data-platform', 'web');
+      // Add platform detection meta tag
+      const meta = document.createElement('meta');
+      meta.name = 'expo-platform';
+      meta.content = 'web';
+      document.head.appendChild(meta);
+    }
     
     // Log performance metrics
     if (typeof performance !== 'undefined') {
