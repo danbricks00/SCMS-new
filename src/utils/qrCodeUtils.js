@@ -16,7 +16,8 @@ export class QRCodeUtils {
       name: studentData.name,
       class: studentData.class,
       timestamp: Date.now(),
-      type: 'student'
+      type: 'student',
+      version: '2.0' // Version for enhanced tracking
     };
 
     // Encrypt the data
@@ -26,6 +27,39 @@ export class QRCodeUtils {
     ).toString();
 
     return encryptedData;
+  }
+
+  /**
+   * Get current NZST timestamp
+   * @returns {string} NZST timestamp string
+   */
+  static getNZSTTimestamp() {
+    const now = new Date();
+    // New Zealand Standard Time is UTC+12 (or UTC+13 during daylight saving)
+    // For simplicity, we'll use UTC+12 (NZST)
+    const nzst = new Date(now.getTime() + (12 * 60 * 60 * 1000));
+    return nzst.toISOString();
+  }
+
+  /**
+   * Format timestamp for display in NZST
+   * @param {string} timestamp - ISO timestamp
+   * @returns {string} Formatted NZST time string
+   */
+  static formatNZSTTime(timestamp) {
+    const date = new Date(timestamp);
+    // Convert to NZST (UTC+12)
+    const nzst = new Date(date.getTime() + (12 * 60 * 60 * 1000));
+    return nzst.toLocaleString('en-NZ', {
+      timeZone: 'Pacific/Auckland',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
   }
 
   /**

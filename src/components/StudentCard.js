@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { QRCodeUtils } from '../utils/qrCodeUtils';
 
 const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 'login' }) => {
   if (!studentData) return null;
@@ -89,7 +90,10 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
         {/* Additional Info */}
         <View style={styles.additionalInfo}>
           <Text style={styles.scanTime}>
-            Scanned at: {new Date().toLocaleTimeString()}
+            Scanned at: {QRCodeUtils.formatNZSTTime(new Date().toISOString())}
+          </Text>
+          <Text style={styles.timezoneInfo}>
+            (New Zealand Standard Time)
           </Text>
         </View>
       </View>
@@ -218,6 +222,11 @@ const styles = StyleSheet.create({
   scanTime: {
     color: '#999',
     fontSize: 12,
+  },
+  timezoneInfo: {
+    color: '#ccc',
+    fontSize: 10,
+    marginTop: 2,
   },
 });
 

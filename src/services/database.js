@@ -173,12 +173,14 @@ export class DatabaseService {
   // ===== ATTENDANCE MANAGEMENT =====
 
   /**
-   * Record student attendance
+   * Record student attendance/activity
    * @param {Object} attendanceData - Attendance information
    * @returns {Promise<string>} Document ID of the attendance record
    */
   static async recordAttendance(attendanceData) {
     try {
+      const { QRCodeUtils } = await import('../utils/qrCodeUtils');
+      
       const attendance = {
         studentId: attendanceData.studentId,
         studentName: attendanceData.studentName,
@@ -186,9 +188,13 @@ export class DatabaseService {
         teacherId: attendanceData.teacherId,
         teacherName: attendanceData.teacherName,
         type: attendanceData.type, // 'login' or 'logout'
+        activity: attendanceData.activity || 'Class Attendance', // e.g., 'Football Practice', 'Library Study'
+        activityType: attendanceData.activityType || 'classroom', // 'sports', 'academic', 'library', 'event'
         timestamp: new Date().toISOString(),
+        nzstTimestamp: QRCodeUtils.getNZSTTimestamp(),
         location: attendanceData.location || 'Classroom',
         notes: attendanceData.notes || '',
+        duration: attendanceData.duration || null, // Duration in minutes if logout
         createdAt: new Date().toISOString()
       };
 
@@ -320,6 +326,134 @@ export class DatabaseService {
       return summary;
     } catch (error) {
       console.error('Error getting attendance summary:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get activity summary for a specific activity
+   * @param {string} activity - Activity name (e.g., 'Football Practice', 'Library Study')
+   * @param {string} date - Date (ISO string)
+   * @returns {Promise<Object>} Activity summary
+   */
+  static async getActivitySummary(activity, date) {
+    try {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const q = query(
+        collection(db, 'attendance'),
+        where('activity', '==', activity),
+        where('timestamp', '>=', startOfDay.toISOString()),
+        where('timestamp', '<=', endOfDay.toISOString()),
+        orderBy('timestamp', 'asc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      const records = [];
+      
+      querySnapshot.forEach((doc) => {
+        records.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      // Process login/logout pairs to calculate durations
+      const activitySessions = [];
+      const loginRecords = {};
+      
+      records.forEach(record => {
+        if (record.type === 'login') {
+          loginRecords[record.studentId] = record;
+        } else if (record.type === 'logout' && loginRecords[record.studentId]) {
+          const loginRecord = loginRecords[record.studentId];
+          const duration = Math.round((new Date(record.timestamp) - new Date(loginRecord.timestamp)) / (1000 * 60)); // minutes
+          
+          activitySessions.push({
+            studentId: record.studentId,
+            studentName: record.studentName,
+            loginTime: loginRecord.nzstTimestamp,
+            logoutTime: record.nzstTimestamp,
+            duration: duration,
+            location: record.location
+          });
+          
+          delete loginRecords[record.studentId];
+        }
+      });
+
+      // Calculate summary statistics
+      const totalParticipants = new Set(records.map(r => r.studentId)).size;
+      const totalDuration = activitySessions.reduce((sum, session) => sum + session.duration, 0);
+      const averageDuration = activitySessions.length > 0 ? Math.round(totalDuration / activitySessions.length) : 0;
+
+      return {
+        activity,
+        date,
+        totalParticipants,
+        completedSessions: activitySessions.length,
+        ongoingSessions: Object.keys(loginRecords).length,
+        totalDuration,
+        averageDuration,
+        sessions: activitySessions,
+        ongoingStudents: Object.values(loginRecords).map(r => ({
+          studentId: r.studentId,
+          studentName: r.studentName,
+          loginTime: r.nzstTimestamp
+        }))
+      };
+    } catch (error) {
+      console.error('Error getting activity summary:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get student activity history
+   * @param {string} studentId - Student ID
+   * @param {string} activityType - Activity type filter (optional)
+   * @param {number} days - Number of days to look back (default 30)
+   * @returns {Promise<Array>} Activity history
+   */
+  static async getStudentActivityHistory(studentId, activityType = null, days = 30) {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      
+      let q = query(
+        collection(db, 'attendance'),
+        where('studentId', '==', studentId),
+        where('timestamp', '>=', startDate.toISOString()),
+        orderBy('timestamp', 'desc')
+      );
+
+      if (activityType) {
+        q = query(
+          collection(db, 'attendance'),
+          where('studentId', '==', studentId),
+          where('activityType', '==', activityType),
+          where('timestamp', '>=', startDate.toISOString()),
+          orderBy('timestamp', 'desc')
+        );
+      }
+
+      const querySnapshot = await getDocs(q);
+      const activities = [];
+      
+      querySnapshot.forEach((doc) => {
+        activities.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      
+      return activities;
+    } catch (error) {
+      console.error('Error getting student activity history:', error);
       throw error;
     }
   }

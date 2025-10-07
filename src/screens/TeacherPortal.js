@@ -5,12 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
+import ActivityScanner from '../components/ActivityScanner';
 import { DatabaseService } from '../services/database';
 import { QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
 
 const TeacherPortal = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showStudentCard, setShowStudentCard] = useState(false);
+  const [showActivityScanner, setShowActivityScanner] = useState(false);
   const [scannedStudent, setScannedStudent] = useState(null);
   const [attendanceType, setAttendanceType] = useState('login');
   const [attendanceSummary, setAttendanceSummary] = useState({
@@ -181,6 +183,23 @@ const TeacherPortal = () => {
         </View>
         
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Activity Tracking</Text>
+          <TouchableOpacity 
+            style={styles.activityButton}
+            onPress={() => setShowActivityScanner(true)}
+          >
+            <Ionicons name="qr-code" size={32} color="#fff" />
+            <View style={styles.activityButtonContent}>
+              <Text style={styles.activityButtonTitle}>Track Activities</Text>
+              <Text style={styles.activityButtonSubtitle}>
+                Sports, Library, Events, Clubs
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Today's Schedule</Text>
           <View style={styles.scheduleList}>
             {['8:00 AM - 9:30 AM: Class 10A', '10:00 AM - 11:30 AM: Class 8B', 
@@ -239,6 +258,22 @@ const TeacherPortal = () => {
             attendanceType={attendanceType}
           />
         </View>
+      </Modal>
+
+      {/* Activity Scanner Modal */}
+      <Modal
+        visible={showActivityScanner}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <ActivityScanner
+          isVisible={showActivityScanner}
+          onClose={() => setShowActivityScanner(false)}
+          onActivityComplete={() => {
+            // Refresh any relevant data if needed
+            loadAttendanceSummary();
+          }}
+        />
       </Modal>
     </SafeAreaView>
   );
@@ -361,6 +396,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  activityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4a90e2',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+  activityButtonContent: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  activityButtonTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  activityButtonSubtitle: {
+    color: '#e3f2fd',
+    fontSize: 14,
   },
   scheduleList: {
     gap: 12,
