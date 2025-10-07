@@ -1,9 +1,85 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Alert, TextInput, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import QRCodeGenerator from '../components/QRCodeGenerator';
+import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
+import { QRCodeUtils } from '../utils/qrCodeUtils';
 
 const AdminPortal = () => {
+  const [showQRGenerator, setShowQRGenerator] = useState(false);
+  const [showStudentList, setShowStudentList] = useState(false);
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [newStudent, setNewStudent] = useState({
+    firstName: '',
+    lastName: '',
+    class: '',
+    parentContact: '',
+    address: '',
+    emergencyContact: ''
+  });
+
+  useEffect(() => {
+    loadStudents();
+  }, []);
+
+  const loadStudents = async () => {
+    try {
+      const studentsData = await DatabaseService.getAllStudents();
+      setStudents(studentsData);
+    } catch (error) {
+      console.error('Error loading students:', error);
+      // Use sample data if database is not available
+      setStudents(SAMPLE_STUDENTS);
+    }
+  };
+
+  const handleAddStudent = async () => {
+    if (!newStudent.firstName || !newStudent.lastName || !newStudent.class) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const studentData = {
+        ...newStudent,
+        name: `${newStudent.firstName} ${newStudent.lastName}`
+      };
+
+      await DatabaseService.addStudent(studentData);
+      Alert.alert('Success', 'Student added successfully');
+      
+      // Reset form
+      setNewStudent({
+        firstName: '',
+        lastName: '',
+        class: '',
+        parentContact: '',
+        address: '',
+        emergencyContact: ''
+      });
+      
+      setShowAddStudent(false);
+      loadStudents();
+    } catch (error) {
+      console.error('Error adding student:', error);
+      Alert.alert('Error', 'Failed to add student');
+    }
+  };
+
+  const handleGenerateQR = (student) => {
+    setSelectedStudent(student);
+    setShowQRGenerator(true);
+  };
+
+  const handlePrintQR = (uri) => {
+    console.log('QR Code printed:', uri);
+    Alert.alert('Success', 'QR Code generated successfully');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -39,21 +115,27 @@ const AdminPortal = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionGrid}>
-            <TouchableOpacity style={styles.actionCard}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => setShowStudentList(true)}
+            >
               <Ionicons name="people" size={32} color="#4a90e2" />
-              <Text style={styles.actionText}>Manage Users</Text>
+              <Text style={styles.actionText}>Manage Students</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionCard}>
               <Ionicons name="calendar" size={32} color="#4a90e2" />
               <Text style={styles.actionText}>Attendance Reports</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="school" size={32} color="#4a90e2" />
-              <Text style={styles.actionText}>Class Management</Text>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => setShowAddStudent(true)}
+            >
+              <Ionicons name="person-add" size={32} color="#4CAF50" />
+              <Text style={styles.actionText}>Add Student</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="notifications" size={32} color="#4a90e2" />
-              <Text style={styles.actionText}>Send Notifications</Text>
+              <Ionicons name="qr-code" size={32} color="#FF9800" />
+              <Text style={styles.actionText}>QR Codes</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -78,6 +160,150 @@ const AdminPortal = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Student List Modal */}
+      <Modal
+        visible={showStudentList}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowStudentList(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Student Management</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          <FlatList
+            data={students}
+            keyExtractor={(item) => item.studentId}
+            renderItem={({ item }) => (
+              <View style={styles.studentItem}>
+                <View style={styles.studentInfo}>
+                  <Text style={styles.studentName}>{item.name}</Text>
+                  <Text style={styles.studentDetails}>
+                    ID: {item.studentId} • Class: {item.class}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.qrButton}
+                  onPress={() => handleGenerateQR(item)}
+                >
+                  <Ionicons name="qr-code" size={20} color="#4a90e2" />
+                  <Text style={styles.qrButtonText}>QR Code</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            contentContainerStyle={styles.studentList}
+          />
+        </SafeAreaView>
+      </Modal>
+
+      {/* Add Student Modal */}
+      <Modal
+        visible={showAddStudent}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAddStudent(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Add New Student</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          <ScrollView style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>First Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newStudent.firstName}
+                onChangeText={(text) => setNewStudent({...newStudent, firstName: text})}
+                placeholder="Enter first name"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Last Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newStudent.lastName}
+                onChangeText={(text) => setNewStudent({...newStudent, lastName: text})}
+                placeholder="Enter last name"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Class *</Text>
+              <TextInput
+                style={styles.input}
+                value={newStudent.class}
+                onChangeText={(text) => setNewStudent({...newStudent, class: text})}
+                placeholder="e.g., 10A, 9B"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Parent Contact</Text>
+              <TextInput
+                style={styles.input}
+                value={newStudent.parentContact}
+                onChangeText={(text) => setNewStudent({...newStudent, parentContact: text})}
+                placeholder="parent@email.com"
+                keyboardType="email-address"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Address</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={newStudent.address}
+                onChangeText={(text) => setNewStudent({...newStudent, address: text})}
+                placeholder="Student address"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Emergency Contact</Text>
+              <TextInput
+                style={styles.input}
+                value={newStudent.emergencyContact}
+                onChangeText={(text) => setNewStudent({...newStudent, emergencyContact: text})}
+                placeholder="+64 21 123 4567"
+                keyboardType="phone-pad"
+              />
+            </View>
+            
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddStudent}
+            >
+              <Ionicons name="add-circle" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Add Student</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* QR Code Generator Modal */}
+      <Modal
+        visible={showQRGenerator}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <QRCodeGenerator
+          studentData={selectedStudent}
+          onClose={() => setShowQRGenerator(false)}
+          onPrint={handlePrintQR}
+        />
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -188,6 +414,108 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 2,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  placeholder: {
+    width: 24,
+  },
+  studentList: {
+    padding: 20,
+  },
+  studentItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+  },
+  studentInfo: {
+    flex: 1,
+  },
+  studentName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  studentDetails: {
+    fontSize: 14,
+    color: '#666',
+  },
+  qrButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4a90e2',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    gap: 4,
+  },
+  qrButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  // Form styles
+  formContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  addButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    borderRadius: 8,
+    marginTop: 20,
+    gap: 8,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

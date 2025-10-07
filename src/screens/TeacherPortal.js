@@ -1,10 +1,100 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import QRScanner from '../components/QRScanner';
+import StudentCard from '../components/StudentCard';
+import { DatabaseService } from '../services/database';
+import { QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
 
 const TeacherPortal = () => {
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showStudentCard, setShowStudentCard] = useState(false);
+  const [scannedStudent, setScannedStudent] = useState(null);
+  const [attendanceType, setAttendanceType] = useState('login');
+  const [attendanceSummary, setAttendanceSummary] = useState({
+    totalStudents: 0,
+    presentStudents: 0,
+    absentStudents: 0
+  });
+  const [currentClass, setCurrentClass] = useState('10A');
+
+  useEffect(() => {
+    loadAttendanceSummary();
+  }, [currentClass]);
+
+  const loadAttendanceSummary = async () => {
+    try {
+      const summary = await DatabaseService.getTodayAttendanceSummary(currentClass);
+      setAttendanceSummary(summary);
+    } catch (error) {
+      console.error('Error loading attendance summary:', error);
+    }
+  };
+
+  const handleQRScan = (scanResult) => {
+    setShowQRScanner(false);
+    
+    if (scanResult.result === QR_SCAN_RESULTS.SUCCESS) {
+      setScannedStudent(scanResult.studentData);
+      setShowStudentCard(true);
+    } else if (scanResult.result === QR_SCAN_RESULTS.INVALID) {
+      Alert.alert('Invalid QR Code', 'The scanned QR code is not valid for this system.');
+    } else {
+      Alert.alert('Scan Error', scanResult.error || 'Failed to scan QR code');
+    }
+  };
+
+  const handleMarkAttendance = async (studentData, type) => {
+    try {
+      const attendanceData = {
+        studentId: studentData.studentId,
+        studentName: studentData.name,
+        class: studentData.class,
+        teacherId: 'TCH001', // This should come from teacher authentication
+        teacherName: 'Ms. Johnson', // This should come from teacher authentication
+        type: type,
+        location: 'Classroom A',
+        notes: type === 'login' ? 'Present' : 'Absent'
+      };
+
+      await DatabaseService.recordAttendance(attendanceData);
+      
+      Alert.alert(
+        'Attendance Recorded',
+        `${studentData.name} marked as ${type === 'login' ? 'Present' : 'Absent'}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowStudentCard(false);
+              setScannedStudent(null);
+              loadAttendanceSummary(); // Refresh the summary
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error recording attendance:', error);
+      Alert.alert('Error', 'Failed to record attendance. Please try again.');
+    }
+  };
+
+  const openQRScanner = (type) => {
+    setAttendanceType(type);
+    setShowQRScanner(true);
+  };
+
+  const closeQRScanner = () => {
+    setShowQRScanner(false);
+  };
+
+  const closeStudentCard = () => {
+    setShowStudentCard(false);
+    setScannedStudent(null);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -18,21 +108,75 @@ const TeacherPortal = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Classes</Text>
           <View style={styles.classList}>
-            <TouchableOpacity style={styles.classCard}>
-              <Text style={styles.className}>Class 10A</Text>
-              <Text style={styles.classInfo}>32 Students</Text>
-              <View style={styles.attendanceIndicator}>
-                <Text style={styles.attendanceText}>Today's Attendance: 30/32</Text>
+            <View style={styles.classCard}>
+              <View style={styles.classHeader}>
+                <Text style={styles.className}>Class {currentClass}</Text>
+                <Text style={styles.classInfo}>{attendanceSummary.totalStudents} Students</Text>
               </View>
-            </TouchableOpacity>
+              
+              <View style={styles.attendanceIndicator}>
+                <Text style={styles.attendanceText}>
+                  Today's Attendance: {attendanceSummary.presentStudents}/{attendanceSummary.totalStudents}
+                </Text>
+                <Text style={styles.absentText}>
+                  Absent: {attendanceSummary.absentStudents}
+                </Text>
+              </View>
+
+              <View style={styles.qrScanButtons}>
+                <TouchableOpacity 
+                  style={[styles.scanButton, styles.presentButton]}
+                  onPress={() => openQRScanner('login')}
+                >
+                  <Ionicons name="qr-code" size={20} color="#fff" />
+                  <Text style={styles.scanButtonText}>Mark Present</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.scanButton, styles.absentButton]}
+                  onPress={() => openQRScanner('logout')}
+                >
+                  <Ionicons name="close-circle" size={20} color="#fff" />
+                  <Text style={styles.scanButtonText}>Mark Absent</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             
-            <TouchableOpacity style={styles.classCard}>
-              <Text style={styles.className}>Class 8B</Text>
-              <Text style={styles.classInfo}>28 Students</Text>
+            <View style={styles.classCard}>
+              <View style={styles.classHeader}>
+                <Text style={styles.className}>Class 8B</Text>
+                <Text style={styles.classInfo}>28 Students</Text>
+              </View>
+              
               <View style={styles.attendanceIndicator}>
                 <Text style={styles.attendanceText}>Today's Attendance: 26/28</Text>
+                <Text style={styles.absentText}>Absent: 2</Text>
               </View>
-            </TouchableOpacity>
+
+              <View style={styles.qrScanButtons}>
+                <TouchableOpacity 
+                  style={[styles.scanButton, styles.presentButton]}
+                  onPress={() => {
+                    setCurrentClass('8B');
+                    openQRScanner('login');
+                  }}
+                >
+                  <Ionicons name="qr-code" size={20} color="#fff" />
+                  <Text style={styles.scanButtonText}>Mark Present</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.scanButton, styles.absentButton]}
+                  onPress={() => {
+                    setCurrentClass('8B');
+                    openQRScanner('logout');
+                  }}
+                >
+                  <Ionicons name="close-circle" size={20} color="#fff" />
+                  <Text style={styles.scanButtonText}>Mark Absent</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
         
@@ -66,6 +210,36 @@ const TeacherPortal = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* QR Scanner Modal */}
+      <Modal
+        visible={showQRScanner}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <QRScanner
+          onScan={handleQRScan}
+          onClose={closeQRScanner}
+          isVisible={showQRScanner}
+        />
+      </Modal>
+
+      {/* Student Card Modal */}
+      <Modal
+        visible={showStudentCard}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeStudentCard}
+      >
+        <View style={styles.modalOverlay}>
+          <StudentCard
+            studentData={scannedStudent}
+            onMarkAttendance={handleMarkAttendance}
+            onClose={closeStudentCard}
+            attendanceType={attendanceType}
+          />
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -123,6 +297,12 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#4a90e2',
   },
+  classHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   className: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -136,14 +316,51 @@ const styles = StyleSheet.create({
   attendanceIndicator: {
     marginTop: 8,
     backgroundColor: '#e3f2fd',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 15,
   },
   attendanceText: {
     color: '#1976d2',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  absentText: {
+    color: '#f44336',
     fontSize: 12,
+    marginTop: 2,
+  },
+  qrScanButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  scanButton: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  presentButton: {
+    backgroundColor: '#4CAF50',
+  },
+  absentButton: {
+    backgroundColor: '#FF9800',
+  },
+  scanButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scheduleList: {
     gap: 12,
