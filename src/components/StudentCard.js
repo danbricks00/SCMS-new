@@ -90,10 +90,10 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
         {/* Additional Info */}
         <View style={styles.additionalInfo}>
           <Text style={styles.scanTime}>
-            Scanned at: {QRCodeUtils.formatNZSTTime(new Date().toISOString())}
+            Scanned at: {QRCodeUtils.formatNZTTime(new Date().toISOString())}
           </Text>
           <Text style={styles.timezoneInfo}>
-            (New Zealand Standard Time)
+            ({QRCodeUtils.getNZTimezoneAbbreviation()})
           </Text>
         </View>
       </View>

@@ -30,27 +30,32 @@ export class QRCodeUtils {
   }
 
   /**
-   * Get current NZST timestamp
-   * @returns {string} NZST timestamp string
+   * Get current NZT timestamp (handles both NZST and NZDT automatically)
+   * @returns {string} NZT timestamp string
    */
-  static getNZSTTimestamp() {
+  static getNZTimestamp() {
     const now = new Date();
-    // New Zealand Standard Time is UTC+12 (or UTC+13 during daylight saving)
-    // For simplicity, we'll use UTC+12 (NZST)
-    const nzst = new Date(now.getTime() + (12 * 60 * 60 * 1000));
-    return nzst.toISOString();
+    // Use Pacific/Auckland timezone which automatically handles NZST/NZDT
+    return now.toLocaleString('en-CA', {
+      timeZone: 'Pacific/Auckland',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).replace(',', 'T') + '.000Z';
   }
 
   /**
-   * Format timestamp for display in NZST
+   * Format timestamp for display in NZT (New Zealand Time - handles both NZST and NZDT)
    * @param {string} timestamp - ISO timestamp
-   * @returns {string} Formatted NZST time string
+   * @returns {string} Formatted NZT time string
    */
-  static formatNZSTTime(timestamp) {
+  static formatNZTTime(timestamp) {
     const date = new Date(timestamp);
-    // Convert to NZST (UTC+12)
-    const nzst = new Date(date.getTime() + (12 * 60 * 60 * 1000));
-    return nzst.toLocaleString('en-NZ', {
+    return date.toLocaleString('en-NZ', {
       timeZone: 'Pacific/Auckland',
       year: 'numeric',
       month: '2-digit',
@@ -60,6 +65,38 @@ export class QRCodeUtils {
       second: '2-digit',
       hour12: false
     });
+  }
+
+  /**
+   * Get the current timezone abbreviation (NZST or NZDT)
+   * @returns {string} Timezone abbreviation
+   */
+  static getNZTimezoneAbbreviation() {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-NZ', {
+      timeZone: 'Pacific/Auckland',
+      timeZoneName: 'short'
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const timeZoneName = parts.find(part => part.type === 'timeZoneName');
+    return timeZoneName ? timeZoneName.value : 'NZT';
+  }
+
+  /**
+   * Get detailed NZT timestamp with timezone info
+   * @returns {Object} NZT timestamp object with timezone details
+   */
+  static getNZTDetails() {
+    const now = new Date();
+    const timezone = this.getNZTimezoneAbbreviation();
+    
+    return {
+      timestamp: this.getNZTimestamp(),
+      formatted: this.formatNZTTime(now.toISOString()),
+      timezone: timezone,
+      isDST: timezone === 'NZDT'
+    };
   }
 
   /**

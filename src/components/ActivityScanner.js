@@ -80,7 +80,7 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
 
       await DatabaseService.recordAttendance(activityData);
       
-      const timeText = QRCodeUtils.formatNZSTTime(new Date().toISOString());
+      const timeText = QRCodeUtils.formatNZTTime(new Date().toISOString());
       
       Alert.alert(
         'Activity Recorded',

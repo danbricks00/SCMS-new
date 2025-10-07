@@ -7,7 +7,7 @@ import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
 import ActivityScanner from '../components/ActivityScanner';
 import { DatabaseService } from '../services/database';
-import { QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
+import { QR_SCAN_RESULTS, QRCodeUtils } from '../utils/qrCodeUtils';
 
 const TeacherPortal = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -63,9 +63,12 @@ const TeacherPortal = () => {
 
       await DatabaseService.recordAttendance(attendanceData);
       
+      const timeText = QRCodeUtils.formatNZTTime(new Date().toISOString());
+      const timezone = QRCodeUtils.getNZTimezoneAbbreviation();
+      
       Alert.alert(
         'Attendance Recorded',
-        `${studentData.name} marked as ${type === 'login' ? 'Present' : 'Absent'}`,
+        `${studentData.name} marked as ${type === 'login' ? 'Present' : 'Absent'} at ${timeText} (${timezone})`,
         [
           {
             text: 'OK',

@@ -181,6 +181,8 @@ export class DatabaseService {
     try {
       const { QRCodeUtils } = await import('../utils/qrCodeUtils');
       
+      const nztDetails = QRCodeUtils.getNZTDetails();
+      
       const attendance = {
         studentId: attendanceData.studentId,
         studentName: attendanceData.studentName,
@@ -191,7 +193,10 @@ export class DatabaseService {
         activity: attendanceData.activity || 'Class Attendance', // e.g., 'Football Practice', 'Library Study'
         activityType: attendanceData.activityType || 'classroom', // 'sports', 'academic', 'library', 'event'
         timestamp: new Date().toISOString(),
-        nzstTimestamp: QRCodeUtils.getNZSTTimestamp(),
+        nztTimestamp: nztDetails.timestamp,
+        nztFormatted: nztDetails.formatted,
+        nztTimezone: nztDetails.timezone,
+        nztIsDST: nztDetails.isDST,
         location: attendanceData.location || 'Classroom',
         notes: attendanceData.notes || '',
         duration: attendanceData.duration || null, // Duration in minutes if logout
@@ -376,10 +381,11 @@ export class DatabaseService {
           activitySessions.push({
             studentId: record.studentId,
             studentName: record.studentName,
-            loginTime: loginRecord.nzstTimestamp,
-            logoutTime: record.nzstTimestamp,
+            loginTime: loginRecord.nztFormatted,
+            logoutTime: record.nztFormatted,
             duration: duration,
-            location: record.location
+            location: record.location,
+            timezone: record.nztTimezone
           });
           
           delete loginRecords[record.studentId];
@@ -403,7 +409,8 @@ export class DatabaseService {
         ongoingStudents: Object.values(loginRecords).map(r => ({
           studentId: r.studentId,
           studentName: r.studentName,
-          loginTime: r.nzstTimestamp
+          loginTime: r.nztFormatted,
+          timezone: r.nztTimezone
         }))
       };
     } catch (error) {
