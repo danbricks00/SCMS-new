@@ -47,19 +47,30 @@
     }
   </style>
   <script>
-    // Platform detection
+    // Platform detection with iPad Safari fix
     (function() {
       const userAgent = navigator.userAgent;
       let platform = 'web';
       
-      if (/iPhone|iPad|iPod/.test(userAgent)) {
+      // Detect iPad Safari (which reports as macOS but has touch)
+      const isIPad = navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform);
+      const isIOS = /iPhone|iPad|iPod/.test(userAgent) || isIPad;
+      
+      if (isIOS) {
         platform = 'ios';
       } else if (/Android/.test(userAgent)) {
         platform = 'android';
       }
       
       document.documentElement.setAttribute('data-platform', platform);
-      console.log('[SCMS] Platform detected:', platform);
+      
+      // Set the meta tag for Expo
+      const meta = document.createElement('meta');
+      meta.name = 'expo-platform';
+      meta.content = platform;
+      document.head.appendChild(meta);
+      
+      console.log('[SCMS] Platform detected:', platform, 'isIPad:', isIPad, 'userAgent:', userAgent);
     })();
   </script>
 </head>
