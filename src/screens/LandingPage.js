@@ -18,6 +18,7 @@ const LandingPage = ({ navigation }) => {
   }, []);
 
   const toggleMenu = () => {
+    console.log('[SCMS] Toggle menu clicked, current state:', menuOpen);
     setMenuOpen(!menuOpen);
   };
 
@@ -34,6 +35,8 @@ const LandingPage = ({ navigation }) => {
     // Use the router imported at the top level
     router.push(`/${routeMap[route] || route.toLowerCase()}`);
   };
+
+  console.log('[SCMS] Rendering LandingPage, menuOpen:', menuOpen);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -132,6 +135,10 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     padding: 5,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   headerTitle: {
     fontSize: 18,
