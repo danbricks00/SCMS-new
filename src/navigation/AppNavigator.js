@@ -1,6 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import React from 'react';
 import { Text, View } from 'react-native';
 
 import LandingPage from '../screens/LandingPage';

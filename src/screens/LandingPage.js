@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { signOut } from 'firebase/auth'; // ✅ import signOut
 import { useEffect, useState } from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { auth } from '../config/firebase'; // ✅ import auth instance
 
 const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -24,16 +26,24 @@ const LandingPage = ({ navigation }) => {
 
   const navigateTo = (route) => {
     setMenuOpen(false);
-    // Map the portal names to the correct routes
     const routeMap = {
       'StudentPortal': 'student',
       'ParentPortal': 'parent',
       'TeacherPortal': 'teacher',
-      'AdminPortal': 'admin'
+      'AdminPortal': 'admin',
     };
-    
-    // Use the router imported at the top level
     router.push(`/${routeMap[route] || route.toLowerCase()}`);
+  };
+
+  // ✅ Logout handler
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      console.log('[Auth] Successfully signed out');
+      router.replace('/login');  // Go back to login page
+    } catch (error) {
+      console.error('[Auth] Logout error:', error.message);
+    }
   };
 
   console.log('[SCMS] Rendering LandingPage, menuOpen:', menuOpen);
@@ -54,33 +64,35 @@ const LandingPage = ({ navigation }) => {
           <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
             <Ionicons name="close" size={32} color="#fff" />
           </TouchableOpacity>
+
           <View style={styles.menuItems}>
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => navigateTo('StudentPortal')}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('StudentPortal')}>
               <Ionicons name="school" size={24} color="#fff" />
               <Text style={styles.menuText}>Student Portal</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => navigateTo('ParentPortal')}>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('ParentPortal')}>
               <Ionicons name="people" size={24} color="#fff" />
               <Text style={styles.menuText}>Parent Portal</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => navigateTo('TeacherPortal')}>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('TeacherPortal')}>
               <Ionicons name="book" size={24} color="#fff" />
               <Text style={styles.menuText}>Teacher Portal</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => navigateTo('AdminPortal')}>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AdminPortal')}>
               <Ionicons name="settings" size={24} color="#fff" />
               <Text style={styles.menuText}>Admin Portal</Text>
+            </TouchableOpacity>
+
+            {/* ✅ Working Logout Button */}
+            <TouchableOpacity 
+              style={[styles.menuItem, { backgroundColor: '#ff6b6b' }]}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out" size={24} color="#fff" />
+              <Text style={styles.menuText}>Logout</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -91,20 +103,20 @@ const LandingPage = ({ navigation }) => {
         <View style={styles.heroSection}>
           <Text style={styles.heroTitle}>Welcome to Our School</Text>
           <Text style={styles.heroSubtitle}>Attendance Management System</Text>
-          
+
           <View style={styles.featureCards}>
             <View style={styles.card}>
               <Ionicons name="calendar" size={40} color="#4a90e2" />
               <Text style={styles.cardTitle}>Attendance Tracking</Text>
               <Text style={styles.cardDescription}>Real-time attendance monitoring for students</Text>
             </View>
-            
+
             <View style={styles.card}>
               <Ionicons name="stats-chart" size={40} color="#4a90e2" />
               <Text style={styles.cardTitle}>Performance Analytics</Text>
               <Text style={styles.cardDescription}>Detailed reports and analytics</Text>
             </View>
-            
+
             <View style={styles.card}>
               <Ionicons name="notifications" size={40} color="#4a90e2" />
               <Text style={styles.cardTitle}>Instant Notifications</Text>
@@ -118,10 +130,7 @@ const LandingPage = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-  },
+  container: { flex: 1, backgroundColor: '#f0f0f0' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -148,24 +157,12 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.8)',
     zIndex: 1000,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 1001,
-  },
-  menuItems: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  closeButton: { position: 'absolute', top: 50, right: 20, zIndex: 1001 },
+  menuItems: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -175,36 +172,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     width: '80%',
   },
-  menuText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '500',
-    marginLeft: 15,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  heroSection: {
-    alignItems: 'center',
-    paddingTop: 50,
-  },
+  menuText: { color: '#fff', fontSize: 18, fontWeight: '500', marginLeft: 15 },
+  content: { flex: 1, padding: 20 },
+  heroSection: { alignItems: 'center', paddingTop: 50 },
   heroTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 10,
+    fontSize: 28, fontWeight: 'bold', color: '#333', textAlign: 'center', marginBottom: 10,
   },
   heroSubtitle: {
-    fontSize: 18,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 40,
+    fontSize: 18, color: '#666', textAlign: 'center', marginBottom: 40,
   },
-  featureCards: {
-    width: '100%',
-  },
+  featureCards: { width: '100%' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 15,
@@ -218,18 +195,9 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 15,
-    marginBottom: 10,
+    fontSize: 18, fontWeight: 'bold', color: '#333', marginTop: 15, marginBottom: 10,
   },
-  cardDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  cardDescription: { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 20 },
 });
 
 export default LandingPage;

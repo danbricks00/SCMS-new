@@ -1,28 +1,33 @@
 import { Redirect } from "expo-router";
-import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 
 export default function App() {
-  const [isClient, setIsClient] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(null);
 
   useEffect(() => {
-    setIsClient(true);
-    console.log("App component mounted on the client.");
-
-    return () => {
-      console.log("App component will unmount.");
-    };
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user);
+    });
+    return unsubscribe;
   }, []);
 
-  if (!isClient) {
-    return null; // Return null or a loading indicator
+  if (isLoggedIn === null) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#fff",
+        }}
+      >
+        <ActivityIndicator size="large" color="#4a90e2" />
+      </View>
+    );
   }
 
-  try {
-    return <Redirect href="/landing" />;
-  } catch (error) {
-    console.error("Error during redirect:", error);
-    // In a real app, you might want to show a proper error screen
-    return <Text>Error loading the application.</Text>;
-  }
+  return <Redirect href={isLoggedIn ? "/landing" : "/login"} />;
 }
