@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { QRCodeUtils, QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
+import DebugOverlay from './DebugOverlay';
 
 const { width, height } = Dimensions.get('window');
 
@@ -14,6 +15,8 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
   const [isScanning, setIsScanning] = useState(true);
   const [isMobileDevice, setIsMobileDevice] = useState(true); // Default to true to prevent flash of wrong UI
   const [isDesktopWeb, setIsDesktopWeb] = useState(false);
+  const [showDebugOverlay, setShowDebugOverlay] = useState(false);
+  const [deviceInfo, setDeviceInfo] = useState(null);
 
   // Check if device has camera capability (mobile phones, tablets, etc.)
   const detectDevice = () => {
@@ -45,6 +48,16 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
     const platform = navigator.platform || '';
     const maxTouchPoints = navigator.maxTouchPoints || 0;
     
+    const detectionInfo = {
+      userAgent: userAgent,
+      platform,
+      maxTouchPoints,
+      screenWidth: window.screen.width,
+      hasTouch: 'ontouchstart' in window,
+      isMobile: false,
+      isDesktop: false
+    };
+    
     console.log('Detecting web device:', {
       userAgent: userAgent.substring(0, 100),
       platform,
@@ -57,6 +70,9 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
     const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
     if (mobileRegex.test(userAgent)) {
       console.log('✅ Mobile device detected via user agent');
+      detectionInfo.isMobile = true;
+      detectionInfo.isDesktop = false;
+      setDeviceInfo(detectionInfo);
       setIsMobileDevice(true);
       setIsDesktopWeb(false);
       return;
@@ -67,6 +83,9 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
                    (platform === 'MacIntel' && maxTouchPoints > 1);
     if (isIPad) {
       console.log('✅ iPad detected');
+      detectionInfo.isMobile = true;
+      detectionInfo.isDesktop = false;
+      setDeviceInfo(detectionInfo);
       setIsMobileDevice(true);
       setIsDesktopWeb(false);
       return;
@@ -76,6 +95,9 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
     const isWindowsTablet = /Windows/i.test(userAgent) && maxTouchPoints > 1;
     if (isWindowsTablet) {
       console.log('✅ Windows tablet detected');
+      detectionInfo.isMobile = true;
+      detectionInfo.isDesktop = false;
+      setDeviceInfo(detectionInfo);
       setIsMobileDevice(true);
       setIsDesktopWeb(false);
       return;
@@ -85,6 +107,9 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
     const isAndroidTablet = /Android/i.test(userAgent) && !/Mobile/i.test(userAgent);
     if (isAndroidTablet) {
       console.log('✅ Android tablet detected');
+      detectionInfo.isMobile = true;
+      detectionInfo.isDesktop = false;
+      setDeviceInfo(detectionInfo);
       setIsMobileDevice(true);
       setIsDesktopWeb(false);
       return;
@@ -94,6 +119,9 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
     const isTablet = /Tablet/i.test(userAgent);
     if (isTablet) {
       console.log('✅ Tablet detected via user agent');
+      detectionInfo.isMobile = true;
+      detectionInfo.isDesktop = false;
+      setDeviceInfo(detectionInfo);
       setIsMobileDevice(true);
       setIsDesktopWeb(false);
       return;
@@ -107,6 +135,9 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
     );
     if (isLikelyMobile) {
       console.log('✅ Mobile device detected via touch and screen size');
+      detectionInfo.isMobile = true;
+      detectionInfo.isDesktop = false;
+      setDeviceInfo(detectionInfo);
       setIsMobileDevice(true);
       setIsDesktopWeb(false);
       return;
@@ -114,6 +145,9 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
     
     // If we get here, it's likely a desktop
     console.log('❌ Desktop device detected');
+    detectionInfo.isMobile = false;
+    detectionInfo.isDesktop = true;
+    setDeviceInfo(detectionInfo);
     setIsMobileDevice(false);
     setIsDesktopWeb(true);
   };
@@ -298,7 +332,12 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>QR Scanner - Desktop</Text>
-          <View style={styles.placeholder} />
+          <TouchableOpacity 
+            onPress={() => setShowDebugOverlay(!showDebugOverlay)} 
+            style={styles.debugButton}
+          >
+            <Ionicons name="bug" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.webMessageContainer}>
@@ -342,6 +381,13 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
             <Text style={styles.webCloseButtonText}>Close Scanner</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Debug Overlay */}
+        <DebugOverlay 
+          deviceInfo={deviceInfo}
+          visible={showDebugOverlay}
+          onClose={() => setShowDebugOverlay(false)}
+        />
       </SafeAreaView>
     );
   }
@@ -353,7 +399,12 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Scan Student QR Code</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity 
+          onPress={() => setShowDebugOverlay(!showDebugOverlay)} 
+          style={styles.debugButton}
+        >
+          <Ionicons name="bug" size={24} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       {/* Platform Notice for Mobile/Tablet */}
@@ -406,6 +457,13 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
           </View>
         </CameraView>
       </View>
+
+      {/* Debug Overlay - Shows device info on screen */}
+      <DebugOverlay 
+        deviceInfo={deviceInfo}
+        visible={showDebugOverlay}
+        onClose={() => setShowDebugOverlay(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -433,6 +491,11 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 34,
+  },
+  debugButton: {
+    padding: 5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 5,
   },
   platformNotice: {
     flexDirection: 'row',
