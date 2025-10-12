@@ -237,6 +237,61 @@ export class DatabaseService {
         }
       }
       
+      // Calculate timing data for reports
+      const timingData = {};
+      
+      // If checking out, calculate duration from check-in
+      if (attendanceData.type === 'logout') {
+        const checkInRecord = todayAttendance?.find(r => 
+          r.studentId === attendanceData.studentId && 
+          r.activity === attendanceData.activity && 
+          r.type === 'login'
+        );
+        
+        if (checkInRecord) {
+          const checkInTime = new Date(checkInRecord.timestamp);
+          const checkOutTime = new Date();
+          const durationMinutes = Math.round((checkOutTime - checkInTime) / (1000 * 60));
+          
+          timingData.checkInTime = checkInRecord.timestamp;
+          timingData.checkOutTime = new Date().toISOString();
+          timingData.durationMinutes = durationMinutes;
+          timingData.durationHours = (durationMinutes / 60).toFixed(2);
+          
+          // If activity was scheduled, calculate completion percentage
+          if (attendanceData.scheduledEndTime && checkInRecord.scheduledStartTime) {
+            const scheduledStart = new Date(`2000-01-01T${checkInRecord.scheduledStartTime}:00`);
+            const scheduledEnd = new Date(`2000-01-01T${attendanceData.scheduledEndTime}:00`);
+            const scheduledDuration = (scheduledEnd - scheduledStart) / (1000 * 60);
+            timingData.completionPercentage = Math.round((durationMinutes / scheduledDuration) * 100);
+            
+            // Calculate if left early
+            if (attendanceData.status === 'left-early') {
+              const scheduledEndActual = new Date(checkInTime);
+              scheduledEndActual.setHours(
+                parseInt(attendanceData.scheduledEndTime.split(':')[0]),
+                parseInt(attendanceData.scheduledEndTime.split(':')[1])
+              );
+              const leftEarlyMinutes = Math.round((scheduledEndActual - checkOutTime) / (1000 * 60));
+              timingData.leftEarlyBy = leftEarlyMinutes > 0 ? leftEarlyMinutes : 0;
+            }
+          }
+        }
+      }
+      
+      // If checking in late, calculate how late
+      if (attendanceData.type === 'login' && attendanceData.status === 'late' && attendanceData.scheduledStartTime) {
+        const scheduledStart = new Date();
+        scheduledStart.setHours(
+          parseInt(attendanceData.scheduledStartTime.split(':')[0]),
+          parseInt(attendanceData.scheduledStartTime.split(':')[1]),
+          0, 0
+        );
+        const actualArrival = new Date();
+        const lateByMinutes = Math.round((actualArrival - scheduledStart) / (1000 * 60));
+        timingData.lateBy = lateByMinutes > 0 ? lateByMinutes : 0;
+      }
+      
       const attendance = {
         studentId: attendanceData.studentId,
         studentName: attendanceData.studentName,
@@ -244,20 +299,33 @@ export class DatabaseService {
         teacherId: attendanceData.teacherId,
         teacherName: attendanceData.teacherName,
         type: attendanceData.type, // 'login' or 'logout'
-        status: attendanceData.status || 'present', // 'present', 'late', 'absent', 'checkout'
+        status: attendanceData.status || 'present', // 'present', 'late', 'absent', 'checkout', 'left-early'
         activity: attendanceData.activity || 'Class Attendance',
         activityType: attendanceData.activityType || 'classroom',
+        
+        // Actual times (when scanned)
         timestamp: new Date().toISOString(),
         nztTimestamp: nztDetails.timestamp,
         nztFormatted: nztDetails.formatted,
         nztTimezone: nztDetails.timezone,
         nztIsDST: nztDetails.isDST,
+        
+        // Scheduled times (for comparison)
+        scheduledStartTime: attendanceData.scheduledStartTime || null,
+        scheduledEndTime: attendanceData.scheduledEndTime || null,
+        
+        // Timing calculations (for reports)
+        ...timingData,
+        
+        // Location data
         location: attendanceData.location || 'Classroom',
         gpsLocation: options.currentLocation || null,
         userIP: options.userIP || null,
+        
+        // Additional data
         notes: attendanceData.notes || '',
-        duration: attendanceData.duration || null,
         fraudChecked: !options.skipFraudCheck,
+        automated: attendanceData.automated || false, // True if auto-checkout
         createdAt: new Date().toISOString()
       };
 

@@ -87,14 +87,24 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
               </TouchableOpacity>
             </>
           ) : (
-            /* Logout/Checkout Button */
-            <TouchableOpacity
-              style={[styles.attendanceButton, styles.logoutButton]}
-              onPress={() => handleMarkAttendance('checkout')}
-            >
-              <Ionicons name="log-out" size={20} color="#fff" />
-              <Text style={styles.attendanceButtonText}>Check Out</Text>
-            </TouchableOpacity>
+            /* Logout/Checkout Buttons */
+            <>
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.checkoutButton]}
+                onPress={() => handleMarkAttendance('checkout')}
+              >
+                <Ionicons name="checkmark-done" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Check Out (Completed)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.earlyButton]}
+                onPress={() => handleMarkAttendance('left-early')}
+              >
+                <Ionicons name="exit" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Left Early</Text>
+              </TouchableOpacity>
+            </>
           )}
 
           {/* Cancel Button */}
@@ -255,8 +265,11 @@ const styles = StyleSheet.create({
   absentButton: {
     backgroundColor: '#f44336',
   },
-  logoutButton: {
-    backgroundColor: '#9C27B0',
+  checkoutButton: {
+    backgroundColor: '#4CAF50',
+  },
+  earlyButton: {
+    backgroundColor: '#FF9800',
   },
   attendanceButtonText: {
     color: '#fff',

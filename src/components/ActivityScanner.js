@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity, Modal, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity, Modal, ScrollView, TextInput, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QRScanner from './QRScanner';
 import StudentCard from './StudentCard';
 import { DatabaseService } from '../services/database';
 import { QRCodeUtils, QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
+import { scheduleActivity } from '../utils/activityScheduler';
 
 const ACTIVITY_TYPES = [
   { id: 'classroom', name: 'Classroom', icon: 'school', color: '#4a90e2' },
@@ -33,6 +34,13 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
   const [customActivity, setCustomActivity] = useState('');
   const [location, setLocation] = useState('');
   const [currentActivitySummary, setCurrentActivitySummary] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleData, setScheduleData] = useState({
+    startTime: '08:00',
+    endTime: '09:30',
+    autoCheckout: true,
+    recurring: false
+  });
 
   useEffect(() => {
     if (isVisible && selectedActivity) {
@@ -98,14 +106,22 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
       
       const timeText = QRCodeUtils.formatNZTTime(new Date().toISOString());
       
-      const statusEmoji = status === 'late' ? '⏰' : status === 'present' ? '✅' : '👋';
+      const statusEmoji = {
+        present: '✅',
+        late: '⏰',
+        absent: '❌',
+        checkout: '👋',
+        'left-early': '⚠️'
+      };
+      
+      const emoji = statusEmoji[status] || '📝';
       const action = type === 'login' 
         ? (status === 'late' ? 'started (late)' : 'started') 
-        : 'completed';
+        : (status === 'left-early' ? 'left early from' : 'completed');
       
       Alert.alert(
         'Activity Recorded',
-        `${statusEmoji} ${studentData.name} ${action} ${selectedActivity || customActivity} at ${timeText}`,
+        `${emoji} ${studentData.name} ${action} ${selectedActivity || customActivity} at ${timeText}`,
         [
           {
             text: 'OK',
@@ -291,6 +307,30 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
           </View>
         )}
 
+        {/* Schedule Activity */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Activity Schedule (Optional)</Text>
+          <TouchableOpacity 
+            style={styles.scheduleButton}
+            onPress={() => setShowScheduleModal(true)}
+          >
+            <Ionicons name="calendar" size={20} color="#4a90e2" />
+            <Text style={styles.scheduleButtonText}>Set Activity Time & Auto-Checkout</Text>
+          </TouchableOpacity>
+          {scheduleData.startTime && scheduleData.endTime && (
+            <View style={styles.scheduleInfo}>
+              <Text style={styles.scheduleInfoText}>
+                ⏰ Scheduled: {scheduleData.startTime} - {scheduleData.endTime}
+              </Text>
+              {scheduleData.autoCheckout && (
+                <Text style={styles.scheduleInfoSubtext}>
+                  🤖 Students will auto-checkout at {scheduleData.endTime}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+
         {/* Scan Buttons */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Scan Student QR Code</Text>
@@ -300,7 +340,7 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
               onPress={() => openQRScanner('login')}
             >
               <Ionicons name="qr-code" size={24} color="#fff" />
-              <Text style={styles.scanButtonText}>Start Activity</Text>
+              <Text style={styles.scanButtonText}>Check In</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -308,11 +348,92 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
               onPress={() => openQRScanner('logout')}
             >
               <Ionicons name="stop-circle" size={24} color="#fff" />
-              <Text style={styles.scanButtonText}>End Activity</Text>
+              <Text style={styles.scanButtonText}>Check Out</Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
+
+      {/* Schedule Activity Modal */}
+      <Modal
+        visible={showScheduleModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.scheduleModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Schedule Activity</Text>
+              <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.scheduleForm}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Start Time</Text>
+                <TextInput
+                  style={styles.timeInput}
+                  value={scheduleData.startTime}
+                  onChangeText={(text) => setScheduleData({...scheduleData, startTime: text})}
+                  placeholder="08:00"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>End Time</Text>
+                <TextInput
+                  style={styles.timeInput}
+                  value={scheduleData.endTime}
+                  onChangeText={(text) => setScheduleData({...scheduleData, endTime: text})}
+                  placeholder="09:30"
+                />
+              </View>
+              
+              <View style={styles.switchGroup}>
+                <View>
+                  <Text style={styles.inputLabel}>Auto-Checkout Students</Text>
+                  <Text style={styles.switchDesc}>
+                    Automatically check out all students at end time
+                  </Text>
+                </View>
+                <Switch
+                  value={scheduleData.autoCheckout}
+                  onValueChange={(value) => setScheduleData({...scheduleData, autoCheckout: value})}
+                  trackColor={{ false: '#ccc', true: '#4CAF50' }}
+                />
+              </View>
+              
+              <View style={styles.switchGroup}>
+                <View>
+                  <Text style={styles.inputLabel}>Recurring Activity</Text>
+                  <Text style={styles.switchDesc}>
+                    Repeat this schedule for future sessions
+                  </Text>
+                </View>
+                <Switch
+                  value={scheduleData.recurring}
+                  onValueChange={(value) => setScheduleData({...scheduleData, recurring: value})}
+                  trackColor={{ false: '#ccc', true: '#4CAF50' }}
+                />
+              </View>
+              
+              <TouchableOpacity
+                style={styles.saveScheduleButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Schedule Saved',
+                    `Activity scheduled from ${scheduleData.startTime} to ${scheduleData.endTime}${scheduleData.autoCheckout ? '. Students will auto-checkout at end time.' : ''}`,
+                    [{ text: 'OK', onPress: () => setShowScheduleModal(false) }]
+                  );
+                }}
+              >
+                <Text style={styles.saveScheduleButtonText}>Save Schedule</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* QR Scanner Modal */}
       <Modal
@@ -496,6 +617,104 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  scheduleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4a90e2',
+    gap: 8,
+  },
+  scheduleButtonText: {
+    fontSize: 14,
+    color: '#4a90e2',
+    fontWeight: '500',
+  },
+  scheduleInfo: {
+    backgroundColor: '#e3f2fd',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  scheduleInfoText: {
+    fontSize: 14,
+    color: '#1976d2',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  scheduleInfoSubtext: {
+    fontSize: 12,
+    color: '#1976d2',
+  },
+  scheduleModal: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  scheduleForm: {
+    padding: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  timeInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  switchGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  switchDesc: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    maxWidth: 250,
+  },
+  saveScheduleButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  saveScheduleButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

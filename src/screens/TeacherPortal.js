@@ -56,14 +56,16 @@ const TeacherPortal = () => {
         present: 'Present (On Time)',
         late: 'Late',
         absent: 'Absent',
-        checkout: 'Checked Out'
+        checkout: 'Checked Out',
+        'left-early': 'Left Early'
       };
       
       const statusNotes = {
         present: 'Present - On time',
         late: 'Present - Arrived late',
         absent: 'Marked absent',
-        checkout: 'Checked out'
+        checkout: 'Checked out - Completed activity',
+        'left-early': 'Left early - Did not complete full activity'
       };
       
       const attendanceData = {
@@ -100,7 +102,8 @@ const TeacherPortal = () => {
         present: '✅',
         late: '⏰',
         absent: '❌',
-        checkout: '👋'
+        checkout: '👋',
+        'left-early': '⚠️'
       };
       
       Alert.alert(
