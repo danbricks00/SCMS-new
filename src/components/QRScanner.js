@@ -8,82 +8,134 @@ import { QRCodeUtils, QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
 
 const { width, height } = Dimensions.get('window');
 
-// Check if device has camera capability (mobile phones, tablets, etc.)
-const isMobileDevice = () => {
-  if (Platform.OS !== 'web') return false;
-  
-  if (typeof navigator === 'undefined') return false;
-  
-  const userAgent = navigator.userAgent || '';
-  const platform = navigator.platform || '';
-  const maxTouchPoints = navigator.maxTouchPoints || 0;
-  
-  // 1. Standard mobile/tablet detection
-  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
-  if (mobileRegex.test(userAgent)) return true;
-  
-  // 2. iPad detection (even when disguised as Mac)
-  const isIPad = /iPad/i.test(userAgent) || 
-                 (platform === 'MacIntel' && maxTouchPoints > 1);
-  if (isIPad) return true;
-  
-  // 3. Windows tablets and 2-in-1 devices (Surface, etc.)
-  const isWindowsTablet = /Windows/i.test(userAgent) && maxTouchPoints > 1;
-  if (isWindowsTablet) return true;
-  
-  // 4. Android tablets
-  const isAndroidTablet = /Android/i.test(userAgent) && !/Mobile/i.test(userAgent);
-  if (isAndroidTablet) return true;
-  
-  // 5. Generic tablet detection
-  const isTablet = /Tablet/i.test(userAgent);
-  if (isTablet) return true;
-  
-  // 6. Touch-enabled devices (catch-all for devices with cameras)
-  // If device has touch AND is not explicitly a desktop, likely has camera
-  const hasTouchScreen = maxTouchPoints > 0 || 'ontouchstart' in window;
-  const isLikelyMobile = hasTouchScreen && (
-    window.screen.width <= 1024 || // Tablet/phone screen size
-    window.matchMedia('(pointer: coarse)').matches // Touch as primary input
-  );
-  if (isLikelyMobile) return true;
-  
-  return false;
-};
-
-const isWeb = Platform.OS === 'web';
-const isDesktopWeb = isWeb && !isMobileDevice();
-
 const QRScanner = ({ onScan, onClose, isVisible }) => {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
   const [isScanning, setIsScanning] = useState(true);
+  const [isMobileDevice, setIsMobileDevice] = useState(true); // Default to true to prevent flash of wrong UI
+  const [isDesktopWeb, setIsDesktopWeb] = useState(false);
 
-  useEffect(() => {
-    // Log device detection for debugging
-    if (isWeb) {
-      const deviceInfo = {
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        touchPoints: navigator.maxTouchPoints,
-        isMobile: isMobileDevice(),
-        isDesktop: isDesktopWeb,
-        screenWidth: window.screen.width,
-        hasTouch: 'ontouchstart' in window
-      };
-      console.log('Device Detection:', deviceInfo);
+  // Check if device has camera capability (mobile phones, tablets, etc.)
+  const detectDevice = () => {
+    const isWeb = Platform.OS === 'web';
+    
+    // Native iOS/Android apps - always allow
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      setIsMobileDevice(true);
+      setIsDesktopWeb(false);
+      console.log('Native app detected:', Platform.OS);
+      return;
     }
     
-    // Only warn if on desktop web (not mobile browsers/tablets)
-    if (isDesktopWeb) {
+    // Not web platform - shouldn't happen but handle it
+    if (!isWeb) {
+      setIsMobileDevice(true);
+      setIsDesktopWeb(false);
+      return;
+    }
+    
+    // Web platform - need to detect mobile vs desktop
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      setIsMobileDevice(true); // Default to allowing on SSR
+      setIsDesktopWeb(false);
+      return;
+    }
+    
+    const userAgent = navigator.userAgent || '';
+    const platform = navigator.platform || '';
+    const maxTouchPoints = navigator.maxTouchPoints || 0;
+    
+    console.log('Detecting web device:', {
+      userAgent: userAgent.substring(0, 100),
+      platform,
+      maxTouchPoints,
+      screenWidth: window.screen.width,
+      hasTouch: 'ontouchstart' in window
+    });
+    
+    // 1. Standard mobile/tablet detection (iPhone, Android, etc.)
+    const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+    if (mobileRegex.test(userAgent)) {
+      console.log('✅ Mobile device detected via user agent');
+      setIsMobileDevice(true);
+      setIsDesktopWeb(false);
+      return;
+    }
+    
+    // 2. iPad detection (even when disguised as Mac)
+    const isIPad = /iPad/i.test(userAgent) || 
+                   (platform === 'MacIntel' && maxTouchPoints > 1);
+    if (isIPad) {
+      console.log('✅ iPad detected');
+      setIsMobileDevice(true);
+      setIsDesktopWeb(false);
+      return;
+    }
+    
+    // 3. Windows tablets and 2-in-1 devices (Surface, etc.)
+    const isWindowsTablet = /Windows/i.test(userAgent) && maxTouchPoints > 1;
+    if (isWindowsTablet) {
+      console.log('✅ Windows tablet detected');
+      setIsMobileDevice(true);
+      setIsDesktopWeb(false);
+      return;
+    }
+    
+    // 4. Android tablets
+    const isAndroidTablet = /Android/i.test(userAgent) && !/Mobile/i.test(userAgent);
+    if (isAndroidTablet) {
+      console.log('✅ Android tablet detected');
+      setIsMobileDevice(true);
+      setIsDesktopWeb(false);
+      return;
+    }
+    
+    // 5. Generic tablet detection
+    const isTablet = /Tablet/i.test(userAgent);
+    if (isTablet) {
+      console.log('✅ Tablet detected via user agent');
+      setIsMobileDevice(true);
+      setIsDesktopWeb(false);
+      return;
+    }
+    
+    // 6. Touch-enabled devices (catch-all for devices with cameras)
+    const hasTouchScreen = maxTouchPoints > 0 || 'ontouchstart' in window;
+    const isLikelyMobile = hasTouchScreen && (
+      window.screen.width <= 1024 || // Tablet/phone screen size
+      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) // Touch as primary input
+    );
+    if (isLikelyMobile) {
+      console.log('✅ Mobile device detected via touch and screen size');
+      setIsMobileDevice(true);
+      setIsDesktopWeb(false);
+      return;
+    }
+    
+    // If we get here, it's likely a desktop
+    console.log('❌ Desktop device detected');
+    setIsMobileDevice(false);
+    setIsDesktopWeb(true);
+  };
+
+  useEffect(() => {
+    // Detect device type first
+    detectDevice();
+    
+    // Request camera permissions
+    getCameraPermissions();
+  }, []);
+
+  useEffect(() => {
+    // Show warning only for desktop web (after detection completes)
+    if (isDesktopWeb && Platform.OS === 'web') {
       Alert.alert(
         'Desktop Browser Detected',
         'QR code scanning requires a device with a camera (phone or tablet). Please open this on your mobile device or tablet.',
         [{ text: 'OK' }]
       );
     }
-    getCameraPermissions();
-  }, []);
+  }, [isDesktopWeb]);
 
   const getCameraPermissions = async () => {
     try {
@@ -278,7 +330,7 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
       </View>
 
       {/* Platform Notice for Mobile/Tablet */}
-      {(Platform.OS === 'ios' || Platform.OS === 'android' || (isWeb && isMobileDevice())) && (
+      {(Platform.OS === 'ios' || Platform.OS === 'android' || (Platform.OS === 'web' && isMobileDevice)) && (
         <View style={styles.platformNotice}>
           <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
           <Text style={styles.platformNoticeText}>
