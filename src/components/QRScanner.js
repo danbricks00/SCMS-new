@@ -8,17 +8,51 @@ import { QRCodeUtils, QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
 
 const { width, height } = Dimensions.get('window');
 
-// Check if it's a mobile browser (iPhone, Android browser, etc.)
-const isMobileBrowser = () => {
+// Check if device has camera capability (mobile phones, tablets, etc.)
+const isMobileDevice = () => {
   if (Platform.OS !== 'web') return false;
   
-  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  if (typeof navigator === 'undefined') return false;
+  
+  const userAgent = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  
+  // 1. Standard mobile/tablet detection
   const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
-  return mobileRegex.test(userAgent);
+  if (mobileRegex.test(userAgent)) return true;
+  
+  // 2. iPad detection (even when disguised as Mac)
+  const isIPad = /iPad/i.test(userAgent) || 
+                 (platform === 'MacIntel' && maxTouchPoints > 1);
+  if (isIPad) return true;
+  
+  // 3. Windows tablets and 2-in-1 devices (Surface, etc.)
+  const isWindowsTablet = /Windows/i.test(userAgent) && maxTouchPoints > 1;
+  if (isWindowsTablet) return true;
+  
+  // 4. Android tablets
+  const isAndroidTablet = /Android/i.test(userAgent) && !/Mobile/i.test(userAgent);
+  if (isAndroidTablet) return true;
+  
+  // 5. Generic tablet detection
+  const isTablet = /Tablet/i.test(userAgent);
+  if (isTablet) return true;
+  
+  // 6. Touch-enabled devices (catch-all for devices with cameras)
+  // If device has touch AND is not explicitly a desktop, likely has camera
+  const hasTouchScreen = maxTouchPoints > 0 || 'ontouchstart' in window;
+  const isLikelyMobile = hasTouchScreen && (
+    window.screen.width <= 1024 || // Tablet/phone screen size
+    window.matchMedia('(pointer: coarse)').matches // Touch as primary input
+  );
+  if (isLikelyMobile) return true;
+  
+  return false;
 };
 
 const isWeb = Platform.OS === 'web';
-const isDesktopWeb = isWeb && !isMobileBrowser();
+const isDesktopWeb = isWeb && !isMobileDevice();
 
 const QRScanner = ({ onScan, onClose, isVisible }) => {
   const [hasPermission, setHasPermission] = useState(null);
@@ -26,11 +60,25 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
   const [isScanning, setIsScanning] = useState(true);
 
   useEffect(() => {
-    // Only warn if on desktop web (not mobile browsers)
+    // Log device detection for debugging
+    if (isWeb) {
+      const deviceInfo = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        touchPoints: navigator.maxTouchPoints,
+        isMobile: isMobileDevice(),
+        isDesktop: isDesktopWeb,
+        screenWidth: window.screen.width,
+        hasTouch: 'ontouchstart' in window
+      };
+      console.log('Device Detection:', deviceInfo);
+    }
+    
+    // Only warn if on desktop web (not mobile browsers/tablets)
     if (isDesktopWeb) {
       Alert.alert(
         'Desktop Browser Detected',
-        'QR code scanning works best on mobile phones. If you\'re on a phone, the camera should work. On desktop, please open this on your mobile device.',
+        'QR code scanning requires a device with a camera (phone or tablet). Please open this on your mobile device or tablet.',
         [{ text: 'OK' }]
       );
     }
@@ -176,34 +224,38 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
 
         <View style={styles.webMessageContainer}>
           <Ionicons name="desktop" size={80} color="#4a90e2" />
-          <Text style={styles.webMessageTitle}>Mobile Device Required</Text>
+          <Text style={styles.webMessageTitle}>Camera Device Required</Text>
           <Text style={styles.webMessageText}>
-            QR code scanning requires a mobile phone with a camera.
+            QR code scanning requires a device with a rear camera.
           </Text>
           <Text style={styles.webMessageSubtext}>
-            The camera feature works on mobile browsers (Safari, Chrome on phone) but not on desktop browsers.
+            The camera feature works on phones and tablets (iPhone, iPad, Android, Windows tablets) but not on desktop computers.
           </Text>
           
           <View style={styles.webInstructions}>
-            <Text style={styles.webInstructionsTitle}>📱 To scan QR codes:</Text>
+            <Text style={styles.webInstructionsTitle}>📱 Supported Devices:</Text>
             <View style={styles.instructionItem}>
-              <Text style={styles.bulletPoint}>1.</Text>
-              <Text style={styles.instructionText}>Open this app on your iPhone or Android phone browser</Text>
+              <Text style={styles.bulletPoint}>✓</Text>
+              <Text style={styles.instructionText}>iPhone (all models) - Safari or Chrome</Text>
             </View>
             <View style={styles.instructionItem}>
-              <Text style={styles.bulletPoint}>2.</Text>
-              <Text style={styles.instructionText}>Navigate to Teacher Portal</Text>
+              <Text style={styles.bulletPoint}>✓</Text>
+              <Text style={styles.instructionText}>iPad (all models) - Safari or Chrome</Text>
             </View>
             <View style={styles.instructionItem}>
-              <Text style={styles.bulletPoint}>3.</Text>
-              <Text style={styles.instructionText}>Click "Mark Present" - camera will open</Text>
+              <Text style={styles.bulletPoint}>✓</Text>
+              <Text style={styles.instructionText}>Android phones &amp; tablets - Chrome or Firefox</Text>
+            </View>
+            <View style={styles.instructionItem}>
+              <Text style={styles.bulletPoint}>✓</Text>
+              <Text style={styles.instructionText}>Windows tablets (Surface, etc.) - Edge or Chrome</Text>
             </View>
           </View>
 
           <View style={styles.webTestInfo}>
-            <Ionicons name="information-circle" size={20} color="#FF9800" />
+            <Ionicons name="information-circle" size={20} color="#4CAF50" />
             <Text style={styles.webTestInfoText}>
-              On iPhone: Use Safari or Chrome. On Android: Use Chrome or Firefox.
+              Any device with a touchscreen and rear camera will work for QR scanning!
             </Text>
           </View>
 
@@ -225,12 +277,14 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
         <View style={styles.placeholder} />
       </View>
 
-      {/* Platform Notice for Mobile */}
-      {(Platform.OS === 'ios' || Platform.OS === 'android') && (
+      {/* Platform Notice for Mobile/Tablet */}
+      {(Platform.OS === 'ios' || Platform.OS === 'android' || (isWeb && isMobileDevice())) && (
         <View style={styles.platformNotice}>
-          <Ionicons name="phone-portrait" size={16} color="#4CAF50" />
+          <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
           <Text style={styles.platformNoticeText}>
-            {Platform.OS === 'ios' ? '📱 iPhone' : '📱 Android'} - Perfect for scanning!
+            {Platform.OS === 'ios' ? '📱 iOS Device' : 
+             Platform.OS === 'android' ? '📱 Android Device' : 
+             '📱 Camera-Enabled Device'} - Ready to scan QR codes!
           </Text>
         </View>
       )}
