@@ -138,29 +138,56 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
   }, [isDesktopWeb]);
 
   const getCameraPermissions = async () => {
+    console.log('=== CAMERA PERMISSION REQUEST START ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Platform:', Platform.OS);
+    console.log('Is Mobile Device:', isMobileDevice);
+    console.log('Is Desktop Web:', isDesktopWeb);
+    
     try {
+      console.log('Requesting camera permissions...');
       const { status } = await Camera.requestCameraPermissionsAsync();
-      console.log('Camera permission status:', status);
+      
+      console.log('=== CAMERA PERMISSION RESULT ===');
+      console.log('Status:', status);
+      console.log('Granted:', status === 'granted');
+      console.log('Timestamp:', new Date().toISOString());
+      
       setHasPermission(status === 'granted');
       
       if (status !== 'granted') {
+        console.warn('Camera permission denied or restricted');
         Alert.alert(
           'Camera Permission Required',
           'Please enable camera permissions in your device settings to scan QR codes.',
           [{ text: 'OK' }]
         );
+      } else {
+        console.log('✅ Camera permission GRANTED - Camera should be accessible');
       }
     } catch (error) {
-      console.error('Error requesting camera permissions:', error);
+      console.error('=== CAMERA PERMISSION ERROR ===');
+      console.error('Error:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('Timestamp:', new Date().toISOString());
       setHasPermission(false);
     }
+    
+    console.log('=== CAMERA PERMISSION REQUEST END ===\n');
   };
 
   const handleBarCodeScanned = async ({ type, data }) => {
-    console.log('Barcode scanned:', { type, data: data.substring(0, 50) + '...' });
+    console.log('=== QR CODE SCAN EVENT ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Barcode type:', type);
+    console.log('Data (first 50 chars):', data.substring(0, 50) + '...');
+    console.log('Data length:', data.length);
+    console.log('Already scanned:', scanned);
+    console.log('Is scanning:', isScanning);
     
     if (scanned || !isScanning) {
-      console.log('Scan ignored - already scanned or not scanning');
+      console.log('⚠️ Scan ignored - already scanned or not scanning');
       return;
     }
     
