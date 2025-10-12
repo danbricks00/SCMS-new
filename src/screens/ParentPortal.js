@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import DateTimeDisplay from '../components/DateTimeDisplay';
 
 const ParentPortal = () => {
   return (
@@ -11,6 +11,11 @@ const ParentPortal = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Parent Portal</Text>
+      </View>
+      
+      {/* Date and Time Display */}
+      <View style={styles.dateTimeContainer}>
+        <DateTimeDisplay />
       </View>
       
       <ScrollView style={styles.content}>
@@ -93,6 +98,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 15,
     color: '#333',
+  },
+  dateTimeContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   content: {
     flex: 1,

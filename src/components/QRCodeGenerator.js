@@ -47,6 +47,9 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
   };
 
   const generatePrintableHTML = (student, qrData) => {
+    const photoUrl = student.photo || '';
+    const hasPhoto = photoUrl && photoUrl.trim() !== '';
+    
     return `
       <!DOCTYPE html>
       <html>
@@ -54,6 +57,10 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
         <meta charset="utf-8">
         <title>Student QR Code - ${student.name}</title>
         <style>
+          @media print {
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .no-print { display: none; }
+          }
           body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -61,130 +68,270 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
             background: white;
           }
           .container {
-            max-width: 400px;
+            max-width: 450px;
             margin: 0 auto;
-            text-align: center;
+            border: 3px solid #4a90e2;
+            border-radius: 15px;
+            overflow: hidden;
           }
           .header {
             background: #4a90e2;
             color: white;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
           }
           .school-name {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             margin-bottom: 5px;
           }
-          .qr-container {
-            background: white;
-            padding: 20px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            margin-bottom: 20px;
+          .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
           }
-          .qr-code {
-            margin: 0 auto;
+          .main-content {
+            padding: 20px;
+            background: white;
+          }
+          .student-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+          }
+          .photo-section {
+            flex-shrink: 0;
+          }
+          .student-photo {
+            width: 100px;
+            height: 120px;
+            border: 3px solid #4a90e2;
+            border-radius: 8px;
+            object-fit: cover;
             display: block;
           }
-          .student-info {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: left;
+          .photo-placeholder {
+            width: 100px;
+            height: 120px;
+            border: 3px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f0f0f0;
+            color: #999;
+            font-size: 12px;
+            text-align: center;
+            padding: 10px;
+          }
+          .info-section {
+            flex: 1;
+            margin-left: 20px;
           }
           .student-name {
-            font-size: 20px;
+            font-size: 24px;
             font-weight: bold;
             color: #333;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
           }
           .info-row {
             display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            padding: 5px 0;
-            border-bottom: 1px solid #eee;
+            margin-bottom: 6px;
           }
           .label {
             font-weight: bold;
             color: #666;
+            min-width: 90px;
           }
           .value {
             color: #333;
+            font-weight: 500;
           }
-          .footer {
-            margin-top: 20px;
-            font-size: 12px;
-            color: #999;
+          .qr-section {
             text-align: center;
+            padding: 20px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin: 20px 0;
+          }
+          .qr-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #4a90e2;
+            margin-bottom: 15px;
+          }
+          .qr-code {
+            margin: 0 auto;
+            display: inline-block;
+            padding: 15px;
+            background: white;
+            border: 2px dashed #4a90e2;
+            border-radius: 10px;
+          }
+          .security-notice {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+          }
+          .security-notice h4 {
+            margin: 0 0 8px 0;
+            color: #856404;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+          }
+          .security-notice h4::before {
+            content: "⚠️";
+            margin-right: 8px;
+          }
+          .security-notice p {
+            margin: 0;
+            color: #856404;
+            font-size: 13px;
+            line-height: 1.5;
           }
           .instructions {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 5px;
+            background: #e3f2fd;
+            border: 2px solid #4a90e2;
+            border-radius: 8px;
             padding: 15px;
-            margin-top: 20px;
-            text-align: left;
+            margin-top: 15px;
           }
           .instructions h4 {
             margin: 0 0 10px 0;
-            color: #856404;
+            color: #1976d2;
+            font-size: 15px;
           }
-          .instructions p {
-            margin: 5px 0;
-            color: #856404;
+          .instructions ul {
+            margin: 0;
+            padding-left: 20px;
+          }
+          .instructions li {
+            color: #1976d2;
+            font-size: 13px;
+            margin-bottom: 5px;
+            line-height: 1.4;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 12px;
+            font-size: 11px;
+            color: #666;
+            text-align: center;
+            border-top: 2px solid #e0e0e0;
+          }
+          .verification-box {
+            background: #e8f5e9;
+            border: 2px solid #4caf50;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            text-align: center;
+          }
+          .verification-box h4 {
+            margin: 0 0 5px 0;
+            color: #2e7d32;
             font-size: 14px;
+          }
+          .verification-box p {
+            margin: 0;
+            color: #2e7d32;
+            font-size: 12px;
           }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <div class="school-name">School Management System</div>
-            <div>Student QR Code</div>
+            <div class="school-name">🏫 School Management System</div>
+            <div class="subtitle">Student Identification & Attendance Card</div>
           </div>
           
-          <div class="qr-container">
-            <div class="qr-code">
-              <!-- QR Code will be generated here -->
-              <div style="width: ${qrSize}px; height: ${qrSize}px; background: #f0f0f0; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
-                <div style="text-align: center; color: #999;">
-                  <div style="font-size: 24px; margin-bottom: 5px;">QR</div>
-                  <div style="font-size: 12px;">Code</div>
+          <div class="main-content">
+            <!-- Student Header with Photo -->
+            <div class="student-header">
+              <div class="photo-section">
+                ${hasPhoto ? 
+                  `<img src="${photoUrl}" alt="${student.name}" class="student-photo" />` :
+                  `<div class="photo-placeholder">
+                    <div style="font-size: 32px; margin-bottom: 5px;">👤</div>
+                    <div>Student Photo</div>
+                    <div style="font-size: 10px; margin-top: 5px;">Affix photo here</div>
+                  </div>`
+                }
+              </div>
+              <div class="info-section">
+                <div class="student-name">${student.name}</div>
+                <div class="info-row">
+                  <span class="label">Student ID:</span>
+                  <span class="value">${student.studentId}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Class:</span>
+                  <span class="value">${student.class}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Issued:</span>
+                  <span class="value">${new Date().toLocaleDateString('en-NZ', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    year: 'numeric' 
+                  })}</span>
                 </div>
               </div>
             </div>
-          </div>
-          
-          <div class="student-info">
-            <div class="student-name">${student.name}</div>
-            <div class="info-row">
-              <span class="label">Student ID:</span>
-              <span class="value">${student.studentId}</span>
+
+            <!-- Verification Notice -->
+            <div class="verification-box">
+              <h4>✓ Teacher Verification Required</h4>
+              <p>Compare photo with student before marking attendance</p>
             </div>
-            <div class="info-row">
-              <span class="label">Class:</span>
-              <span class="value">${student.class}</span>
+
+            <!-- QR Code Section -->
+            <div class="qr-section">
+              <div class="qr-title">📱 Scan for Attendance</div>
+              <div class="qr-code">
+                <div style="width: 180px; height: 180px; background: #f0f0f0; border: 2px dashed #4a90e2; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                  <div style="text-align: center; color: #999;">
+                    <div style="font-size: 40px; margin-bottom: 5px;">📷</div>
+                    <div style="font-size: 14px; font-weight: bold;">QR CODE</div>
+                    <div style="font-size: 11px; margin-top: 5px;">${student.studentId}</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="info-row">
-              <span class="label">Generated:</span>
-              <span class="value">${new Date().toLocaleDateString()}</span>
+
+            <!-- Security Notice -->
+            <div class="security-notice">
+              <h4>Security Notice - Prevent Fraud</h4>
+              <p><strong>Teachers:</strong> Always verify the student's face matches the photo on this card before marking attendance. This prevents students from signing in for their friends.</p>
+            </div>
+
+            <!-- Instructions -->
+            <div class="instructions">
+              <h4>📋 Instructions for Student:</h4>
+              <ul>
+                <li><strong>Keep this card safe</strong> and bring it to school daily</li>
+                <li><strong>Laminate this card</strong> for durability (recommended)</li>
+                <li>Present card with QR code and photo to teacher</li>
+                <li><strong>Do NOT lend</strong> this card to classmates</li>
+                <li>Report lost or damaged cards to admin immediately</li>
+                <li>Keep a backup copy at home</li>
+              </ul>
             </div>
           </div>
-          
-          <div class="instructions">
-            <h4>Instructions for Student:</h4>
-            <p>• Keep this QR code safe and bring it to school daily</p>
-            <p>• Present QR code to teacher for attendance marking</p>
-            <p>• Do not share or duplicate this QR code</p>
-            <p>• Contact admin if QR code is lost or damaged</p>
-          </div>
-          
+
           <div class="footer">
-            Generated by School Management System<br>
-            ${new Date().toLocaleString()}
+            <strong>For Teachers:</strong> Use your phone camera to scan this QR code<br>
+            Generated: ${new Date().toLocaleString('en-NZ')} • Valid for current academic year<br>
+            © School Management System
           </div>
         </div>
       </body>

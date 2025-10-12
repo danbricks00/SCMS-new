@@ -1,25 +1,39 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Alert, TextInput, FlatList } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimeDisplay from '../components/DateTimeDisplay';
 import QRCodeGenerator from '../components/QRCodeGenerator';
 import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
-import { QRCodeUtils } from '../utils/qrCodeUtils';
 
 const AdminPortal = () => {
+  const [activeView, setActiveView] = useState('dashboard'); // dashboard, students, teachers, classes, reports, settings
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showAddTeacher, setShowAddTeacher] = useState(false);
+  const [showAddClass, setShowAddClass] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [students, setStudents] = useState([]);
+  const [teachers, setTeachers] = useState([
+    { id: 'TCH001', name: 'Ms. Johnson', subject: 'Mathematics', classes: ['10A', '9B'] },
+    { id: 'TCH002', name: 'Mr. Smith', subject: 'English', classes: ['10A', '10B'] },
+    { id: 'TCH003', name: 'Dr. Williams', subject: 'Science', classes: ['9A', '9B', '9C'] }
+  ]);
+  const [classes, setClasses] = useState([
+    { id: 'CLS001', name: '10A', students: 30, teacher: 'Ms. Johnson' },
+    { id: 'CLS002', name: '10B', students: 28, teacher: 'Mr. Smith' },
+    { id: 'CLS003', name: '9A', students: 32, teacher: 'Dr. Williams' }
+  ]);
   const [newStudent, setNewStudent] = useState({
     firstName: '',
     lastName: '',
     class: '',
     parentContact: '',
     address: '',
-    emergencyContact: ''
+    emergencyContact: '',
+    photo: ''
   });
 
   useEffect(() => {
@@ -59,7 +73,8 @@ const AdminPortal = () => {
         class: '',
         parentContact: '',
         address: '',
-        emergencyContact: ''
+        emergencyContact: '',
+        photo: ''
       });
       
       setShowAddStudent(false);
@@ -89,76 +104,408 @@ const AdminPortal = () => {
         <Text style={styles.headerTitle}>Admin Portal</Text>
       </View>
       
+      {/* Date and Time Display */}
+      <View style={styles.dateTimeContainer}>
+        <DateTimeDisplay />
+      </View>
+      
+      {/* Navigation Tabs */}
+      <View style={styles.tabContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TouchableOpacity 
+            style={[styles.tab, activeView === 'dashboard' && styles.activeTab]}
+            onPress={() => setActiveView('dashboard')}
+          >
+            <Ionicons name="grid" size={20} color={activeView === 'dashboard' ? '#4a90e2' : '#666'} />
+            <Text style={[styles.tabText, activeView === 'dashboard' && styles.activeTabText]}>Dashboard</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, activeView === 'students' && styles.activeTab]}
+            onPress={() => setActiveView('students')}
+          >
+            <Ionicons name="people" size={20} color={activeView === 'students' ? '#4a90e2' : '#666'} />
+            <Text style={[styles.tabText, activeView === 'students' && styles.activeTabText]}>Students</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, activeView === 'teachers' && styles.activeTab]}
+            onPress={() => setActiveView('teachers')}
+          >
+            <Ionicons name="school" size={20} color={activeView === 'teachers' ? '#4a90e2' : '#666'} />
+            <Text style={[styles.tabText, activeView === 'teachers' && styles.activeTabText]}>Teachers</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, activeView === 'classes' && styles.activeTab]}
+            onPress={() => setActiveView('classes')}
+          >
+            <Ionicons name="book" size={20} color={activeView === 'classes' ? '#4a90e2' : '#666'} />
+            <Text style={[styles.tabText, activeView === 'classes' && styles.activeTabText]}>Classes</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, activeView === 'reports' && styles.activeTab]}
+            onPress={() => setActiveView('reports')}
+          >
+            <Ionicons name="stats-chart" size={20} color={activeView === 'reports' ? '#4a90e2' : '#666'} />
+            <Text style={[styles.tabText, activeView === 'reports' && styles.activeTabText]}>Reports</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, activeView === 'settings' && styles.activeTab]}
+            onPress={() => setActiveView('settings')}
+          >
+            <Ionicons name="settings" size={20} color={activeView === 'settings' ? '#4a90e2' : '#666'} />
+            <Text style={[styles.tabText, activeView === 'settings' && styles.activeTabText]}>Settings</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+
       <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>School Overview</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>450</Text>
-              <Text style={styles.statLabel}>Students</Text>
+        {/* Dashboard View */}
+        {activeView === 'dashboard' && (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>School Overview</Text>
+              <View style={styles.statsGrid}>
+                <TouchableOpacity style={styles.statCard} onPress={() => setActiveView('students')}>
+                  <Ionicons name="people" size={28} color="#4a90e2" />
+                  <Text style={styles.statNumber}>{students.length || 450}</Text>
+                  <Text style={styles.statLabel}>Students</Text>
+                  <Text style={styles.statAction}>View All →</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.statCard} onPress={() => setActiveView('teachers')}>
+                  <Ionicons name="school" size={28} color="#4CAF50" />
+                  <Text style={styles.statNumber}>{teachers.length}</Text>
+                  <Text style={styles.statLabel}>Teachers</Text>
+                  <Text style={styles.statAction}>View All →</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.statCard} onPress={() => setActiveView('classes')}>
+                  <Ionicons name="book" size={28} color="#FF9800" />
+                  <Text style={styles.statNumber}>{classes.length}</Text>
+                  <Text style={styles.statLabel}>Classes</Text>
+                  <Text style={styles.statAction}>View All →</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.statCard} onPress={() => setActiveView('reports')}>
+                  <Ionicons name="trending-up" size={28} color="#9C27B0" />
+                  <Text style={styles.statNumber}>92%</Text>
+                  <Text style={styles.statLabel}>Attendance</Text>
+                  <Text style={styles.statAction}>View Report →</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>35</Text>
-              <Text style={styles.statLabel}>Teachers</Text>
+            
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <View style={styles.actionGrid}>
+                <TouchableOpacity 
+                  style={[styles.actionCard, styles.primaryAction]}
+                  onPress={() => setShowAddStudent(true)}
+                >
+                  <Ionicons name="person-add" size={32} color="#fff" />
+                  <Text style={styles.actionCardTitle}>Add Student</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.actionCard, styles.secondaryAction]}
+                  onPress={() => setShowStudentList(true)}
+                >
+                  <Ionicons name="qr-code" size={32} color="#fff" />
+                  <Text style={styles.actionCardTitle}>Generate QR</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.actionCard, styles.accentAction]}
+                  onPress={() => setShowAddTeacher(true)}
+                >
+                  <Ionicons name="person-add-outline" size={32} color="#fff" />
+                  <Text style={styles.actionCardTitle}>Add Teacher</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.actionCard, styles.warningAction]}
+                  onPress={() => setShowAddClass(true)}
+                >
+                  <Ionicons name="add-circle" size={32} color="#fff" />
+                  <Text style={styles.actionCardTitle}>Create Class</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.actionCard, styles.infoAction]}
+                  onPress={() => setActiveView('reports')}
+                >
+                  <Ionicons name="document-text" size={32} color="#fff" />
+                  <Text style={styles.actionCardTitle}>View Reports</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.actionCard, styles.successAction]}
+                >
+                  <Ionicons name="megaphone" size={32} color="#fff" />
+                  <Text style={styles.actionCardTitle}>Announcements</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>15</Text>
-              <Text style={styles.statLabel}>Classes</Text>
+            
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recent Activity</Text>
+                <TouchableOpacity>
+                  <Text style={styles.seeAllText}>See All</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.activityList}>
+                {[
+                  { action: 'New student registered', name: 'John Doe', time: '10 minutes ago', icon: 'person-add', color: '#4CAF50' },
+                  { action: 'Attendance marked', name: 'Class 10A', time: '1 hour ago', icon: 'checkmark-circle', color: '#4a90e2' },
+                  { action: 'QR Code generated', name: 'Jane Smith', time: '2 hours ago', icon: 'qr-code', color: '#FF9800' },
+                  { action: 'Report generated', name: 'Monthly Report', time: '3 hours ago', icon: 'document-text', color: '#9C27B0' },
+                ].map((activity, index) => (
+                  <TouchableOpacity key={index} style={styles.activityItem}>
+                    <View style={[styles.activityIcon, { backgroundColor: activity.color + '20' }]}>
+                      <Ionicons name={activity.icon} size={24} color={activity.color} />
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityText}>{activity.action}</Text>
+                      <Text style={styles.activityName}>{activity.name}</Text>
+                      <Text style={styles.activityTime}>{activity.time}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>92%</Text>
-              <Text style={styles.statLabel}>Attendance</Text>
+          </>
+        )}
+
+        {/* Students View */}
+        {activeView === 'students' && (
+          <>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>All Students ({students.length})</Text>
+                <TouchableOpacity 
+                  style={styles.addNewButton}
+                  onPress={() => setShowAddStudent(true)}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={styles.addNewButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.searchBar}>
+                <Ionicons name="search" size={20} color="#666" />
+                <Text style={styles.searchPlaceholder}>Search students...</Text>
+              </View>
+
+              <View style={styles.filterBar}>
+                <TouchableOpacity style={[styles.filterChip, styles.filterChipActive]}>
+                  <Text style={styles.filterChipTextActive}>All</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.filterChip}>
+                  <Text style={styles.filterChipText}>Class 10A</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.filterChip}>
+                  <Text style={styles.filterChipText}>Class 9B</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.filterChip}>
+                  <Text style={styles.filterChipText}>Active</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {students.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="people-outline" size={64} color="#ccc" />
+                  <Text style={styles.emptyStateText}>No students yet</Text>
+                  <TouchableOpacity 
+                    style={styles.emptyStateButton}
+                    onPress={() => setShowAddStudent(true)}
+                  >
+                    <Text style={styles.emptyStateButtonText}>Add First Student</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.studentGrid}>
+                  {students.map((student) => (
+                    <TouchableOpacity key={student.studentId} style={styles.studentGridCard}>
+                      <Ionicons name="person-circle" size={48} color="#4a90e2" />
+                      <Text style={styles.studentGridName}>{student.name}</Text>
+                      <Text style={styles.studentGridId}>{student.studentId}</Text>
+                      <Text style={styles.studentGridClass}>{student.class}</Text>
+                      <View style={styles.studentGridActions}>
+                        <TouchableOpacity 
+                          style={styles.studentGridAction}
+                          onPress={() => handleGenerateQR(student)}
+                        >
+                          <Ionicons name="qr-code" size={18} color="#4a90e2" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.studentGridAction}>
+                          <Ionicons name="create" size={18} color="#FF9800" />
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
-          </View>
-        </View>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionGrid}>
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={() => setShowStudentList(true)}
-            >
-              <Ionicons name="people" size={32} color="#4a90e2" />
-              <Text style={styles.actionText}>Manage Students</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="calendar" size={32} color="#4a90e2" />
-              <Text style={styles.actionText}>Attendance Reports</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.actionCard}
-              onPress={() => setShowAddStudent(true)}
-            >
-              <Ionicons name="person-add" size={32} color="#4CAF50" />
-              <Text style={styles.actionText}>Add Student</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="qr-code" size={32} color="#FF9800" />
-              <Text style={styles.actionText}>QR Codes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <View style={styles.activityList}>
-            {[
-              { action: 'New student registered', time: '10 minutes ago', icon: 'person-add' },
-              { action: 'Attendance report generated', time: '1 hour ago', icon: 'document-text' },
-              { action: 'System update completed', time: '3 hours ago', icon: 'refresh-circle' },
-              { action: 'New announcement posted', time: 'Yesterday', icon: 'megaphone' },
-            ].map((activity, index) => (
-              <View key={index} style={styles.activityItem}>
-                <Ionicons name={activity.icon} size={24} color="#4a90e2" />
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>{activity.action}</Text>
-                  <Text style={styles.activityTime}>{activity.time}</Text>
+          </>
+        )}
+
+        {/* Teachers View */}
+        {activeView === 'teachers' && (
+          <>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>All Teachers ({teachers.length})</Text>
+                <TouchableOpacity 
+                  style={styles.addNewButton}
+                  onPress={() => setShowAddTeacher(true)}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={styles.addNewButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {teachers.map((teacher) => (
+                <TouchableOpacity key={teacher.id} style={styles.teacherCard}>
+                  <View style={styles.teacherIcon}>
+                    <Ionicons name="person" size={32} color="#fff" />
+                  </View>
+                  <View style={styles.teacherInfo}>
+                    <Text style={styles.teacherName}>{teacher.name}</Text>
+                    <Text style={styles.teacherSubject}>{teacher.subject}</Text>
+                    <Text style={styles.teacherClasses}>Classes: {teacher.classes.join(', ')}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.teacherAction}>
+                    <Ionicons name="chevron-forward" size={24} color="#666" />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Classes View */}
+        {activeView === 'classes' && (
+          <>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>All Classes ({classes.length})</Text>
+                <TouchableOpacity 
+                  style={styles.addNewButton}
+                  onPress={() => setShowAddClass(true)}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={styles.addNewButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {classes.map((classItem) => (
+                <TouchableOpacity key={classItem.id} style={styles.classCard}>
+                  <View style={styles.classHeader}>
+                    <View style={styles.classIcon}>
+                      <Ionicons name="book" size={24} color="#fff" />
+                    </View>
+                    <View style={styles.classInfo}>
+                      <Text style={styles.className}>Class {classItem.name}</Text>
+                      <Text style={styles.classTeacher}>Teacher: {classItem.teacher}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.classStats}>
+                    <View style={styles.classStat}>
+                      <Ionicons name="people" size={18} color="#4a90e2" />
+                      <Text style={styles.classStatText}>{classItem.students} Students</Text>
+                    </View>
+                    <TouchableOpacity style={styles.classViewButton}>
+                      <Text style={styles.classViewButtonText}>View Details</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#4a90e2" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Reports View */}
+        {activeView === 'reports' && (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Attendance Reports</Text>
+              
+              <View style={styles.reportGrid}>
+                <TouchableOpacity style={styles.reportCard}>
+                  <Ionicons name="calendar" size={32} color="#4a90e2" />
+                  <Text style={styles.reportCardTitle}>Daily Report</Text>
+                  <Text style={styles.reportCardDate}>Today</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.reportCard}>
+                  <Ionicons name="calendar-outline" size={32} color="#4CAF50" />
+                  <Text style={styles.reportCardTitle}>Weekly Report</Text>
+                  <Text style={styles.reportCardDate}>This Week</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.reportCard}>
+                  <Ionicons name="stats-chart" size={32} color="#FF9800" />
+                  <Text style={styles.reportCardTitle}>Monthly Report</Text>
+                  <Text style={styles.reportCardDate}>October 2025</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.reportCard}>
+                  <Ionicons name="document-text" size={32} color="#9C27B0" />
+                  <Text style={styles.reportCardTitle}>Custom Report</Text>
+                  <Text style={styles.reportCardDate}>Generate</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Quick Stats</Text>
+              <View style={styles.quickStats}>
+                <View style={styles.quickStat}>
+                  <Text style={styles.quickStatNumber}>94%</Text>
+                  <Text style={styles.quickStatLabel}>Today&apos;s Attendance</Text>
+                </View>
+                <View style={styles.quickStat}>
+                  <Text style={styles.quickStatNumber}>28</Text>
+                  <Text style={styles.quickStatLabel}>Absent Today</Text>
+                </View>
+                <View style={styles.quickStat}>
+                  <Text style={styles.quickStatNumber}>15</Text>
+                  <Text style={styles.quickStatLabel}>Late Arrivals</Text>
                 </View>
               </View>
-            ))}
-          </View>
-        </View>
+            </View>
+          </>
+        )}
+
+        {/* Settings View */}
+        {activeView === 'settings' && (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>System Settings</Text>
+              
+              {[
+                { title: 'School Information', icon: 'business', color: '#4a90e2' },
+                { title: 'Academic Year Settings', icon: 'calendar', color: '#4CAF50' },
+                { title: 'User Management', icon: 'people', color: '#FF9800' },
+                { title: 'Notification Settings', icon: 'notifications', color: '#9C27B0' },
+                { title: 'Backup & Restore', icon: 'cloud-upload', color: '#00BCD4' },
+                { title: 'System Logs', icon: 'list', color: '#607D8B' },
+              ].map((setting, index) => (
+                <TouchableOpacity key={index} style={styles.settingItem}>
+                  <View style={[styles.settingIcon, { backgroundColor: setting.color + '20' }]}>
+                    <Ionicons name={setting.icon} size={24} color={setting.color} />
+                  </View>
+                  <Text style={styles.settingTitle}>{setting.title}</Text>
+                  <Ionicons name="chevron-forward" size={24} color="#ccc" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Student List Modal */}
@@ -217,6 +564,19 @@ const AdminPortal = () => {
           </View>
           
           <ScrollView style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Student Photo (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={newStudent.photo}
+                onChangeText={(text) => setNewStudent({...newStudent, photo: text})}
+                placeholder="Photo URL (e.g., https://example.com/photo.jpg)"
+              />
+              <Text style={styles.helperText}>
+                📷 Tip: Upload photo to a hosting service and paste URL here, or print and affix photo to QR card
+              </Text>
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>First Name *</Text>
               <TextInput
@@ -329,9 +689,67 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  dateTimeContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tabContainer: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingVertical: 8,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginHorizontal: 5,
+    borderRadius: 20,
+  },
+  activeTab: {
+    backgroundColor: '#e3f2fd',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  activeTabText: {
+    color: '#4a90e2',
+    fontWeight: '600',
+  },
   content: {
     flex: 1,
     padding: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  seeAllText: {
+    color: '#4a90e2',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  addNewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  addNewButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,
@@ -367,11 +785,18 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#4a90e2',
+    marginTop: 8,
   },
   statLabel: {
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  statAction: {
+    fontSize: 12,
+    color: '#4a90e2',
+    marginTop: 8,
+    fontWeight: '500',
   },
   actionGrid: {
     flexDirection: 'row',
@@ -380,11 +805,40 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     width: '48%',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 12,
+    padding: 20,
     marginBottom: 12,
     alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  primaryAction: {
+    backgroundColor: '#4CAF50',
+  },
+  secondaryAction: {
+    backgroundColor: '#4a90e2',
+  },
+  accentAction: {
+    backgroundColor: '#FF9800',
+  },
+  warningAction: {
+    backgroundColor: '#9C27B0',
+  },
+  infoAction: {
+    backgroundColor: '#00BCD4',
+  },
+  successAction: {
+    backgroundColor: '#FF5722',
+  },
+  actionCardTitle: {
+    fontSize: 14,
+    color: '#fff',
+    marginTop: 12,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   actionText: {
     fontSize: 14,
@@ -403,17 +857,306 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
+  activityIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   activityContent: {
+    flex: 1,
     marginLeft: 12,
   },
   activityText: {
     fontSize: 14,
     color: '#333',
+    fontWeight: '600',
+  },
+  activityName: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
   },
   activityTime: {
     fontSize: 12,
     color: '#999',
     marginTop: 2,
+  },
+  // Students View Styles
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  searchPlaceholder: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#999',
+  },
+  filterBar: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  filterChipActive: {
+    backgroundColor: '#4a90e2',
+  },
+  filterChipText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  filterChipTextActive: {
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  emptyStateButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  emptyStateButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  studentGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  studentGridCard: {
+    width: '48%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  studentGridName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  studentGridId: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 4,
+  },
+  studentGridClass: {
+    fontSize: 12,
+    color: '#4a90e2',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  studentGridActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  studentGridAction: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Teachers View Styles
+  teacherCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  teacherIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#4a90e2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  teacherInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  teacherName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  teacherSubject: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  teacherClasses: {
+    fontSize: 12,
+    color: '#4a90e2',
+    marginTop: 4,
+  },
+  teacherAction: {
+    padding: 4,
+  },
+  // Classes View Styles
+  classCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4a90e2',
+  },
+  classHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  classIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#4a90e2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  classInfo: {
+    marginLeft: 12,
+  },
+  className: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  classTeacher: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+  },
+  classStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  classStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  classStatText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  classViewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  classViewButtonText: {
+    fontSize: 13,
+    color: '#4a90e2',
+    fontWeight: '500',
+  },
+  // Reports View Styles
+  reportGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  reportCard: {
+    width: '48%',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  reportCardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  reportCardDate: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  quickStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  quickStat: {
+    flex: 1,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  quickStatNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#4a90e2',
+  },
+  quickStatLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  // Settings View Styles
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 8,
+  },
+  settingIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  settingTitle: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
   },
   // Modal styles
   modalContainer: {
@@ -497,6 +1240,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   textArea: {
     height: 80,

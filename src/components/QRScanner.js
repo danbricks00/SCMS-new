@@ -1,43 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity, Dimensions } from 'react-native';
-import { Camera } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import { Camera, CameraView } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useState } from 'react';
+import { Alert, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { QRCodeUtils, QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
-import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
 
 const QRScanner = ({ onScan, onClose, isVisible }) => {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
   const [isScanning, setIsScanning] = useState(true);
-  const [flashMode, setFlashMode] = useState(false);
 
   useEffect(() => {
+    // Warn if not on mobile device
+    if (isWeb) {
+      Alert.alert(
+        'Mobile Device Required',
+        'QR code scanning works best on mobile phones (iPhone or Android). Please open this app on your phone to scan QR codes.',
+        [{ text: 'OK' }]
+      );
+    }
     getCameraPermissions();
   }, []);
 
   const getCameraPermissions = async () => {
-    const { status } = await Camera.requestCameraPermissionsAsync();
-    setHasPermission(status === 'granted');
+    try {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      console.log('Camera permission status:', status);
+      setHasPermission(status === 'granted');
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Camera Permission Required',
+          'Please enable camera permissions in your device settings to scan QR codes.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error requesting camera permissions:', error);
+      setHasPermission(false);
+    }
   };
 
   const handleBarCodeScanned = async ({ type, data }) => {
-    if (scanned || !isScanning) return;
+    console.log('Barcode scanned:', { type, data: data.substring(0, 50) + '...' });
+    
+    if (scanned || !isScanning) {
+      console.log('Scan ignored - already scanned or not scanning');
+      return;
+    }
     
     setScanned(true);
     setIsScanning(false);
 
     // Haptic feedback for successful scan
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.log('Haptics not available');
+    }
 
     try {
+      console.log('Attempting to decrypt QR code...');
       // Decrypt and validate QR code
       const studentData = QRCodeUtils.decryptStudentQR(data);
       
+      console.log('Decryption result:', studentData ? 'Success' : 'Failed');
+      
       if (studentData) {
         // Successful scan
+        console.log('Valid student QR code scanned:', studentData.name);
         onScan({
           result: QR_SCAN_RESULTS.SUCCESS,
           studentData,
@@ -45,7 +80,12 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
         });
       } else {
         // Invalid QR code
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        console.log('Invalid QR code format');
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        } catch (e) {
+          console.log('Haptics not available');
+        }
         onScan({
           result: QR_SCAN_RESULTS.INVALID,
           error: 'Invalid QR code format',
@@ -54,24 +94,24 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
       }
     } catch (error) {
       console.error('QR Scan Error:', error);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch (e) {
+        console.log('Haptics not available');
+      }
       onScan({
         result: QR_SCAN_RESULTS.ERROR,
-        error: error.message,
+        error: error.message || 'Failed to process QR code',
         timestamp: new Date().toISOString()
       });
     }
 
     // Reset scanner after 2 seconds
     setTimeout(() => {
+      console.log('Resetting scanner...');
       setScanned(false);
       setIsScanning(true);
     }, 2000);
-  };
-
-  const toggleFlash = async () => {
-    setFlashMode(!flashMode);
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const resetScanner = () => {
@@ -112,23 +152,26 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Scan Student QR Code</Text>
-        <TouchableOpacity onPress={toggleFlash} style={styles.flashButton}>
-          <Ionicons 
-            name={flashMode ? "flash" : "flash-off"} 
-            size={24} 
-            color="#fff" 
-          />
-        </TouchableOpacity>
+        <View style={styles.placeholder} />
       </View>
 
+      {/* Platform Notice for Mobile */}
+      {(Platform.OS === 'ios' || Platform.OS === 'android') && (
+        <View style={styles.platformNotice}>
+          <Ionicons name="phone-portrait" size={16} color="#4CAF50" />
+          <Text style={styles.platformNoticeText}>
+            {Platform.OS === 'ios' ? '📱 iPhone' : '📱 Android'} - Perfect for scanning!
+          </Text>
+        </View>
+      )}
+
       <View style={styles.cameraContainer}>
-        <Camera
+        <CameraView
           style={styles.camera}
-          type={Camera.Constants.Type.back}
-          flashMode={flashMode ? Camera.Constants.FlashMode.torch : Camera.Constants.FlashMode.off}
-          onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-          barCodeScannerSettings={{
-            barCodeTypes: ['qr'],
+          facing="back"
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: ['qr'],
           }}
         >
           {/* Scanning overlay */}
@@ -158,7 +201,7 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
               </TouchableOpacity>
             )}
           </View>
-        </Camera>
+        </CameraView>
       </View>
     </SafeAreaView>
   );
@@ -185,8 +228,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  flashButton: {
-    padding: 5,
+  placeholder: {
+    width: 34,
+  },
+  platformNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e8f5e9',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  platformNoticeText: {
+    color: '#2e7d32',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   cameraContainer: {
     flex: 1,

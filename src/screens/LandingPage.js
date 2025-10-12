@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimeDisplay from '../components/DateTimeDisplay';
 
 const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -46,6 +47,11 @@ const LandingPage = ({ navigation }) => {
           <Ionicons name="menu" size={32} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>School Management System</Text>
+      </View>
+
+      {/* Date and Time Display */}
+      <View style={styles.dateTimeContainer}>
+        <DateTimeDisplay />
       </View>
 
       {/* Sidebar Menu */}
@@ -145,6 +151,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 15,
     color: '#333',
+  },
+  dateTimeContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   sideMenu: {
     position: 'absolute',

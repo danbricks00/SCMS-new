@@ -1,8 +1,8 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimeDisplay from '../components/DateTimeDisplay';
 
 const StudentPortal = () => {
   return (
@@ -12,6 +12,11 @@ const StudentPortal = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Student Portal</Text>
+      </View>
+      
+      {/* Date and Time Display */}
+      <View style={styles.dateTimeContainer}>
+        <DateTimeDisplay />
       </View>
       
       <ScrollView style={styles.content}>
@@ -85,6 +90,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 15,
     color: '#333',
+  },
+  dateTimeContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   content: {
     flex: 1,

@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ActivityScanner from '../components/ActivityScanner';
+import DateTimeDisplay from '../components/DateTimeDisplay';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
-import ActivityScanner from '../components/ActivityScanner';
 import { DatabaseService } from '../services/database';
 import { QR_SCAN_RESULTS, QRCodeUtils } from '../utils/qrCodeUtils';
 
@@ -109,6 +110,11 @@ const TeacherPortal = () => {
         <Text style={styles.headerTitle}>Teacher Portal</Text>
       </View>
       
+      {/* Date and Time Display */}
+      <View style={styles.dateTimeContainer}>
+        <DateTimeDisplay />
+      </View>
+      
       <ScrollView style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Classes</Text>
@@ -121,7 +127,7 @@ const TeacherPortal = () => {
               
               <View style={styles.attendanceIndicator}>
                 <Text style={styles.attendanceText}>
-                  Today's Attendance: {attendanceSummary.presentStudents}/{attendanceSummary.totalStudents}
+                  Today&apos;s Attendance: {attendanceSummary.presentStudents}/{attendanceSummary.totalStudents}
                 </Text>
                 <Text style={styles.absentText}>
                   Absent: {attendanceSummary.absentStudents}
@@ -154,7 +160,8 @@ const TeacherPortal = () => {
               </View>
               
               <View style={styles.attendanceIndicator}>
-                <Text style={styles.attendanceText}>Today's Attendance: 26/28</Text>
+                <Text style={styles.attendanceText}>Today&apos;s Attendance: 26/28</Text>
+                
                 <Text style={styles.absentText}>Absent: 2</Text>
               </View>
 
@@ -203,7 +210,7 @@ const TeacherPortal = () => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Schedule</Text>
+          <Text style={styles.sectionTitle}>Today&apos;s Schedule</Text>
           <View style={styles.scheduleList}>
             {['8:00 AM - 9:30 AM: Class 10A', '10:00 AM - 11:30 AM: Class 8B', 
               '12:30 PM - 2:00 PM: Class 9C', '2:30 PM - 4:00 PM: Staff Meeting'].map((session, index) => (
@@ -302,6 +309,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+  },
+  dateTimeContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   content: {
     flex: 1,

@@ -39,15 +39,24 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
       </View>
 
       <View style={styles.content}>
-        {/* Student Photo */}
+        {/* Student Photo - Prominent Display */}
         <View style={styles.photoContainer}>
           {studentData.photo ? (
             <Image source={{ uri: studentData.photo }} style={styles.photo} />
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Ionicons name="person" size={40} color="#666" />
+              <Ionicons name="person" size={48} color="#999" />
+              <Text style={styles.noPhotoText}>No Photo</Text>
             </View>
           )}
+        </View>
+
+        {/* Verification Warning */}
+        <View style={styles.verificationWarning}>
+          <Ionicons name="shield-checkmark" size={20} color="#ff9800" />
+          <Text style={styles.verificationText}>
+            Verify student face matches their photo
+          </Text>
         </View>
 
         {/* Student Details */}
@@ -59,7 +68,7 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
           {/* QR Code Info */}
           <View style={styles.qrInfoContainer}>
             <Ionicons name="qr-code" size={16} color="#4a90e2" />
-            <Text style={styles.qrInfoText}>QR Code Verified</Text>
+            <Text style={styles.qrInfoText}>QR Code Verified ✓</Text>
           </View>
         </View>
 
@@ -136,24 +145,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   photoContainer: {
-    marginBottom: 20,
+    marginBottom: 15,
+    alignItems: 'center',
   },
   photo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
+    width: 120,
+    height: 140,
+    borderRadius: 10,
+    borderWidth: 4,
     borderColor: '#4a90e2',
   },
   photoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f0f0f0',
+    width: 120,
+    height: 140,
+    borderRadius: 10,
+    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#ddd',
+    borderStyle: 'dashed',
+  },
+  noPhotoText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 8,
+  },
+  verificationWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ff9800',
+  },
+  verificationText: {
+    color: '#e65100',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
   },
   detailsContainer: {
     alignItems: 'center',
