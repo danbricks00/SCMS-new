@@ -63,7 +63,7 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
     }
   };
 
-  const handleMarkActivity = async (studentData, type) => {
+  const handleMarkActivity = async (studentData, type, status = 'present') => {
     try {
       const activityData = {
         studentId: studentData.studentId,
@@ -72,19 +72,40 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
         teacherId: 'TCH001', // This should come from teacher authentication
         teacherName: 'Ms. Johnson', // This should come from teacher authentication
         type: type,
+        status: status, // 'present', 'late', 'absent', 'checkout'
         activity: selectedActivity || customActivity,
         activityType: selectedActivityType,
         location: location || 'Main Campus',
-        notes: type === 'login' ? 'Started activity' : 'Completed activity'
+        notes: type === 'login' 
+          ? (status === 'late' ? 'Started activity - Late arrival' : 'Started activity') 
+          : 'Completed activity'
       };
 
-      await DatabaseService.recordAttendance(activityData);
+      const result = await DatabaseService.recordAttendance(activityData);
+      
+      // Check if blocked by fraud detection
+      if (result.blocked) {
+        Alert.alert(
+          '🚨 Activity Blocked',
+          result.message,
+          [{ text: 'OK', onPress: () => {
+            setShowStudentCard(false);
+            setScannedStudent(null);
+          }}]
+        );
+        return;
+      }
       
       const timeText = QRCodeUtils.formatNZTTime(new Date().toISOString());
       
+      const statusEmoji = status === 'late' ? '⏰' : status === 'present' ? '✅' : '👋';
+      const action = type === 'login' 
+        ? (status === 'late' ? 'started (late)' : 'started') 
+        : 'completed';
+      
       Alert.alert(
         'Activity Recorded',
-        `${studentData.name} ${type === 'login' ? 'started' : 'completed'} ${selectedActivity || customActivity} at ${timeText}`,
+        `${statusEmoji} ${studentData.name} ${action} ${selectedActivity || customActivity} at ${timeText}`,
         [
           {
             text: 'OK',

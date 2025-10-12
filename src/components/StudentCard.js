@@ -6,26 +6,9 @@ import { QRCodeUtils } from '../utils/qrCodeUtils';
 const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 'login' }) => {
   if (!studentData) return null;
 
-  const getAttendanceButtonColor = () => {
-    switch (attendanceType) {
-      case 'login':
-        return '#4CAF50';
-      case 'logout':
-        return '#FF9800';
-      default:
-        return '#4a90e2';
-    }
-  };
-
-  const getAttendanceButtonText = () => {
-    switch (attendanceType) {
-      case 'login':
-        return 'Mark Present';
-      case 'logout':
-        return 'Mark Absent';
-      default:
-        return 'Mark Attendance';
-    }
+  const handleMarkAttendance = (status) => {
+    // status can be: 'present', 'late', 'absent'
+    onMarkAttendance(studentData, attendanceType, status);
   };
 
   return (
@@ -74,20 +57,47 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.attendanceButton, { backgroundColor: getAttendanceButtonColor() }]}
-            onPress={() => onMarkAttendance(studentData, attendanceType)}
-          >
-            <Ionicons 
-              name={attendanceType === 'login' ? 'checkmark-circle' : 'close-circle'} 
-              size={20} 
-              color="#fff" 
-            />
-            <Text style={styles.attendanceButtonText}>
-              {getAttendanceButtonText()}
-            </Text>
-          </TouchableOpacity>
+          {attendanceType === 'login' ? (
+            <>
+              {/* Present Button */}
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.presentButton]}
+                onPress={() => handleMarkAttendance('present')}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Mark Present</Text>
+              </TouchableOpacity>
 
+              {/* Late Button */}
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.lateButton]}
+                onPress={() => handleMarkAttendance('late')}
+              >
+                <Ionicons name="time" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Mark Late</Text>
+              </TouchableOpacity>
+
+              {/* Absent Button */}
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.absentButton]}
+                onPress={() => handleMarkAttendance('absent')}
+              >
+                <Ionicons name="close-circle" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Mark Absent</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            /* Logout/Checkout Button */
+            <TouchableOpacity
+              style={[styles.attendanceButton, styles.logoutButton]}
+              onPress={() => handleMarkAttendance('checkout')}
+            >
+              <Ionicons name="log-out" size={20} color="#fff" />
+              <Text style={styles.attendanceButtonText}>Check Out</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Cancel Button */}
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={onClose}
@@ -236,9 +246,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
+  presentButton: {
+    backgroundColor: '#4CAF50',
+  },
+  lateButton: {
+    backgroundColor: '#FF9800',
+  },
+  absentButton: {
+    backgroundColor: '#f44336',
+  },
+  logoutButton: {
+    backgroundColor: '#9C27B0',
+  },
   attendanceButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
   },

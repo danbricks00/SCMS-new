@@ -49,8 +49,23 @@ const TeacherPortal = () => {
     }
   };
 
-  const handleMarkAttendance = async (studentData, type) => {
+  const handleMarkAttendance = async (studentData, type, status = 'present') => {
     try {
+      // status can be: 'present', 'late', 'absent', 'checkout'
+      const statusLabels = {
+        present: 'Present (On Time)',
+        late: 'Late',
+        absent: 'Absent',
+        checkout: 'Checked Out'
+      };
+      
+      const statusNotes = {
+        present: 'Present - On time',
+        late: 'Present - Arrived late',
+        absent: 'Marked absent',
+        checkout: 'Checked out'
+      };
+      
       const attendanceData = {
         studentId: studentData.studentId,
         studentName: studentData.name,
@@ -58,18 +73,39 @@ const TeacherPortal = () => {
         teacherId: 'TCH001', // This should come from teacher authentication
         teacherName: 'Ms. Johnson', // This should come from teacher authentication
         type: type,
+        status: status, // 'present', 'late', 'absent', 'checkout'
         location: 'Classroom A',
-        notes: type === 'login' ? 'Present' : 'Absent'
+        notes: statusNotes[status] || 'Attendance marked'
       };
 
-      await DatabaseService.recordAttendance(attendanceData);
+      const result = await DatabaseService.recordAttendance(attendanceData);
+      
+      // Check if attendance was blocked due to fraud detection
+      if (result.blocked) {
+        Alert.alert(
+          '🚨 Attendance Blocked',
+          result.message,
+          [{ text: 'OK', onPress: () => {
+            setShowStudentCard(false);
+            setScannedStudent(null);
+          }}]
+        );
+        return;
+      }
       
       const timeText = QRCodeUtils.formatNZTTime(new Date().toISOString());
       const timezone = QRCodeUtils.getNZTimezoneAbbreviation();
       
+      const statusEmoji = {
+        present: '✅',
+        late: '⏰',
+        absent: '❌',
+        checkout: '👋'
+      };
+      
       Alert.alert(
         'Attendance Recorded',
-        `${studentData.name} marked as ${type === 'login' ? 'Present' : 'Absent'} at ${timeText} (${timezone})`,
+        `${statusEmoji[status]} ${studentData.name} marked as ${statusLabels[status]} at ${timeText} (${timezone})`,
         [
           {
             text: 'OK',

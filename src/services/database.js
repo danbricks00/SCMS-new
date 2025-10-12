@@ -1,6 +1,7 @@
 import { db } from '../config/firebase';
 import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, getDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
+import { comprehensiveFraudCheck, logFraudAttempt, formatFraudCheckMessage } from '../utils/fraudDetection';
 
 // Database service for managing students and attendance
 export class DatabaseService {
@@ -173,15 +174,68 @@ export class DatabaseService {
   // ===== ATTENDANCE MANAGEMENT =====
 
   /**
-   * Record student attendance/activity
+   * Record student attendance/activity with fraud detection
    * @param {Object} attendanceData - Attendance information
-   * @returns {Promise<string>} Document ID of the attendance record
+   * @param {Object} options - Additional options { skipFraudCheck, currentLocation, userIP }
+   * @returns {Promise<Object>} { success: boolean, docId: string|null, fraudCheck: Object }
    */
-  static async recordAttendance(attendanceData) {
+  static async recordAttendance(attendanceData, options = {}) {
     try {
       const { QRCodeUtils } = await import('../utils/qrCodeUtils');
-      
       const nztDetails = QRCodeUtils.getNZTDetails();
+      
+      // Run fraud detection checks (unless skipped by admin override)
+      if (!options.skipFraudCheck && attendanceData.type === 'login') {
+        console.log('🔒 Running fraud detection checks...');
+        
+        // Get today's attendance for duplicate check
+        const today = new Date().toISOString().split('T')[0];
+        const todayAttendance = await this.getClassAttendance(attendanceData.class, today);
+        
+        // Get recent attendance for velocity check (last hour)
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const recentAttendance = todayAttendance.filter(r => r.timestamp > oneHourAgo);
+        
+        // Run comprehensive fraud check
+        const fraudCheck = comprehensiveFraudCheck({
+          studentId: attendanceData.studentId,
+          studentName: attendanceData.studentName,
+          activity: attendanceData.activity || 'Class Attendance',
+          scanType: attendanceData.type,
+          currentLocation: options.currentLocation,
+          todayAttendance,
+          recentAttendance,
+          userIP: options.userIP,
+          allowedIPs: options.allowedIPs || [],
+          override: options.adminOverride || false
+        });
+        
+        console.log('Fraud check result:', fraudCheck);
+        
+        // If fraud detected and not overridden, block attendance
+        if (!fraudCheck.allowed) {
+          console.warn('🚨 Attendance blocked due to fraud detection');
+          await logFraudAttempt({
+            ...fraudCheck,
+            teacherId: attendanceData.teacherId,
+            location: attendanceData.location,
+            deviceInfo: options.deviceInfo
+          });
+          
+          return {
+            success: false,
+            docId: null,
+            fraudCheck,
+            message: formatFraudCheckMessage(fraudCheck),
+            blocked: true
+          };
+        }
+        
+        // If warnings but allowed, proceed with warnings logged
+        if (fraudCheck.warnings.length > 0) {
+          console.warn('⚠️ Attendance allowed with warnings:', fraudCheck.warnings);
+        }
+      }
       
       const attendance = {
         studentId: attendanceData.studentId,
@@ -190,23 +244,33 @@ export class DatabaseService {
         teacherId: attendanceData.teacherId,
         teacherName: attendanceData.teacherName,
         type: attendanceData.type, // 'login' or 'logout'
-        activity: attendanceData.activity || 'Class Attendance', // e.g., 'Football Practice', 'Library Study'
-        activityType: attendanceData.activityType || 'classroom', // 'sports', 'academic', 'library', 'event'
+        status: attendanceData.status || 'present', // 'present', 'late', 'absent', 'checkout'
+        activity: attendanceData.activity || 'Class Attendance',
+        activityType: attendanceData.activityType || 'classroom',
         timestamp: new Date().toISOString(),
         nztTimestamp: nztDetails.timestamp,
         nztFormatted: nztDetails.formatted,
         nztTimezone: nztDetails.timezone,
         nztIsDST: nztDetails.isDST,
         location: attendanceData.location || 'Classroom',
+        gpsLocation: options.currentLocation || null,
+        userIP: options.userIP || null,
         notes: attendanceData.notes || '',
-        duration: attendanceData.duration || null, // Duration in minutes if logout
+        duration: attendanceData.duration || null,
+        fraudChecked: !options.skipFraudCheck,
         createdAt: new Date().toISOString()
       };
 
       const docRef = await addDoc(collection(db, 'attendance'), attendance);
       
-      console.log('Attendance recorded with ID:', docRef.id);
-      return docRef.id;
+      console.log('✅ Attendance recorded with ID:', docRef.id);
+      return {
+        success: true,
+        docId: docRef.id,
+        fraudCheck: null,
+        message: 'Attendance recorded successfully',
+        blocked: false
+      };
     } catch (error) {
       console.error('Error recording attendance:', error);
       throw error;
