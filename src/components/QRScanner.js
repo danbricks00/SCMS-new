@@ -140,6 +140,65 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
           <Text style={styles.messageSubtext}>
             Please enable camera permission to scan QR codes
           </Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={getCameraPermissions}
+          >
+            <Text style={styles.retryButtonText}>Retry Permission</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Web platform - Camera doesn't work well, show alternative
+  if (isWeb) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>QR Scanner - Web Version</Text>
+          <View style={styles.placeholder} />
+        </View>
+
+        <View style={styles.webMessageContainer}>
+          <Ionicons name="phone-portrait" size={80} color="#4a90e2" />
+          <Text style={styles.webMessageTitle}>Mobile Device Required</Text>
+          <Text style={styles.webMessageText}>
+            QR code scanning requires a mobile phone with a camera.
+          </Text>
+          <Text style={styles.webMessageSubtext}>
+            The camera feature doesn't work in web browsers due to platform limitations.
+          </Text>
+          
+          <View style={styles.webInstructions}>
+            <Text style={styles.webInstructionsTitle}>📱 To scan QR codes:</Text>
+            <View style={styles.instructionItem}>
+              <Text style={styles.bulletPoint}>1.</Text>
+              <Text style={styles.instructionText}>Open this app on your iPhone or Android phone</Text>
+            </View>
+            <View style={styles.instructionItem}>
+              <Text style={styles.bulletPoint}>2.</Text>
+              <Text style={styles.instructionText}>Navigate to Teacher Portal</Text>
+            </View>
+            <View style={styles.instructionItem}>
+              <Text style={styles.bulletPoint}>3.</Text>
+              <Text style={styles.instructionText}>Click "Mark Present" to scan</Text>
+            </View>
+          </View>
+
+          <View style={styles.webTestInfo}>
+            <Ionicons name="information-circle" size={20} color="#FF9800" />
+            <Text style={styles.webTestInfoText}>
+              Testing on Vercel? Deploy works perfectly on mobile devices!
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.webCloseButton} onPress={onClose}>
+            <Text style={styles.webCloseButtonText}>Close Scanner</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -359,6 +418,107 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 10,
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#4a90e2',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Web-specific styles
+  webMessageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  webMessageTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  webMessageText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 24,
+  },
+  webMessageSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 20,
+  },
+  webInstructions: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    marginBottom: 20,
+  },
+  webInstructionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 15,
+  },
+  instructionItem: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  bulletPoint: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4a90e2',
+    marginRight: 12,
+    minWidth: 20,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+    lineHeight: 20,
+  },
+  webTestInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3e0',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 30,
+    maxWidth: 400,
+  },
+  webTestInfoText: {
+    fontSize: 13,
+    color: '#e65100',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 18,
+  },
+  webCloseButton: {
+    backgroundColor: '#4a90e2',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  webCloseButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
