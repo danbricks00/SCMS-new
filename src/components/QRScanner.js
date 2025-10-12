@@ -7,7 +7,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { QRCodeUtils, QR_SCAN_RESULTS } from '../utils/qrCodeUtils';
 
 const { width, height } = Dimensions.get('window');
+
+// Check if it's a mobile browser (iPhone, Android browser, etc.)
+const isMobileBrowser = () => {
+  if (Platform.OS !== 'web') return false;
+  
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+  return mobileRegex.test(userAgent);
+};
+
 const isWeb = Platform.OS === 'web';
+const isDesktopWeb = isWeb && !isMobileBrowser();
 
 const QRScanner = ({ onScan, onClose, isVisible }) => {
   const [hasPermission, setHasPermission] = useState(null);
@@ -15,11 +26,11 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
   const [isScanning, setIsScanning] = useState(true);
 
   useEffect(() => {
-    // Warn if not on mobile device
-    if (isWeb) {
+    // Only warn if on desktop web (not mobile browsers)
+    if (isDesktopWeb) {
       Alert.alert(
-        'Mobile Device Required',
-        'QR code scanning works best on mobile phones (iPhone or Android). Please open this app on your phone to scan QR codes.',
+        'Desktop Browser Detected',
+        'QR code scanning works best on mobile phones. If you\'re on a phone, the camera should work. On desktop, please open this on your mobile device.',
         [{ text: 'OK' }]
       );
     }
@@ -151,33 +162,33 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
     );
   }
 
-  // Web platform - Camera doesn't work well, show alternative
-  if (isWeb) {
+  // Desktop web only - show message (mobile browsers should use camera)
+  if (isDesktopWeb) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>QR Scanner - Web Version</Text>
+          <Text style={styles.headerTitle}>QR Scanner - Desktop</Text>
           <View style={styles.placeholder} />
         </View>
 
         <View style={styles.webMessageContainer}>
-          <Ionicons name="phone-portrait" size={80} color="#4a90e2" />
+          <Ionicons name="desktop" size={80} color="#4a90e2" />
           <Text style={styles.webMessageTitle}>Mobile Device Required</Text>
           <Text style={styles.webMessageText}>
             QR code scanning requires a mobile phone with a camera.
           </Text>
           <Text style={styles.webMessageSubtext}>
-            The camera feature doesn't work in web browsers due to platform limitations.
+            The camera feature works on mobile browsers (Safari, Chrome on phone) but not on desktop browsers.
           </Text>
           
           <View style={styles.webInstructions}>
             <Text style={styles.webInstructionsTitle}>📱 To scan QR codes:</Text>
             <View style={styles.instructionItem}>
               <Text style={styles.bulletPoint}>1.</Text>
-              <Text style={styles.instructionText}>Open this app on your iPhone or Android phone</Text>
+              <Text style={styles.instructionText}>Open this app on your iPhone or Android phone browser</Text>
             </View>
             <View style={styles.instructionItem}>
               <Text style={styles.bulletPoint}>2.</Text>
@@ -185,14 +196,14 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
             </View>
             <View style={styles.instructionItem}>
               <Text style={styles.bulletPoint}>3.</Text>
-              <Text style={styles.instructionText}>Click "Mark Present" to scan</Text>
+              <Text style={styles.instructionText}>Click "Mark Present" - camera will open</Text>
             </View>
           </View>
 
           <View style={styles.webTestInfo}>
             <Ionicons name="information-circle" size={20} color="#FF9800" />
             <Text style={styles.webTestInfoText}>
-              Testing on Vercel? Deploy works perfectly on mobile devices!
+              On iPhone: Use Safari or Chrome. On Android: Use Chrome or Firefox.
             </Text>
           </View>
 
