@@ -32,6 +32,14 @@ const TeacherPortal = () => {
     loadClassStudents();
   }, [currentClass]);
 
+  useEffect(() => {
+    // Refresh when student list modal opens
+    if (showStudentList) {
+      loadClassStudents();
+      loadAttendanceSummary();
+    }
+  }, [showStudentList]);
+
   const loadAttendanceSummary = async () => {
     try {
       const summary = await DatabaseService.getTodayAttendanceSummary(currentClass);
@@ -195,7 +203,7 @@ const TeacherPortal = () => {
             <View style={styles.classCard}>
               <View style={styles.classHeader}>
                 <Text style={styles.className}>Class {currentClass}</Text>
-                <Text style={styles.classInfo}>{attendanceSummary.totalStudents} Students</Text>
+                <Text style={styles.classInfo}>{classStudents.length || attendanceSummary.totalStudents} Students</Text>
               </View>
               
               <View style={styles.attendanceIndicator}>
@@ -212,7 +220,6 @@ const TeacherPortal = () => {
               <TouchableOpacity 
                 style={styles.viewStudentListButton}
                 onPress={() => {
-                  setCurrentClass('10A');
                   setShowStudentList(true);
                 }}
               >
@@ -247,9 +254,23 @@ const TeacherPortal = () => {
               
               <View style={styles.attendanceIndicator}>
                 <Text style={styles.attendanceText}>Today&apos;s Attendance: 26/28</Text>
-                
-                <Text style={styles.absentText}>Absent: 2</Text>
+                <View style={styles.statusBreakdown}>
+                  <Text style={styles.presentText}>✅ Present: 26</Text>
+                  <Text style={styles.lateText}>⏰ Late: 0</Text>
+                  <Text style={styles.absentText}>❌ Absent: 2</Text>
+                </View>
               </View>
+
+              <TouchableOpacity 
+                style={styles.viewStudentListButton}
+                onPress={() => {
+                  setCurrentClass('8B');
+                  setShowStudentList(true);
+                }}
+              >
+                <Ionicons name="list" size={18} color="#4a90e2" />
+                <Text style={styles.viewStudentListText}>View All Students</Text>
+              </TouchableOpacity>
 
               <View style={styles.qrScanButtons}>
                 <TouchableOpacity 
