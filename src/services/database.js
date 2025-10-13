@@ -451,13 +451,19 @@ export class DatabaseService {
 
       // Process attendance records
       const presentToday = new Set();
+      const lateToday = new Set();
+      
       attendance.forEach(record => {
         if (record.type === 'login') {
           presentToday.add(record.studentId);
+          if (record.status === 'late') {
+            lateToday.add(record.studentId);
+          }
         }
       });
 
       summary.presentStudents = presentToday.size;
+      summary.lateStudents = lateToday.size;
       summary.absentStudents = summary.totalStudents - summary.presentStudents;
 
       return summary;

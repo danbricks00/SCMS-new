@@ -19,20 +19,54 @@ const TeacherPortal = () => {
   const [attendanceSummary, setAttendanceSummary] = useState({
     totalStudents: 0,
     presentStudents: 0,
-    absentStudents: 0
+    absentStudents: 0,
+    lateStudents: 0
   });
   const [currentClass, setCurrentClass] = useState('10A');
+  const [showStudentList, setShowStudentList] = useState(false);
+  const [classStudents, setClassStudents] = useState([]);
+  const [studentAttendanceStatus, setStudentAttendanceStatus] = useState({});
 
   useEffect(() => {
     loadAttendanceSummary();
+    loadClassStudents();
   }, [currentClass]);
 
   const loadAttendanceSummary = async () => {
     try {
       const summary = await DatabaseService.getTodayAttendanceSummary(currentClass);
       setAttendanceSummary(summary);
+      
+      // Build status map for each student
+      const statusMap = {};
+      summary.attendance.forEach(record => {
+        if (record.type === 'login') {
+          statusMap[record.studentId] = {
+            status: record.status || 'present',
+            time: record.nztFormatted || record.timestamp,
+            activity: record.activity,
+            lateBy: record.lateBy || 0
+          };
+        }
+      });
+      setStudentAttendanceStatus(statusMap);
     } catch (error) {
       console.error('Error loading attendance summary:', error);
+    }
+  };
+
+  const loadClassStudents = async () => {
+    try {
+      const students = await DatabaseService.getStudentsByClass(currentClass);
+      setClassStudents(students);
+    } catch (error) {
+      console.error('Error loading class students:', error);
+      // Fallback to sample data
+      setClassStudents([
+        { studentId: 'STU10AJ1234', name: 'John Doe', class: currentClass, photo: null },
+        { studentId: 'STU10BS5678', name: 'Jane Smith', class: currentClass, photo: null },
+        { studentId: 'STU10CW9012', name: 'Bob Wilson', class: currentClass, photo: null },
+      ]);
     }
   };
 
@@ -168,10 +202,23 @@ const TeacherPortal = () => {
                 <Text style={styles.attendanceText}>
                   Today&apos;s Attendance: {attendanceSummary.presentStudents}/{attendanceSummary.totalStudents}
                 </Text>
-                <Text style={styles.absentText}>
-                  Absent: {attendanceSummary.absentStudents}
-                </Text>
+                <View style={styles.statusBreakdown}>
+                  <Text style={styles.presentText}>✅ Present: {attendanceSummary.presentStudents}</Text>
+                  <Text style={styles.lateText}>⏰ Late: {attendanceSummary.lateStudents || 0}</Text>
+                  <Text style={styles.absentText}>❌ Absent: {attendanceSummary.absentStudents}</Text>
+                </View>
               </View>
+
+              <TouchableOpacity 
+                style={styles.viewStudentListButton}
+                onPress={() => {
+                  setCurrentClass('10A');
+                  setShowStudentList(true);
+                }}
+              >
+                <Ionicons name="list" size={18} color="#4a90e2" />
+                <Text style={styles.viewStudentListText}>View All Students</Text>
+              </TouchableOpacity>
 
               <View style={styles.qrScanButtons}>
                 <TouchableOpacity 
@@ -324,6 +371,107 @@ const TeacherPortal = () => {
           }}
         />
       </Modal>
+
+      {/* Student List Modal */}
+      <Modal
+        visible={showStudentList}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowStudentList(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Class {currentClass} - All Students</Text>
+            <TouchableOpacity onPress={() => loadAttendanceSummary()}>
+              <Ionicons name="refresh" size={24} color="#4a90e2" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Attendance Summary Header */}
+          <View style={styles.summaryHeader}>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryNumber}>{attendanceSummary.totalStudents}</Text>
+              <Text style={styles.summaryLabel}>Total</Text>
+            </View>
+            <View style={[styles.summaryCard, styles.presentCard]}>
+              <Text style={[styles.summaryNumber, styles.presentNumber]}>{attendanceSummary.presentStudents}</Text>
+              <Text style={styles.summaryLabel}>Present</Text>
+            </View>
+            <View style={[styles.summaryCard, styles.lateCard]}>
+              <Text style={[styles.summaryNumber, styles.lateNumber]}>{attendanceSummary.lateStudents || 0}</Text>
+              <Text style={styles.summaryLabel}>Late</Text>
+            </View>
+            <View style={[styles.summaryCard, styles.absentCard]}>
+              <Text style={[styles.summaryNumber, styles.absentNumber]}>{attendanceSummary.absentStudents}</Text>
+              <Text style={styles.summaryLabel}>Absent</Text>
+            </View>
+          </View>
+
+          {/* Filter Tabs */}
+          <View style={styles.filterTabs}>
+            <TouchableOpacity style={[styles.filterTab, styles.activeFilterTab]}>
+              <Text style={styles.activeFilterText}>All ({classStudents.length})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.filterTab}>
+              <Text style={styles.filterText}>Present ({attendanceSummary.presentStudents})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.filterTab}>
+              <Text style={styles.filterText}>Absent ({attendanceSummary.absentStudents})</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Student List */}
+          <ScrollView style={styles.studentListContainer}>
+            {classStudents.map((student) => {
+              const attendanceInfo = studentAttendanceStatus[student.studentId];
+              const status = attendanceInfo?.status || 'absent';
+              
+              return (
+                <View key={student.studentId} style={styles.studentListItem}>
+                  <View style={styles.studentAvatar}>
+                    <Ionicons name="person-circle" size={48} color="#4a90e2" />
+                  </View>
+                  
+                  <View style={styles.studentInfo}>
+                    <Text style={styles.studentListName}>{student.name}</Text>
+                    <Text style={styles.studentListId}>{student.studentId}</Text>
+                    {attendanceInfo && (
+                      <Text style={styles.studentListActivity}>
+                        {attendanceInfo.activity} • {attendanceInfo.time}
+                      </Text>
+                    )}
+                  </View>
+                  
+                  <View style={styles.statusBadgeContainer}>
+                    {status === 'present' && (
+                      <View style={[styles.statusBadge, styles.presentBadge]}>
+                        <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                        <Text style={styles.presentBadgeText}>Present</Text>
+                      </View>
+                    )}
+                    {status === 'late' && (
+                      <View style={[styles.statusBadge, styles.lateBadge]}>
+                        <Ionicons name="time" size={16} color="#FF9800" />
+                        <Text style={styles.lateBadgeText}>
+                          Late {attendanceInfo?.lateBy ? `(+${attendanceInfo.lateBy}m)` : ''}
+                        </Text>
+                      </View>
+                    )}
+                    {status === 'absent' && (
+                      <View style={[styles.statusBadge, styles.absentBadge]}>
+                        <Ionicons name="close-circle" size={16} color="#f44336" />
+                        <Text style={styles.absentBadgeText}>Absent</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -416,10 +564,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  statusBreakdown: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  presentText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  lateText: {
+    color: '#FF9800',
+    fontSize: 12,
+    fontWeight: '500',
+  },
   absentText: {
     color: '#f44336',
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: '500',
+  },
+  viewStudentListButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#4a90e2',
+    gap: 6,
+  },
+  viewStudentListText: {
+    color: '#4a90e2',
+    fontSize: 14,
+    fontWeight: '600',
   },
   qrScanButtons: {
     flexDirection: 'row',
@@ -513,6 +695,153 @@ const styles = StyleSheet.create({
   announcementDate: {
     fontSize: 12,
     color: '#999',
+  },
+  // Student List Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  summaryCard: {
+    alignItems: 'center',
+  },
+  summaryNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  presentNumber: {
+    color: '#4CAF50',
+  },
+  lateNumber: {
+    color: '#FF9800',
+  },
+  absentNumber: {
+    color: '#f44336',
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 4,
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  activeFilterTab: {
+    backgroundColor: '#4a90e2',
+  },
+  filterText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  activeFilterText: {
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  studentListContainer: {
+    flex: 1,
+    padding: 15,
+  },
+  studentListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  studentAvatar: {
+    marginRight: 12,
+  },
+  studentInfo: {
+    flex: 1,
+  },
+  studentListName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  studentListId: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  studentListActivity: {
+    fontSize: 11,
+    color: '#999',
+  },
+  statusBadgeContainer: {
+    marginLeft: 8,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 15,
+    gap: 4,
+  },
+  presentBadge: {
+    backgroundColor: '#e8f5e9',
+  },
+  presentBadgeText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  lateBadge: {
+    backgroundColor: '#fff3e0',
+  },
+  lateBadgeText: {
+    color: '#FF9800',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  absentBadge: {
+    backgroundColor: '#ffebee',
+  },
+  absentBadgeText: {
+    color: '#f44336',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 
