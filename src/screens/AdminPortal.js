@@ -4,7 +4,11 @@ import { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 import DateTimeDisplay from '../components/DateTimeDisplay';
+=======
+import AnnouncementBanner from '../components/AnnouncementBanner';
+>>>>>>> Stashed changes
 =======
 import AnnouncementBanner from '../components/AnnouncementBanner';
 >>>>>>> Stashed changes
@@ -15,6 +19,7 @@ const AdminPortal = () => {
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, students, teachers, classes, reports, settings
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showAddTeacher, setShowAddTeacher] = useState(false);
@@ -31,6 +36,13 @@ const AdminPortal = () => {
     { id: 'CLS002', name: '10B', students: 28, teacher: 'Mr. Smith' },
     { id: 'CLS003', name: '9A', students: 32, teacher: 'Dr. Williams' }
   ]);
+=======
+  const [showAddStudent, setShowStudentList] = useState(false);
+  const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+>>>>>>> Stashed changes
 =======
   const [showAddStudent, setShowStudentList] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
@@ -81,12 +93,22 @@ const AdminPortal = () => {
     visibility: 'all',
     targetClasses: []
   });
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '',
+    message: '',
+    priority: 'normal',
+    visibility: 'all',
+    targetClasses: []
+  });
 
   useEffect(() => {
     loadStudents();
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     loadTeachers();
     loadClasses();
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
     loadAnnouncements();
@@ -148,6 +170,7 @@ const AdminPortal = () => {
   };
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   const loadTeachers = async () => {
     try {
       const teachersData = await DatabaseService.getAllTeachers();
@@ -176,17 +199,23 @@ const AdminPortal = () => {
       console.error('Error loading announcements:', error);
       // Keep empty array if database is not available
 =======
+=======
+>>>>>>> Stashed changes
   const loadAnnouncements = async () => {
     try {
       const announcementsData = await DatabaseService.getAllAnnouncements();
       setAnnouncements(announcementsData);
     } catch (error) {
       console.error('Error loading announcements:', error);
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
       setAnnouncements([]);
     }
   };
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
   const handleAddTeacher = async () => {
     if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.email || !newTeacher.subject) {
@@ -254,6 +283,8 @@ const AdminPortal = () => {
 
 =======
 >>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
   const handleAddAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.message) {
       Alert.alert('Error', 'Please fill in title and message');
@@ -262,8 +293,11 @@ const AdminPortal = () => {
 
     try {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       await DatabaseService.addAnnouncement(newAnnouncement);
 =======
+=======
+>>>>>>> Stashed changes
       const announcementData = {
         ...newAnnouncement,
         createdBy: 'admin',
@@ -271,6 +305,9 @@ const AdminPortal = () => {
       };
 
       await DatabaseService.addAnnouncement(announcementData);
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
       Alert.alert('Success', 'Announcement posted successfully');
       
@@ -280,7 +317,12 @@ const AdminPortal = () => {
         message: '',
         priority: 'normal',
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         targetAudience: 'all'
+=======
+        visibility: 'all',
+        targetClasses: []
+>>>>>>> Stashed changes
 =======
         visibility: 'all',
         targetClasses: []
@@ -310,6 +352,7 @@ const AdminPortal = () => {
         </TouchableOpacity>
       </View>
       
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
       {/* Date and Time Display */}
       <View style={styles.dateTimeContainer}>
@@ -370,11 +413,16 @@ const AdminPortal = () => {
       </View>
 
 =======
+=======
+>>>>>>> Stashed changes
       {/* Announcements Banner */}
       <AnnouncementBanner 
         userRole="admin" 
       />
       
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
       <ScrollView style={styles.content}>
         {/* Dashboard View */}
@@ -881,6 +929,7 @@ const AdminPortal = () => {
       </Modal>
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       {/* Add Teacher Modal */}
       <Modal
         visible={showAddTeacher}
@@ -1081,6 +1130,9 @@ const AdminPortal = () => {
 =======
       {/* Announcements Management Modal */}
 >>>>>>> Stashed changes
+=======
+      {/* Announcements Management Modal */}
+>>>>>>> Stashed changes
       <Modal
         visible={showAnnouncements}
         animationType="slide"
@@ -1091,6 +1143,7 @@ const AdminPortal = () => {
             <TouchableOpacity onPress={() => setShowAnnouncements(false)}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
             <Text style={styles.modalTitle}>Announcements</Text>
             <TouchableOpacity onPress={() => {/* TODO: Add new announcement form */}}>
@@ -1135,6 +1188,8 @@ const AdminPortal = () => {
             
             {/* Add New Announcement Form */}
 =======
+=======
+>>>>>>> Stashed changes
             <Text style={styles.modalTitle}>Announcement Management</Text>
             <View style={styles.placeholder} />
           </View>
@@ -1182,6 +1237,9 @@ const AdminPortal = () => {
             </View>
             
             {/* Create New Announcement Form */}
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Create New Announcement</Text>
@@ -1233,6 +1291,7 @@ const AdminPortal = () => {
               
               <View style={styles.inputGroup}>
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
                 <Text style={styles.inputLabel}>Target Audience</Text>
                 <View style={styles.audienceSelector}>
                   {['all', 'teachers', 'students', 'parents'].map((audience) => (
@@ -1250,6 +1309,8 @@ const AdminPortal = () => {
                       ]}>
                         {audience.charAt(0).toUpperCase() + audience.slice(1)}
 =======
+=======
+>>>>>>> Stashed changes
                 <Text style={styles.inputLabel}>Visibility</Text>
                 <View style={styles.visibilitySelector}>
                   {['all', 'staff', 'students'].map((visibility) => (
@@ -1266,6 +1327,9 @@ const AdminPortal = () => {
                         newAnnouncement.visibility === visibility && styles.visibilityOptionTextActive
                       ]}>
                         {visibility.charAt(0).toUpperCase() + visibility.slice(1)}
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
                       </Text>
                     </TouchableOpacity>
@@ -1887,13 +1951,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   marginTop: {
     marginTop: 8,
 =======
+=======
+>>>>>>> Stashed changes
   announcementButton: {
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#f0f8ff',
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   },
   // Announcement styles
@@ -1955,17 +2025,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   },
   announcementTarget: {
     fontSize: 12,
     color: '#999',
 =======
+=======
+>>>>>>> Stashed changes
     marginBottom: 8,
   },
   announcementVisibility: {
     fontSize: 12,
     color: '#999',
     fontStyle: 'italic',
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   },
   announcementDate: {
@@ -1973,12 +2049,18 @@ const styles = StyleSheet.create({
     color: '#999',
   },
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
   announcementCreator: {
     fontSize: 11,
     color: '#ccc',
     fontStyle: 'italic',
   },
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   prioritySelector: {
     flexDirection: 'row',
@@ -2005,6 +2087,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   audienceSelector: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2029,6 +2112,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 =======
+=======
+>>>>>>> Stashed changes
   visibilitySelector: {
     flexDirection: 'row',
     gap: 8,
@@ -2062,6 +2147,9 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 16,
   },
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 });
 

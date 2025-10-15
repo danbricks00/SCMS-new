@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import DateTimeDisplay from '../components/DateTimeDisplay';
+=======
+import AnnouncementBanner from '../components/AnnouncementBanner';
+>>>>>>> Stashed changes
 =======
 import AnnouncementBanner from '../components/AnnouncementBanner';
 >>>>>>> Stashed changes
@@ -19,6 +23,7 @@ const ParentPortal = () => {
       </View>
       
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       {/* Date and Time Display */}
       <View style={styles.dateTimeContainer}>
         <DateTimeDisplay />
@@ -27,11 +32,16 @@ const ParentPortal = () => {
       {/* Announcements Banner */}
       <AnnouncementBanner targetAudience="parents" />
 =======
+=======
+>>>>>>> Stashed changes
       {/* Announcements Banner */}
       <AnnouncementBanner 
         userRole="parent" 
         userClass="10A" // This should come from child's data
       />
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
       
       <ScrollView style={styles.content}>

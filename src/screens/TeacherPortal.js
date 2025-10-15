@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 import { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,11 +11,16 @@ import DateTimeDisplay from '../components/DateTimeDisplay';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
 =======
+=======
+>>>>>>> Stashed changes
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
 import ActivityScanner from '../components/ActivityScanner';
 import TeacherAnnouncement from '../components/TeacherAnnouncement';
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 import { DatabaseService } from '../services/database';
 import { QR_SCAN_RESULTS, QRCodeUtils } from '../utils/qrCodeUtils';
@@ -34,9 +40,13 @@ const TeacherPortal = () => {
   });
   const [currentClass, setCurrentClass] = useState('10A');
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   const [showStudentList, setShowStudentList] = useState(false);
   const [classStudents, setClassStudents] = useState([]);
   const [studentAttendanceStatus, setStudentAttendanceStatus] = useState({});
+=======
+  const [teacherClasses, setTeacherClasses] = useState(['10A', '8B', '9C']); // Teacher's classes
+>>>>>>> Stashed changes
 =======
   const [teacherClasses, setTeacherClasses] = useState(['10A', '8B', '9C']); // Teacher's classes
 >>>>>>> Stashed changes
@@ -212,6 +222,7 @@ const TeacherPortal = () => {
       </View>
       
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       {/* Date and Time Display */}
       <View style={styles.dateTimeContainer}>
         <DateTimeDisplay />
@@ -220,12 +231,17 @@ const TeacherPortal = () => {
       {/* Announcements Banner */}
       <AnnouncementBanner targetAudience="teachers" />
 =======
+=======
+>>>>>>> Stashed changes
       {/* Announcements Banner */}
       <AnnouncementBanner 
         userRole="teacher" 
         userClass={currentClass} 
         userClasses={teacherClasses} 
       />
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
       
       <ScrollView style={styles.content}>
@@ -426,6 +442,7 @@ const TeacherPortal = () => {
       </Modal>
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       {/* Student List Modal */}
       <Modal
         visible={showStudentList}
@@ -527,6 +544,8 @@ const TeacherPortal = () => {
         </SafeAreaView>
       </Modal>
 =======
+=======
+>>>>>>> Stashed changes
       {/* Teacher Announcement Modal */}
       <TeacherAnnouncement
         isVisible={showTeacherAnnouncement}
@@ -534,6 +553,9 @@ const TeacherPortal = () => {
         teacherId="TCH001" // This should come from authentication
         teacherClasses={teacherClasses}
       />
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     </SafeAreaView>
   );
@@ -561,16 +583,22 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   dateTimeContainer: {
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
 =======
+=======
+>>>>>>> Stashed changes
   announcementButton: {
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#f0f8ff',
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   },
   content: {
