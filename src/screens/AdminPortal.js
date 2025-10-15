@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
-import QRCodeGenerator from '../components/QRCodeGenerator';
 import ProtectedRoute from '../components/ProtectedRoute';
+import QRCodeGenerator from '../components/QRCodeGenerator';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
 
