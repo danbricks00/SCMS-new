@@ -116,6 +116,7 @@ const TeacherPortal = () => {
           onPress={() => setShowTeacherAnnouncement(true)}
         >
           <Ionicons name="megaphone" size={20} color="#4a90e2" />
+          <Text style={styles.announcementButtonText}>Announce</Text>
         </TouchableOpacity>
       </View>
       
@@ -298,10 +299,15 @@ const TeacherPortal = () => {
 
       {/* Teacher Announcement Modal */}
       <TeacherAnnouncement
-        isVisible={showTeacherAnnouncement}
+        visible={showTeacherAnnouncement}
         onClose={() => setShowTeacherAnnouncement(false)}
         teacherId="TCH001" // This should come from authentication
-        teacherClasses={teacherClasses}
+        teacherName="John Smith" // This should come from authentication
+        teacherClasses={teacherClasses.map((className, index) => ({
+          id: `class_${index}`,
+          name: className,
+          subject: 'Mathematics' // This should come from actual class data
+        }))}
       />
     </SafeAreaView>
   );
@@ -329,9 +335,17 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   announcementButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#f0f8ff',
+    gap: 4,
+  },
+  announcementButtonText: {
+    color: '#4a90e2',
+    fontSize: 12,
+    fontWeight: '600',
   },
   content: {
     flex: 1,
