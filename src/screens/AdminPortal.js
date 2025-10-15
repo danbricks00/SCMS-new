@@ -3,7 +3,11 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+<<<<<<< Updated upstream
 import DateTimeDisplay from '../components/DateTimeDisplay';
+=======
+import AnnouncementBanner from '../components/AnnouncementBanner';
+>>>>>>> Stashed changes
 import QRCodeGenerator from '../components/QRCodeGenerator';
 import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
 
@@ -11,6 +15,7 @@ const AdminPortal = () => {
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, students, teachers, classes, reports, settings
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
+<<<<<<< Updated upstream
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showAddTeacher, setShowAddTeacher] = useState(false);
   const [showAddClass, setShowAddClass] = useState(false);
@@ -26,6 +31,13 @@ const AdminPortal = () => {
     { id: 'CLS002', name: '10B', students: 28, teacher: 'Mr. Smith' },
     { id: 'CLS003', name: '9A', students: 32, teacher: 'Dr. Williams' }
   ]);
+=======
+  const [showAddStudent, setShowStudentList] = useState(false);
+  const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+>>>>>>> Stashed changes
   const [newStudent, setNewStudent] = useState({
     firstName: '',
     lastName: '',
@@ -62,11 +74,21 @@ const AdminPortal = () => {
     priority: 'normal', // normal, high, urgent
     targetAudience: 'all' // all, teachers, students, parents
   });
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '',
+    message: '',
+    priority: 'normal',
+    visibility: 'all',
+    targetClasses: []
+  });
 
   useEffect(() => {
     loadStudents();
+<<<<<<< Updated upstream
     loadTeachers();
     loadClasses();
+=======
+>>>>>>> Stashed changes
     loadAnnouncements();
   }, []);
 
@@ -125,6 +147,7 @@ const AdminPortal = () => {
     Alert.alert('Success', 'QR Code generated successfully');
   };
 
+<<<<<<< Updated upstream
   const loadTeachers = async () => {
     try {
       const teachersData = await DatabaseService.getAllTeachers();
@@ -152,10 +175,19 @@ const AdminPortal = () => {
     } catch (error) {
       console.error('Error loading announcements:', error);
       // Keep empty array if database is not available
+=======
+  const loadAnnouncements = async () => {
+    try {
+      const announcementsData = await DatabaseService.getAllAnnouncements();
+      setAnnouncements(announcementsData);
+    } catch (error) {
+      console.error('Error loading announcements:', error);
+>>>>>>> Stashed changes
       setAnnouncements([]);
     }
   };
 
+<<<<<<< Updated upstream
   const handleAddTeacher = async () => {
     if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.email || !newTeacher.subject) {
       Alert.alert('Error', 'Please fill in all required fields (First Name, Last Name, Email, Subject)');
@@ -220,6 +252,8 @@ const AdminPortal = () => {
     }
   };
 
+=======
+>>>>>>> Stashed changes
   const handleAddAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.message) {
       Alert.alert('Error', 'Please fill in title and message');
@@ -227,7 +261,17 @@ const AdminPortal = () => {
     }
 
     try {
+<<<<<<< Updated upstream
       await DatabaseService.addAnnouncement(newAnnouncement);
+=======
+      const announcementData = {
+        ...newAnnouncement,
+        createdBy: 'admin',
+        createdByRole: 'admin'
+      };
+
+      await DatabaseService.addAnnouncement(announcementData);
+>>>>>>> Stashed changes
       Alert.alert('Success', 'Announcement posted successfully');
       
       // Reset form
@@ -235,7 +279,12 @@ const AdminPortal = () => {
         title: '',
         message: '',
         priority: 'normal',
+<<<<<<< Updated upstream
         targetAudience: 'all'
+=======
+        visibility: 'all',
+        targetClasses: []
+>>>>>>> Stashed changes
       });
       
       setShowAnnouncements(false);
@@ -253,8 +302,15 @@ const AdminPortal = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Admin Portal</Text>
+        <TouchableOpacity 
+          style={styles.announcementButton}
+          onPress={() => setShowAnnouncements(true)}
+        >
+          <Ionicons name="megaphone" size={20} color="#4a90e2" />
+        </TouchableOpacity>
       </View>
       
+<<<<<<< Updated upstream
       {/* Date and Time Display */}
       <View style={styles.dateTimeContainer}>
         <DateTimeDisplay />
@@ -313,6 +369,13 @@ const AdminPortal = () => {
         </ScrollView>
       </View>
 
+=======
+      {/* Announcements Banner */}
+      <AnnouncementBanner 
+        userRole="admin" 
+      />
+      
+>>>>>>> Stashed changes
       <ScrollView style={styles.content}>
         {/* Dashboard View */}
         {activeView === 'dashboard' && (
@@ -817,6 +880,7 @@ const AdminPortal = () => {
         />
       </Modal>
 
+<<<<<<< Updated upstream
       {/* Add Teacher Modal */}
       <Modal
         visible={showAddTeacher}
@@ -1014,6 +1078,9 @@ const AdminPortal = () => {
       </Modal>
 
       {/* Announcements Modal */}
+=======
+      {/* Announcements Management Modal */}
+>>>>>>> Stashed changes
       <Modal
         visible={showAnnouncements}
         animationType="slide"
@@ -1024,6 +1091,7 @@ const AdminPortal = () => {
             <TouchableOpacity onPress={() => setShowAnnouncements(false)}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
+<<<<<<< Updated upstream
             <Text style={styles.modalTitle}>Announcements</Text>
             <TouchableOpacity onPress={() => {/* TODO: Add new announcement form */}}>
               <Ionicons name="add" size={24} color="#4a90e2" />
@@ -1066,6 +1134,55 @@ const AdminPortal = () => {
             )}
             
             {/* Add New Announcement Form */}
+=======
+            <Text style={styles.modalTitle}>Announcement Management</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          <ScrollView style={styles.announcementContainer}>
+            {/* All Announcements List */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>All Announcements ({announcements.length})</Text>
+              
+              {announcements.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="megaphone-outline" size={64} color="#ccc" />
+                  <Text style={styles.emptyStateText}>No announcements yet</Text>
+                </View>
+              ) : (
+                announcements.map((announcement) => (
+                  <View key={announcement.id} style={styles.announcementCard}>
+                    <View style={styles.announcementHeader}>
+                      <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                      <View style={[styles.priorityBadge, 
+                        announcement.priority === 'urgent' ? styles.urgentBadge : 
+                        announcement.priority === 'high' ? styles.highBadge : styles.normalBadge
+                      ]}>
+                        <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.announcementMessage}>{announcement.message}</Text>
+                    <View style={styles.announcementFooter}>
+                      <Text style={styles.announcementVisibility}>
+                        {announcement.visibility === 'all' ? 'Everyone' :
+                         announcement.visibility === 'staff' ? 'Staff Only' :
+                         announcement.visibility === 'students' ? 'Students Only' :
+                         `Class: ${announcement.targetClasses?.join(', ') || 'N/A'}`}
+                      </Text>
+                      <Text style={styles.announcementDate}>
+                        {new Date(announcement.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <Text style={styles.announcementCreator}>
+                      By: {announcement.createdByRole} {announcement.createdBy}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+            
+            {/* Create New Announcement Form */}
+>>>>>>> Stashed changes
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Create New Announcement</Text>
               
@@ -1115,6 +1232,7 @@ const AdminPortal = () => {
               </View>
               
               <View style={styles.inputGroup}>
+<<<<<<< Updated upstream
                 <Text style={styles.inputLabel}>Target Audience</Text>
                 <View style={styles.audienceSelector}>
                   {['all', 'teachers', 'students', 'parents'].map((audience) => (
@@ -1131,6 +1249,24 @@ const AdminPortal = () => {
                         newAnnouncement.targetAudience === audience && styles.audienceOptionTextActive
                       ]}>
                         {audience.charAt(0).toUpperCase() + audience.slice(1)}
+=======
+                <Text style={styles.inputLabel}>Visibility</Text>
+                <View style={styles.visibilitySelector}>
+                  {['all', 'staff', 'students'].map((visibility) => (
+                    <TouchableOpacity
+                      key={visibility}
+                      style={[
+                        styles.visibilityOption,
+                        newAnnouncement.visibility === visibility && styles.visibilityOptionActive
+                      ]}
+                      onPress={() => setNewAnnouncement({...newAnnouncement, visibility})}
+                    >
+                      <Text style={[
+                        styles.visibilityOptionText,
+                        newAnnouncement.visibility === visibility && styles.visibilityOptionTextActive
+                      ]}>
+                        {visibility.charAt(0).toUpperCase() + visibility.slice(1)}
+>>>>>>> Stashed changes
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1750,8 +1886,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+<<<<<<< Updated upstream
   marginTop: {
     marginTop: 8,
+=======
+  announcementButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f8ff',
+>>>>>>> Stashed changes
   },
   // Announcement styles
   announcementContainer: {
@@ -1811,15 +1954,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+<<<<<<< Updated upstream
   },
   announcementTarget: {
     fontSize: 12,
     color: '#999',
+=======
+    marginBottom: 8,
+  },
+  announcementVisibility: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+>>>>>>> Stashed changes
   },
   announcementDate: {
     fontSize: 12,
     color: '#999',
   },
+<<<<<<< Updated upstream
+=======
+  announcementCreator: {
+    fontSize: 11,
+    color: '#ccc',
+    fontStyle: 'italic',
+  },
+>>>>>>> Stashed changes
   prioritySelector: {
     flexDirection: 'row',
     gap: 8,
@@ -1844,6 +2004,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+<<<<<<< Updated upstream
   audienceSelector: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1867,6 +2028,41 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+=======
+  visibilitySelector: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  visibilityOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+  },
+  visibilityOptionActive: {
+    backgroundColor: '#4CAF50',
+  },
+  visibilityOptionText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  visibilityOptionTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 16,
+  },
+>>>>>>> Stashed changes
 });
 
 export default AdminPortal;

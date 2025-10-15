@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+<<<<<<< Updated upstream
 import { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +9,13 @@ import AnnouncementBanner from '../components/AnnouncementBanner';
 import DateTimeDisplay from '../components/DateTimeDisplay';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
+=======
+import AnnouncementBanner from '../components/AnnouncementBanner';
+import QRScanner from '../components/QRScanner';
+import StudentCard from '../components/StudentCard';
+import ActivityScanner from '../components/ActivityScanner';
+import TeacherAnnouncement from '../components/TeacherAnnouncement';
+>>>>>>> Stashed changes
 import { DatabaseService } from '../services/database';
 import { QR_SCAN_RESULTS, QRCodeUtils } from '../utils/qrCodeUtils';
 
@@ -15,6 +23,7 @@ const TeacherPortal = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showStudentCard, setShowStudentCard] = useState(false);
   const [showActivityScanner, setShowActivityScanner] = useState(false);
+  const [showTeacherAnnouncement, setShowTeacherAnnouncement] = useState(false);
   const [scannedStudent, setScannedStudent] = useState(null);
   const [attendanceType, setAttendanceType] = useState('login');
   const [attendanceSummary, setAttendanceSummary] = useState({
@@ -24,9 +33,13 @@ const TeacherPortal = () => {
     lateStudents: 0
   });
   const [currentClass, setCurrentClass] = useState('10A');
+<<<<<<< Updated upstream
   const [showStudentList, setShowStudentList] = useState(false);
   const [classStudents, setClassStudents] = useState([]);
   const [studentAttendanceStatus, setStudentAttendanceStatus] = useState({});
+=======
+  const [teacherClasses, setTeacherClasses] = useState(['10A', '8B', '9C']); // Teacher's classes
+>>>>>>> Stashed changes
 
   useEffect(() => {
     loadAttendanceSummary();
@@ -190,8 +203,15 @@ const TeacherPortal = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Teacher Portal</Text>
+        <TouchableOpacity 
+          style={styles.announcementButton}
+          onPress={() => setShowTeacherAnnouncement(true)}
+        >
+          <Ionicons name="megaphone" size={20} color="#4a90e2" />
+        </TouchableOpacity>
       </View>
       
+<<<<<<< Updated upstream
       {/* Date and Time Display */}
       <View style={styles.dateTimeContainer}>
         <DateTimeDisplay />
@@ -199,6 +219,14 @@ const TeacherPortal = () => {
       
       {/* Announcements Banner */}
       <AnnouncementBanner targetAudience="teachers" />
+=======
+      {/* Announcements Banner */}
+      <AnnouncementBanner 
+        userRole="teacher" 
+        userClass={currentClass} 
+        userClasses={teacherClasses} 
+      />
+>>>>>>> Stashed changes
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>
@@ -397,6 +425,7 @@ const TeacherPortal = () => {
         />
       </Modal>
 
+<<<<<<< Updated upstream
       {/* Student List Modal */}
       <Modal
         visible={showStudentList}
@@ -497,6 +526,15 @@ const TeacherPortal = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+=======
+      {/* Teacher Announcement Modal */}
+      <TeacherAnnouncement
+        isVisible={showTeacherAnnouncement}
+        onClose={() => setShowTeacherAnnouncement(false)}
+        teacherId="TCH001" // This should come from authentication
+        teacherClasses={teacherClasses}
+      />
+>>>>>>> Stashed changes
     </SafeAreaView>
   );
 };
@@ -522,11 +560,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+<<<<<<< Updated upstream
   dateTimeContainer: {
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+=======
+  announcementButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f8ff',
+>>>>>>> Stashed changes
   },
   content: {
     flex: 1,

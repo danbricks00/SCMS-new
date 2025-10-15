@@ -3,13 +3,23 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { DatabaseService } from '../services/database';
 
+<<<<<<< Updated upstream
 const AnnouncementBanner = ({ targetAudience = 'all', style }) => {
+=======
+const AnnouncementBanner = ({ 
+  userRole = 'student', // 'admin', 'teacher', 'student', 'parent'
+  userClass = null, // User's class (for students/teachers)
+  userClasses = [], // Array of classes user has access to (for teachers)
+  style 
+}) => {
+>>>>>>> Stashed changes
   const [announcements, setAnnouncements] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     loadAnnouncements();
+<<<<<<< Updated upstream
   }, []);
 
   const loadAnnouncements = async () => {
@@ -20,6 +30,16 @@ const AnnouncementBanner = ({ targetAudience = 'all', style }) => {
       const filteredAnnouncements = allAnnouncements.filter(announcement => 
         announcement.targetAudience === 'all' || 
         announcement.targetAudience === targetAudience
+=======
+  }, [userRole, userClass, userClasses]);
+
+  const loadAnnouncements = async () => {
+    try {
+      const filteredAnnouncements = await DatabaseService.getAnnouncementsForUser(
+        userRole, 
+        userClass, 
+        userClasses
+>>>>>>> Stashed changes
       );
       
       // Sort by priority (urgent first, then high, then normal)
@@ -63,6 +83,24 @@ const AnnouncementBanner = ({ targetAudience = 'all', style }) => {
     }
   };
 
+<<<<<<< Updated upstream
+=======
+  const getVisibilityLabel = (visibility, targetClasses = []) => {
+    switch (visibility) {
+      case 'all':
+        return 'Everyone';
+      case 'staff':
+        return 'Staff Only';
+      case 'students':
+        return 'Students Only';
+      case 'class':
+        return `Class: ${targetClasses.join(', ')}`;
+      default:
+        return 'Unknown';
+    }
+  };
+
+>>>>>>> Stashed changes
   const nextAnnouncement = () => {
     setCurrentIndex((prev) => (prev + 1) % announcements.length);
   };
@@ -100,9 +138,20 @@ const AnnouncementBanner = ({ targetAudience = 'all', style }) => {
                 </View>
               </View>
               <Text style={styles.announcementMessage}>{announcement.message}</Text>
+<<<<<<< Updated upstream
               <Text style={styles.announcementDate}>
                 {new Date(announcement.createdAt).toLocaleDateString()} • Target: {announcement.targetAudience}
               </Text>
+=======
+              <View style={styles.announcementFooter}>
+                <Text style={styles.announcementVisibility}>
+                  {getVisibilityLabel(announcement.visibility, announcement.targetClasses)}
+                </Text>
+                <Text style={styles.announcementDate}>
+                  {new Date(announcement.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+>>>>>>> Stashed changes
             </View>
           ))}
         </ScrollView>
@@ -214,6 +263,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
+<<<<<<< Updated upstream
+=======
+  announcementFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  announcementVisibility: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+>>>>>>> Stashed changes
   announcementDate: {
     fontSize: 12,
     color: '#999',
