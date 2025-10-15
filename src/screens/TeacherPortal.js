@@ -196,10 +196,19 @@ const TeacherPortal = () => {
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Teacher Portal - {user?.name}</Text>
-          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-            <Ionicons name="log-out" size={20} color="#e74c3c" />
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.announcementButton}
+              onPress={() => setShowTeacherAnnouncement(true)}
+            >
+              <Ionicons name="megaphone" size={20} color="#4a90e2" />
+              <Text style={styles.announcementButtonText}>Announce</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+              <Ionicons name="log-out" size={20} color="#e74c3c" />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       
       {/* Announcements Banner */}
@@ -506,6 +515,19 @@ const TeacherPortal = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Teacher Announcement Modal */}
+      <TeacherAnnouncement
+        visible={showTeacherAnnouncement}
+        onClose={() => setShowTeacherAnnouncement(false)}
+        teacherId={user?.username || "TCH001"}
+        teacherName={user?.name || "Teacher"}
+        teacherClasses={teacherClasses.map((className, index) => ({
+          id: `class_${index}`,
+          name: className,
+          subject: 'Mathematics' // This should come from actual class data
+        }))}
+      />
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -533,6 +555,11 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
     textAlign: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   logoutButton: {
     flexDirection: 'row',
