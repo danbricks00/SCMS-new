@@ -11,7 +11,7 @@ import { QRCodeUtils } from '../utils/qrCodeUtils';
 const AdminPortal = () => {
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
-  const [showAddStudent, setShowStudentList] = useState(false);
+  const [showAddStudent, setShowAddStudent] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [students, setStudents] = useState([]);
