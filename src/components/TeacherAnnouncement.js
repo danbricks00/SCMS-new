@@ -1,47 +1,21 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, TextInput, Alert, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DatabaseService } from '../services/database';
+import { Ionicons } from '@expo/vector-icons';
+import DatabaseService from '../services/database';
 
-const TeacherAnnouncement = ({ isVisible, onClose, teacherId, teacherClasses = [] }) => {
+const TeacherAnnouncement = ({ visible, onClose, teacherId, teacherName, teacherClasses = [] }) => {
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
     message: '',
     priority: 'normal',
     targetClasses: [],
-    includeParents: false
+    includeParents: false,
   });
-  const [availableClasses, setAvailableClasses] = useState([]);
 
-  useEffect(() => {
-    if (isVisible) {
-      loadTeacherClasses();
-    }
-  }, [isVisible, teacherId]);
-
-  const loadTeacherClasses = async () => {
-    try {
-      const classes = await DatabaseService.getTeacherClasses(teacherId);
-      setAvailableClasses(classes);
-    } catch (error) {
-      console.error('Error loading teacher classes:', error);
-      setAvailableClasses(teacherClasses);
-    }
-  };
-
-  const handleClassToggle = (className) => {
-    setNewAnnouncement(prev => ({
-      ...prev,
-      targetClasses: prev.targetClasses.includes(className)
-        ? prev.targetClasses.filter(c => c !== className)
-        : [...prev.targetClasses, className]
-    }));
-  };
-
-  const handleSubmit = async () => {
-    if (!newAnnouncement.title || !newAnnouncement.message) {
-      Alert.alert('Error', 'Please fill in title and message');
+  const handleCreateAnnouncement = async () => {
+    if (!newAnnouncement.title.trim() || !newAnnouncement.message.trim()) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -53,158 +27,180 @@ const TeacherAnnouncement = ({ isVisible, onClose, teacherId, teacherClasses = [
     try {
       const announcementData = {
         ...newAnnouncement,
-        visibility: 'class',
         createdBy: teacherId,
-        createdByRole: 'teacher'
+        createdByRole: 'teacher',
+        createdByName: teacherName,
+        visibility: 'class',
+        timestamp: new Date(),
+        isActive: true,
       };
 
       await DatabaseService.addAnnouncement(announcementData);
-      Alert.alert('Success', 'Announcement posted successfully');
       
-      // Reset form
+      Alert.alert('Success', 'Announcement created successfully!');
       setNewAnnouncement({
         title: '',
         message: '',
         priority: 'normal',
         targetClasses: [],
-        includeParents: false
+        includeParents: false,
       });
-      
       onClose();
     } catch (error) {
-      console.error('Error posting announcement:', error);
-      Alert.alert('Error', 'Failed to post announcement');
+      console.error('Error creating announcement:', error);
+      Alert.alert('Error', 'Failed to create announcement. Please try again.');
     }
   };
 
-  if (!isVisible) return null;
+  const toggleClass = (classId) => {
+    setNewAnnouncement(prev => ({
+      ...prev,
+      targetClasses: prev.targetClasses.includes(classId)
+        ? prev.targetClasses.filter(id => id !== classId)
+        : [...prev.targetClasses, classId]
+    }));
+  };
+
+  const resetForm = () => {
+    setNewAnnouncement({
+      title: '',
+      message: '',
+      priority: 'normal',
+      targetClasses: [],
+      includeParents: false,
+    });
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   return (
     <Modal
-      visible={isVisible}
+      visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
     >
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity onPress={handleClose}>
             <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Class Announcement</Text>
+          <Text style={styles.title}>Create Class Announcement</Text>
           <View style={styles.placeholder} />
         </View>
-        
+
         <ScrollView style={styles.content}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Announcement Details</Text>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Title *</Text>
-              <TextInput
-                style={styles.input}
-                value={newAnnouncement.title}
-                onChangeText={(text) => setNewAnnouncement({...newAnnouncement, title: text})}
-                placeholder="Enter announcement title"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Message *</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={newAnnouncement.message}
-                onChangeText={(text) => setNewAnnouncement({...newAnnouncement, message: text})}
-                placeholder="Enter announcement message"
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Priority</Text>
-              <View style={styles.prioritySelector}>
-                {['normal', 'high', 'urgent'].map((priority) => (
-                  <TouchableOpacity
-                    key={priority}
-                    style={[
-                      styles.priorityOption,
-                      newAnnouncement.priority === priority && styles.priorityOptionActive
-                    ]}
-                    onPress={() => setNewAnnouncement({...newAnnouncement, priority})}
-                  >
-                    <Text style={[
-                      styles.priorityOptionText,
-                      newAnnouncement.priority === priority && styles.priorityOptionTextActive
-                    ]}>
-                      {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Title *</Text>
+            <TextInput
+              style={styles.input}
+              value={newAnnouncement.title}
+              onChangeText={(text) => setNewAnnouncement({...newAnnouncement, title: text})}
+              placeholder="Enter announcement title"
+            />
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Target Classes *</Text>
-            <Text style={styles.helperText}>Select the classes that should see this announcement</Text>
-            
-            <View style={styles.classSelector}>
-              {availableClasses.map((className) => (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Message *</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={newAnnouncement.message}
+              onChangeText={(text) => setNewAnnouncement({...newAnnouncement, message: text})}
+              placeholder="Enter your message"
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Priority</Text>
+            <View style={styles.priorityContainer}>
+              {['normal', 'high', 'urgent'].map((priority) => (
                 <TouchableOpacity
-                  key={className}
+                  key={priority}
                   style={[
-                    styles.classOption,
-                    newAnnouncement.targetClasses.includes(className) && styles.classOptionActive
+                    styles.priorityOption,
+                    newAnnouncement.priority === priority && styles.priorityOptionActive
                   ]}
-                  onPress={() => handleClassToggle(className)}
+                  onPress={() => setNewAnnouncement({...newAnnouncement, priority})}
                 >
-                  <Ionicons 
-                    name={newAnnouncement.targetClasses.includes(className) ? "checkmark-circle" : "ellipse-outline"} 
-                    size={20} 
-                    color={newAnnouncement.targetClasses.includes(className) ? "#4CAF50" : "#666"} 
-                  />
                   <Text style={[
-                    styles.classOptionText,
-                    newAnnouncement.targetClasses.includes(className) && styles.classOptionTextActive
+                    styles.priorityText,
+                    newAnnouncement.priority === priority && styles.priorityTextActive
                   ]}>
-                    Class {className}
+                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Parent Visibility</Text>
-            
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Target Classes *</Text>
+            <Text style={styles.helperText}>Select the classes that should see this announcement</Text>
+            {teacherClasses.map((classItem) => (
+              <TouchableOpacity
+                key={classItem.id}
+                style={[
+                  styles.classOption,
+                  newAnnouncement.targetClasses.includes(classItem.id) && styles.classOptionActive
+                ]}
+                onPress={() => toggleClass(classItem.id)}
+              >
+                <View style={styles.classInfo}>
+                  <Text style={[
+                    styles.className,
+                    newAnnouncement.targetClasses.includes(classItem.id) && styles.classNameActive
+                  ]}>
+                    {classItem.name}
+                  </Text>
+                  <Text style={[
+                    styles.classSubject,
+                    newAnnouncement.targetClasses.includes(classItem.id) && styles.classSubjectActive
+                  ]}>
+                    {classItem.subject}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={newAnnouncement.targetClasses.includes(classItem.id) ? "checkmark-circle" : "ellipse-outline"}
+                  size={20}
+                  color={newAnnouncement.targetClasses.includes(classItem.id) ? "#4CAF50" : "#ccc"}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.inputGroup}>
             <TouchableOpacity
-              style={styles.parentToggle}
+              style={[
+                styles.checkboxContainer,
+                newAnnouncement.includeParents && styles.checkboxContainerActive
+              ]}
               onPress={() => setNewAnnouncement({...newAnnouncement, includeParents: !newAnnouncement.includeParents})}
             >
-              <Ionicons 
-                name={newAnnouncement.includeParents ? "checkmark-circle" : "ellipse-outline"} 
-                size={24} 
-                color={newAnnouncement.includeParents ? "#4CAF50" : "#666"} 
+              <Ionicons
+                name={newAnnouncement.includeParents ? "checkbox" : "square-outline"}
+                size={20}
+                color={newAnnouncement.includeParents ? "#4CAF50" : "#ccc"}
               />
-              <View style={styles.parentToggleText}>
-                <Text style={styles.parentToggleTitle}>Include Parents</Text>
-                <Text style={styles.parentToggleDescription}>
-                  Parents of students in selected classes will also see this announcement
-                </Text>
-              </View>
+              <Text style={[
+                styles.checkboxText,
+                newAnnouncement.includeParents && styles.checkboxTextActive
+              ]}>
+                Also notify parents of selected classes
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-              <Ionicons name="megaphone" size={20} color="#fff" />
-              <Text style={styles.submitButtonText}>Post Announcement</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={handleCreateAnnouncement}
+          >
+            <Ionicons name="megaphone" size={20} color="#fff" />
+            <Text style={styles.createButtonText}>Create Announcement</Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -218,14 +214,14 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'space-between',
+    padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  headerTitle: {
+  title: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
@@ -237,44 +233,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  section: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-  },
   inputGroup: {
     marginBottom: 20,
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
   },
   helperText: {
     fontSize: 12,
@@ -282,7 +248,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontStyle: 'italic',
   },
-  prioritySelector: {
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  priorityContainer: {
     flexDirection: 'row',
     gap: 8,
   },
@@ -297,91 +275,86 @@ const styles = StyleSheet.create({
   priorityOptionActive: {
     backgroundColor: '#4a90e2',
   },
-  priorityOptionText: {
+  priorityText: {
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
   },
-  priorityOptionTextActive: {
+  priorityTextActive: {
     color: '#fff',
     fontWeight: '600',
-  },
-  classSelector: {
-    gap: 8,
   },
   classOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    padding: 12,
+    backgroundColor: '#fff',
     borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-    gap: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginBottom: 8,
   },
   classOptionActive: {
-    backgroundColor: '#e3f2fd',
-    borderWidth: 1,
-    borderColor: '#4a90e2',
+    borderColor: '#4CAF50',
+    backgroundColor: '#f0f8f0',
   },
-  classOptionText: {
+  classInfo: {
+    flex: 1,
+  },
+  className: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  classNameActive: {
+    color: '#4CAF50',
+  },
+  classSubject: {
     fontSize: 14,
     color: '#666',
-    fontWeight: '500',
   },
-  classOptionTextActive: {
-    color: '#4a90e2',
-    fontWeight: '600',
+  classSubjectActive: {
+    color: '#4CAF50',
   },
-  parentToggle: {
+  checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  parentToggleText: {
-    flex: 1,
-  },
-  parentToggleTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 4,
-  },
-  parentToggleDescription: {
-    fontSize: 12,
-    color: '#666',
-    lineHeight: 16,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 15,
+    padding: 12,
+    backgroundColor: '#fff',
     borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  checkboxContainerActive: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#f0f8f0',
+  },
+  checkboxText: {
+    fontSize: 14,
     color: '#666',
+    marginLeft: 12,
+    flex: 1,
   },
-  submitButton: {
-    flex: 2,
+  checkboxTextActive: {
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#4CAF50',
     paddingVertical: 15,
     borderRadius: 8,
-    backgroundColor: '#4CAF50',
+    marginTop: 20,
     gap: 8,
   },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  createButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

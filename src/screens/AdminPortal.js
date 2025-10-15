@@ -12,9 +12,13 @@ const AdminPortal = () => {
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showAddTeacher, setShowAddTeacher] = useState(false);
+  const [showAddClass, setShowAddClass] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [students, setStudents] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [newStudent, setNewStudent] = useState({
     firstName: '',
@@ -24,6 +28,25 @@ const AdminPortal = () => {
     address: '',
     emergencyContact: '',
     photo: ''
+  });
+  const [newTeacher, setNewTeacher] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    subject: '',
+    department: '',
+    photo: '',
+    classes: []
+  });
+  const [newClass, setNewClass] = useState({
+    name: '',
+    teacherId: '',
+    teacherName: '',
+    subject: '',
+    room: '',
+    schedule: '',
+    studentIds: []
   });
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
@@ -35,6 +58,8 @@ const AdminPortal = () => {
 
   useEffect(() => {
     loadStudents();
+    loadTeachers();
+    loadClasses();
     loadAnnouncements();
   }, []);
 
@@ -46,6 +71,28 @@ const AdminPortal = () => {
       console.error('Error loading students:', error);
       // Use sample data if database is not available
       setStudents(SAMPLE_STUDENTS);
+    }
+  };
+
+  const loadTeachers = async () => {
+    try {
+      const teachersData = await DatabaseService.getAllTeachers();
+      setTeachers(teachersData);
+    } catch (error) {
+      console.error('Error loading teachers:', error);
+      // Keep empty array if database is not available
+      setTeachers([]);
+    }
+  };
+
+  const loadClasses = async () => {
+    try {
+      const classesData = await DatabaseService.getAllClasses();
+      setClasses(classesData);
+    } catch (error) {
+      console.error('Error loading classes:', error);
+      // Keep empty array if database is not available
+      setClasses([]);
     }
   };
 
@@ -83,9 +130,99 @@ const AdminPortal = () => {
     }
   };
 
+  const handleAddTeacher = async () => {
+    if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.email || !newTeacher.subject) {
+      Alert.alert('Error', 'Please fill in all required fields (First Name, Last Name, Email, Subject)');
+      return;
+    }
+
+    try {
+      const teacherData = {
+        ...newTeacher,
+        name: `${newTeacher.firstName} ${newTeacher.lastName}`
+      };
+
+      await DatabaseService.addTeacher(teacherData);
+      Alert.alert('Success', 'Teacher added successfully');
+      
+      // Reset form
+      setNewTeacher({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        subject: '',
+        department: '',
+        photo: '',
+        classes: []
+      });
+      
+      setShowAddTeacher(false);
+      loadTeachers();
+    } catch (error) {
+      console.error('Error adding teacher:', error);
+      Alert.alert('Error', 'Failed to add teacher');
+    }
+  };
+
+  const handleAddClass = async () => {
+    if (!newClass.name || !newClass.teacherId || !newClass.subject) {
+      Alert.alert('Error', 'Please fill in all required fields (Class Name, Teacher, Subject)');
+      return;
+    }
+
+    try {
+      await DatabaseService.addClass(newClass);
+      Alert.alert('Success', 'Class created successfully');
+      
+      // Reset form
+      setNewClass({
+        name: '',
+        teacherId: '',
+        teacherName: '',
+        subject: '',
+        room: '',
+        schedule: '',
+        studentIds: []
+      });
+      
+      setShowAddClass(false);
+      loadClasses();
+    } catch (error) {
+      console.error('Error adding class:', error);
+      Alert.alert('Error', 'Failed to create class');
+    }
+  };
+
   const handleGenerateQR = (student) => {
     setSelectedStudent(student);
     setShowQRGenerator(true);
+  };
+
+  const handleRegenerateQR = async (student) => {
+    Alert.alert(
+      'Regenerate QR Code',
+      `Are you sure you want to regenerate the QR code for ${student.name}? This will invalidate the old QR code and generate a new one.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Regenerate', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Invalidate old QR code and generate new one
+              await DatabaseService.invalidateQRCode(student.studentId);
+              setSelectedStudent(student);
+              setShowQRGenerator(true);
+              Alert.alert('Success', 'Old QR code invalidated. New QR code generated.');
+            } catch (error) {
+              console.error('Error regenerating QR code:', error);
+              Alert.alert('Error', 'Failed to regenerate QR code');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handlePrintQR = (uri) => {
@@ -182,20 +319,37 @@ const AdminPortal = () => {
               <Ionicons name="people" size={32} color="#4a90e2" />
               <Text style={styles.actionText}>Manage Students</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="calendar" size={32} color="#4a90e2" />
-              <Text style={styles.actionText}>Attendance Reports</Text>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => setShowAddTeacher(true)}
+            >
+              <Ionicons name="person-add" size={32} color="#4CAF50" />
+              <Text style={styles.actionText}>Add Teacher</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => setShowAddClass(true)}
+            >
+              <Ionicons name="school" size={32} color="#FF9800" />
+              <Text style={styles.actionText}>Create Class</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionCard}
               onPress={() => setShowAddStudent(true)}
             >
-              <Ionicons name="person-add" size={32} color="#4CAF50" />
+              <Ionicons name="person-add-outline" size={32} color="#9C27B0" />
               <Text style={styles.actionText}>Add Student</Text>
             </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => setShowAnnouncements(true)}
+            >
+              <Ionicons name="megaphone" size={32} color="#00BCD4" />
+              <Text style={styles.actionText}>Announcements</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="qr-code" size={32} color="#FF9800" />
-              <Text style={styles.actionText}>QR Codes</Text>
+              <Ionicons name="calendar" size={32} color="#607D8B" />
+              <Text style={styles.actionText}>Reports</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -236,28 +390,37 @@ const AdminPortal = () => {
             <View style={styles.placeholder} />
           </View>
           
-          <FlatList
-            data={students}
-            keyExtractor={(item) => item.studentId}
-            renderItem={({ item }) => (
-              <View style={styles.studentItem}>
-                <View style={styles.studentInfo}>
-                  <Text style={styles.studentName}>{item.name}</Text>
-                  <Text style={styles.studentDetails}>
-                    ID: {item.studentId} • Class: {item.class}
-                  </Text>
+            <FlatList
+              data={students}
+              keyExtractor={(item) => item.studentId}
+              renderItem={({ item }) => (
+                <View style={styles.studentItem}>
+                  <View style={styles.studentInfo}>
+                    <Text style={styles.studentName}>{item.name}</Text>
+                    <Text style={styles.studentDetails}>
+                      ID: {item.studentId} • Class: {item.class}
+                    </Text>
+                  </View>
+                  <View style={styles.studentActions}>
+                    <TouchableOpacity
+                      style={styles.qrButton}
+                      onPress={() => handleGenerateQR(item)}
+                    >
+                      <Ionicons name="qr-code" size={20} color="#4a90e2" />
+                      <Text style={styles.qrButtonText}>Generate</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.regenerateButton}
+                      onPress={() => handleRegenerateQR(item)}
+                    >
+                      <Ionicons name="refresh" size={20} color="#FF9800" />
+                      <Text style={styles.regenerateButtonText}>Regenerate</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <TouchableOpacity
-                  style={styles.qrButton}
-                  onPress={() => handleGenerateQR(item)}
-                >
-                  <Ionicons name="qr-code" size={20} color="#4a90e2" />
-                  <Text style={styles.qrButtonText}>QR Code</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            contentContainerStyle={styles.studentList}
-          />
+              )}
+              contentContainerStyle={styles.studentList}
+            />
         </SafeAreaView>
       </Modal>
 
@@ -360,6 +523,202 @@ const AdminPortal = () => {
             >
               <Ionicons name="add-circle" size={20} color="#fff" />
               <Text style={styles.addButtonText}>Add Student</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Add Teacher Modal */}
+      <Modal
+        visible={showAddTeacher}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAddTeacher(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Add New Teacher</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          <ScrollView style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Teacher Photo (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.photo}
+                onChangeText={(text) => setNewTeacher({...newTeacher, photo: text})}
+                placeholder="Photo URL (e.g., https://example.com/photo.jpg)"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>First Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.firstName}
+                onChangeText={(text) => setNewTeacher({...newTeacher, firstName: text})}
+                placeholder="Enter first name"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Last Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.lastName}
+                onChangeText={(text) => setNewTeacher({...newTeacher, lastName: text})}
+                placeholder="Enter last name"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.email}
+                onChangeText={(text) => setNewTeacher({...newTeacher, email: text})}
+                placeholder="teacher@school.edu"
+                keyboardType="email-address"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Phone</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.phone}
+                onChangeText={(text) => setNewTeacher({...newTeacher, phone: text})}
+                placeholder="+64 21 123 4567"
+                keyboardType="phone-pad"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Subject *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.subject}
+                onChangeText={(text) => setNewTeacher({...newTeacher, subject: text})}
+                placeholder="e.g., Mathematics, English, Science"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Department</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.department}
+                onChangeText={(text) => setNewTeacher({...newTeacher, department: text})}
+                placeholder="e.g., Mathematics Department"
+              />
+            </View>
+            
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddTeacher}
+            >
+              <Ionicons name="add-circle" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Add Teacher</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Add Class Modal */}
+      <Modal
+        visible={showAddClass}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAddClass(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Create New Class</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          <ScrollView style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Class Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.name}
+                onChangeText={(text) => setNewClass({...newClass, name: text})}
+                placeholder="e.g., 10A, 9B, Advanced Math"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Subject *</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.subject}
+                onChangeText={(text) => setNewClass({...newClass, subject: text})}
+                placeholder="e.g., Mathematics, English, Science"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Room</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.room}
+                onChangeText={(text) => setNewClass({...newClass, room: text})}
+                placeholder="e.g., Room 101, Lab 2"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Schedule</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.schedule}
+                onChangeText={(text) => setNewClass({...newClass, schedule: text})}
+                placeholder="e.g., Mon, Wed, Fri 9:00-10:00 AM"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Assign Teacher *</Text>
+              <Text style={styles.helperText}>Select from existing teachers or enter teacher ID</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.teacherId}
+                onChangeText={(text) => setNewClass({...newClass, teacherId: text})}
+                placeholder="e.g., TCH123456"
+              />
+              <TextInput
+                style={[styles.input, styles.marginTop]}
+                value={newClass.teacherName}
+                onChangeText={(text) => setNewClass({...newClass, teacherName: text})}
+                placeholder="Teacher Name (optional)"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Student IDs (Optional)</Text>
+              <Text style={styles.helperText}>Comma-separated list of student IDs to assign to this class</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={newClass.studentIds.join(', ')}
+                onChangeText={(text) => setNewClass({...newClass, studentIds: text.split(',').map(id => id.trim()).filter(id => id)})}
+                placeholder="STU10AJ1234, STU10BS5678, STU10CW9012"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+            
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddClass}
+            >
+              <Ionicons name="add-circle" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Create Class</Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -1072,6 +1431,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  regenerateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FF9800',
+    marginLeft: 8,
+  },
+  regenerateButtonText: {
+    color: '#FF9800',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
   // Form styles
   formContainer: {
     flex: 1,
@@ -1104,6 +1480,9 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  marginTop: {
+    marginTop: 8,
   },
   addButton: {
     flexDirection: 'row',
