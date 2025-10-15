@@ -3,15 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-import DateTimeDisplay from '../components/DateTimeDisplay';
-=======
 import AnnouncementBanner from '../components/AnnouncementBanner';
->>>>>>> Stashed changes
-=======
-import AnnouncementBanner from '../components/AnnouncementBanner';
->>>>>>> Stashed changes
 import QRCodeGenerator from '../components/QRCodeGenerator';
 import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
 
@@ -19,37 +11,11 @@ const AdminPortal = () => {
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, students, teachers, classes, reports, settings
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
   const [showAddStudent, setShowAddStudent] = useState(false);
-  const [showAddTeacher, setShowAddTeacher] = useState(false);
-  const [showAddClass, setShowAddClass] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [teachers, setTeachers] = useState([
-    { id: 'TCH001', name: 'Ms. Johnson', subject: 'Mathematics', classes: ['10A', '9B'] },
-    { id: 'TCH002', name: 'Mr. Smith', subject: 'English', classes: ['10A', '10B'] },
-    { id: 'TCH003', name: 'Dr. Williams', subject: 'Science', classes: ['9A', '9B', '9C'] }
-  ]);
-  const [classes, setClasses] = useState([
-    { id: 'CLS001', name: '10A', students: 30, teacher: 'Ms. Johnson' },
-    { id: 'CLS002', name: '10B', students: 28, teacher: 'Mr. Smith' },
-    { id: 'CLS003', name: '9A', students: 32, teacher: 'Dr. Williams' }
-  ]);
-=======
-  const [showAddStudent, setShowStudentList] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [students, setStudents] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
->>>>>>> Stashed changes
-=======
-  const [showAddStudent, setShowStudentList] = useState(false);
-  const [showAnnouncements, setShowAnnouncements] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [announcements, setAnnouncements] = useState([]);
->>>>>>> Stashed changes
   const [newStudent, setNewStudent] = useState({
     firstName: '',
     lastName: '',
@@ -58,40 +24,6 @@ const AdminPortal = () => {
     address: '',
     emergencyContact: '',
     photo: ''
-  });
-  const [newTeacher, setNewTeacher] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    subject: '',
-    department: '',
-    photo: '',
-    classes: []
-  });
-  const [newClass, setNewClass] = useState({
-    name: '',
-    teacherId: '',
-    teacherName: '',
-    subject: '',
-    room: '',
-    schedule: '',
-    studentIds: []
-  });
-  const [announcements, setAnnouncements] = useState([]);
-  const [showAnnouncements, setShowAnnouncements] = useState(false);
-  const [newAnnouncement, setNewAnnouncement] = useState({
-    title: '',
-    message: '',
-    priority: 'normal', // normal, high, urgent
-    targetAudience: 'all' // all, teachers, students, parents
-  });
-  const [newAnnouncement, setNewAnnouncement] = useState({
-    title: '',
-    message: '',
-    priority: 'normal',
-    visibility: 'all',
-    targetClasses: []
   });
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
@@ -103,14 +35,6 @@ const AdminPortal = () => {
 
   useEffect(() => {
     loadStudents();
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    loadTeachers();
-    loadClasses();
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
     loadAnnouncements();
   }, []);
 
@@ -169,122 +93,16 @@ const AdminPortal = () => {
     Alert.alert('Success', 'QR Code generated successfully');
   };
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  const loadTeachers = async () => {
-    try {
-      const teachersData = await DatabaseService.getAllTeachers();
-      setTeachers(teachersData);
-    } catch (error) {
-      console.error('Error loading teachers:', error);
-      // Keep sample data if database is not available
-    }
-  };
-
-  const loadClasses = async () => {
-    try {
-      const classesData = await DatabaseService.getAllClasses();
-      setClasses(classesData);
-    } catch (error) {
-      console.error('Error loading classes:', error);
-      // Keep sample data if database is not available
-    }
-  };
-
-  const loadAnnouncements = async () => {
-    try {
-      const announcementsData = await DatabaseService.getActiveAnnouncements();
-      setAnnouncements(announcementsData);
-    } catch (error) {
-      console.error('Error loading announcements:', error);
-      // Keep empty array if database is not available
-=======
-=======
->>>>>>> Stashed changes
   const loadAnnouncements = async () => {
     try {
       const announcementsData = await DatabaseService.getAllAnnouncements();
       setAnnouncements(announcementsData);
     } catch (error) {
       console.error('Error loading announcements:', error);
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
       setAnnouncements([]);
     }
   };
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  const handleAddTeacher = async () => {
-    if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.email || !newTeacher.subject) {
-      Alert.alert('Error', 'Please fill in all required fields (First Name, Last Name, Email, Subject)');
-      return;
-    }
-
-    try {
-      const teacherData = {
-        ...newTeacher,
-        name: `${newTeacher.firstName} ${newTeacher.lastName}`
-      };
-
-      await DatabaseService.addTeacher(teacherData);
-      Alert.alert('Success', 'Teacher added successfully');
-      
-      // Reset form
-      setNewTeacher({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        subject: '',
-        department: '',
-        photo: '',
-        classes: []
-      });
-      
-      setShowAddTeacher(false);
-      loadTeachers();
-    } catch (error) {
-      console.error('Error adding teacher:', error);
-      Alert.alert('Error', 'Failed to add teacher');
-    }
-  };
-
-  const handleAddClass = async () => {
-    if (!newClass.name || !newClass.teacherId || !newClass.subject) {
-      Alert.alert('Error', 'Please fill in all required fields (Class Name, Teacher, Subject)');
-      return;
-    }
-
-    try {
-      await DatabaseService.addClass(newClass);
-      Alert.alert('Success', 'Class created successfully');
-      
-      // Reset form
-      setNewClass({
-        name: '',
-        teacherId: '',
-        teacherName: '',
-        subject: '',
-        room: '',
-        schedule: '',
-        studentIds: []
-      });
-      
-      setShowAddClass(false);
-      loadClasses();
-    } catch (error) {
-      console.error('Error adding class:', error);
-      Alert.alert('Error', 'Failed to create class');
-    }
-  };
-
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   const handleAddAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.message) {
       Alert.alert('Error', 'Please fill in title and message');
@@ -292,12 +110,6 @@ const AdminPortal = () => {
     }
 
     try {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      await DatabaseService.addAnnouncement(newAnnouncement);
-=======
-=======
->>>>>>> Stashed changes
       const announcementData = {
         ...newAnnouncement,
         createdBy: 'admin',
@@ -305,10 +117,6 @@ const AdminPortal = () => {
       };
 
       await DatabaseService.addAnnouncement(announcementData);
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
       Alert.alert('Success', 'Announcement posted successfully');
       
       // Reset form
@@ -316,17 +124,8 @@ const AdminPortal = () => {
         title: '',
         message: '',
         priority: 'normal',
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-        targetAudience: 'all'
-=======
         visibility: 'all',
         targetClasses: []
->>>>>>> Stashed changes
-=======
-        visibility: 'all',
-        targetClasses: []
->>>>>>> Stashed changes
       });
       
       setShowAnnouncements(false);
@@ -344,431 +143,82 @@ const AdminPortal = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Admin Portal</Text>
-        <TouchableOpacity 
-          style={styles.announcementButton}
-          onPress={() => setShowAnnouncements(true)}
-        >
-          <Ionicons name="megaphone" size={20} color="#4a90e2" />
-        </TouchableOpacity>
       </View>
       
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      {/* Date and Time Display */}
-      <View style={styles.dateTimeContainer}>
-        <DateTimeDisplay />
-      </View>
-      
-      {/* Navigation Tabs */}
-      <View style={styles.tabContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <TouchableOpacity 
-            style={[styles.tab, activeView === 'dashboard' && styles.activeTab]}
-            onPress={() => setActiveView('dashboard')}
-          >
-            <Ionicons name="grid" size={20} color={activeView === 'dashboard' ? '#4a90e2' : '#666'} />
-            <Text style={[styles.tabText, activeView === 'dashboard' && styles.activeTabText]}>Dashboard</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tab, activeView === 'students' && styles.activeTab]}
-            onPress={() => setActiveView('students')}
-          >
-            <Ionicons name="people" size={20} color={activeView === 'students' ? '#4a90e2' : '#666'} />
-            <Text style={[styles.tabText, activeView === 'students' && styles.activeTabText]}>Students</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tab, activeView === 'teachers' && styles.activeTab]}
-            onPress={() => setActiveView('teachers')}
-          >
-            <Ionicons name="school" size={20} color={activeView === 'teachers' ? '#4a90e2' : '#666'} />
-            <Text style={[styles.tabText, activeView === 'teachers' && styles.activeTabText]}>Teachers</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tab, activeView === 'classes' && styles.activeTab]}
-            onPress={() => setActiveView('classes')}
-          >
-            <Ionicons name="book" size={20} color={activeView === 'classes' ? '#4a90e2' : '#666'} />
-            <Text style={[styles.tabText, activeView === 'classes' && styles.activeTabText]}>Classes</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tab, activeView === 'reports' && styles.activeTab]}
-            onPress={() => setActiveView('reports')}
-          >
-            <Ionicons name="stats-chart" size={20} color={activeView === 'reports' ? '#4a90e2' : '#666'} />
-            <Text style={[styles.tabText, activeView === 'reports' && styles.activeTabText]}>Reports</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tab, activeView === 'settings' && styles.activeTab]}
-            onPress={() => setActiveView('settings')}
-          >
-            <Ionicons name="settings" size={20} color={activeView === 'settings' ? '#4a90e2' : '#666'} />
-            <Text style={[styles.tabText, activeView === 'settings' && styles.activeTabText]}>Settings</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-
-=======
-=======
->>>>>>> Stashed changes
       {/* Announcements Banner */}
       <AnnouncementBanner 
         userRole="admin" 
       />
-      
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
       <ScrollView style={styles.content}>
-        {/* Dashboard View */}
-        {activeView === 'dashboard' && (
-          <>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>School Overview</Text>
-              <View style={styles.statsGrid}>
-                <TouchableOpacity style={styles.statCard} onPress={() => setActiveView('students')}>
-                  <Ionicons name="people" size={28} color="#4a90e2" />
-                  <Text style={styles.statNumber}>{students.length || 450}</Text>
-                  <Text style={styles.statLabel}>Students</Text>
-                  <Text style={styles.statAction}>View All →</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.statCard} onPress={() => setActiveView('teachers')}>
-                  <Ionicons name="school" size={28} color="#4CAF50" />
-                  <Text style={styles.statNumber}>{teachers.length}</Text>
-                  <Text style={styles.statLabel}>Teachers</Text>
-                  <Text style={styles.statAction}>View All →</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.statCard} onPress={() => setActiveView('classes')}>
-                  <Ionicons name="book" size={28} color="#FF9800" />
-                  <Text style={styles.statNumber}>{classes.length}</Text>
-                  <Text style={styles.statLabel}>Classes</Text>
-                  <Text style={styles.statAction}>View All →</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.statCard} onPress={() => setActiveView('reports')}>
-                  <Ionicons name="trending-up" size={28} color="#9C27B0" />
-                  <Text style={styles.statNumber}>92%</Text>
-                  <Text style={styles.statLabel}>Attendance</Text>
-                  <Text style={styles.statAction}>View Report →</Text>
-                </TouchableOpacity>
-              </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>School Overview</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>450</Text>
+              <Text style={styles.statLabel}>Students</Text>
             </View>
-            
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
-              <View style={styles.actionGrid}>
-                <TouchableOpacity 
-                  style={[styles.actionCard, styles.primaryAction]}
-                  onPress={() => setShowAddStudent(true)}
-                >
-                  <Ionicons name="person-add" size={32} color="#fff" />
-                  <Text style={styles.actionCardTitle}>Add Student</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.actionCard, styles.secondaryAction]}
-                  onPress={() => setShowStudentList(true)}
-                >
-                  <Ionicons name="qr-code" size={32} color="#fff" />
-                  <Text style={styles.actionCardTitle}>Generate QR</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.actionCard, styles.accentAction]}
-                  onPress={() => setShowAddTeacher(true)}
-                >
-                  <Ionicons name="person-add-outline" size={32} color="#fff" />
-                  <Text style={styles.actionCardTitle}>Add Teacher</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.actionCard, styles.warningAction]}
-                  onPress={() => setShowAddClass(true)}
-                >
-                  <Ionicons name="add-circle" size={32} color="#fff" />
-                  <Text style={styles.actionCardTitle}>Create Class</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.actionCard, styles.infoAction]}
-                  onPress={() => setActiveView('reports')}
-                >
-                  <Ionicons name="document-text" size={32} color="#fff" />
-                  <Text style={styles.actionCardTitle}>View Reports</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.actionCard, styles.successAction]}
-                  onPress={() => setShowAnnouncements(true)}
-                >
-                  <Ionicons name="megaphone" size={32} color="#fff" />
-                  <Text style={styles.actionCardTitle}>Announcements</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>35</Text>
+              <Text style={styles.statLabel}>Teachers</Text>
             </View>
-            
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Recent Activity</Text>
-                <TouchableOpacity>
-                  <Text style={styles.seeAllText}>See All</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.activityList}>
-                {[
-                  { action: 'New student registered', name: 'John Doe', time: '10 minutes ago', icon: 'person-add', color: '#4CAF50' },
-                  { action: 'Attendance marked', name: 'Class 10A', time: '1 hour ago', icon: 'checkmark-circle', color: '#4a90e2' },
-                  { action: 'QR Code generated', name: 'Jane Smith', time: '2 hours ago', icon: 'qr-code', color: '#FF9800' },
-                  { action: 'Report generated', name: 'Monthly Report', time: '3 hours ago', icon: 'document-text', color: '#9C27B0' },
-                ].map((activity, index) => (
-                  <TouchableOpacity key={index} style={styles.activityItem}>
-                    <View style={[styles.activityIcon, { backgroundColor: activity.color + '20' }]}>
-                      <Ionicons name={activity.icon} size={24} color={activity.color} />
-                    </View>
-                    <View style={styles.activityContent}>
-                      <Text style={styles.activityText}>{activity.action}</Text>
-                      <Text style={styles.activityName}>{activity.name}</Text>
-                      <Text style={styles.activityTime}>{activity.time}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#ccc" />
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>15</Text>
+              <Text style={styles.statLabel}>Classes</Text>
             </View>
-          </>
-        )}
-
-        {/* Students View */}
-        {activeView === 'students' && (
-          <>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>All Students ({students.length})</Text>
-                <TouchableOpacity 
-                  style={styles.addNewButton}
-                  onPress={() => setShowAddStudent(true)}
-                >
-                  <Ionicons name="add" size={20} color="#fff" />
-                  <Text style={styles.addNewButtonText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.searchBar}>
-                <Ionicons name="search" size={20} color="#666" />
-                <Text style={styles.searchPlaceholder}>Search students...</Text>
-              </View>
-
-              <View style={styles.filterBar}>
-                <TouchableOpacity style={[styles.filterChip, styles.filterChipActive]}>
-                  <Text style={styles.filterChipTextActive}>All</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.filterChip}>
-                  <Text style={styles.filterChipText}>Class 10A</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.filterChip}>
-                  <Text style={styles.filterChipText}>Class 9B</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.filterChip}>
-                  <Text style={styles.filterChipText}>Active</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {students.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Ionicons name="people-outline" size={64} color="#ccc" />
-                  <Text style={styles.emptyStateText}>No students yet</Text>
-                  <TouchableOpacity 
-                    style={styles.emptyStateButton}
-                    onPress={() => setShowAddStudent(true)}
-                  >
-                    <Text style={styles.emptyStateButtonText}>Add First Student</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.studentGrid}>
-                  {students.map((student) => (
-                    <TouchableOpacity key={student.studentId} style={styles.studentGridCard}>
-                      <Ionicons name="person-circle" size={48} color="#4a90e2" />
-                      <Text style={styles.studentGridName}>{student.name}</Text>
-                      <Text style={styles.studentGridId}>{student.studentId}</Text>
-                      <Text style={styles.studentGridClass}>{student.class}</Text>
-                      <View style={styles.studentGridActions}>
-                        <TouchableOpacity 
-                          style={styles.studentGridAction}
-                          onPress={() => handleGenerateQR(student)}
-                        >
-                          <Ionicons name="qr-code" size={18} color="#4a90e2" />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.studentGridAction}>
-                          <Ionicons name="create" size={18} color="#FF9800" />
-                        </TouchableOpacity>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>92%</Text>
+              <Text style={styles.statLabel}>Attendance</Text>
             </View>
-          </>
-        )}
-
-        {/* Teachers View */}
-        {activeView === 'teachers' && (
-          <>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>All Teachers ({teachers.length})</Text>
-                <TouchableOpacity 
-                  style={styles.addNewButton}
-                  onPress={() => setShowAddTeacher(true)}
-                >
-                  <Ionicons name="add" size={20} color="#fff" />
-                  <Text style={styles.addNewButtonText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {teachers.map((teacher) => (
-                <TouchableOpacity key={teacher.id} style={styles.teacherCard}>
-                  <View style={styles.teacherIcon}>
-                    <Ionicons name="person" size={32} color="#fff" />
-                  </View>
-                  <View style={styles.teacherInfo}>
-                    <Text style={styles.teacherName}>{teacher.name}</Text>
-                    <Text style={styles.teacherSubject}>{teacher.subject}</Text>
-                    <Text style={styles.teacherClasses}>Classes: {teacher.classes.join(', ')}</Text>
-                  </View>
-                  <TouchableOpacity style={styles.teacherAction}>
-                    <Ionicons name="chevron-forward" size={24} color="#666" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* Classes View */}
-        {activeView === 'classes' && (
-          <>
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>All Classes ({classes.length})</Text>
-                <TouchableOpacity 
-                  style={styles.addNewButton}
-                  onPress={() => setShowAddClass(true)}
-                >
-                  <Ionicons name="add" size={20} color="#fff" />
-                  <Text style={styles.addNewButtonText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {classes.map((classItem) => (
-                <TouchableOpacity key={classItem.id} style={styles.classCard}>
-                  <View style={styles.classHeader}>
-                    <View style={styles.classIcon}>
-                      <Ionicons name="book" size={24} color="#fff" />
-                    </View>
-                    <View style={styles.classInfo}>
-                      <Text style={styles.className}>Class {classItem.name}</Text>
-                      <Text style={styles.classTeacher}>Teacher: {classItem.teacher}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.classStats}>
-                    <View style={styles.classStat}>
-                      <Ionicons name="people" size={18} color="#4a90e2" />
-                      <Text style={styles.classStatText}>{classItem.students} Students</Text>
-                    </View>
-                    <TouchableOpacity style={styles.classViewButton}>
-                      <Text style={styles.classViewButtonText}>View Details</Text>
-                      <Ionicons name="arrow-forward" size={16} color="#4a90e2" />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* Reports View */}
-        {activeView === 'reports' && (
-          <>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Attendance Reports</Text>
-              
-              <View style={styles.reportGrid}>
-                <TouchableOpacity style={styles.reportCard}>
-                  <Ionicons name="calendar" size={32} color="#4a90e2" />
-                  <Text style={styles.reportCardTitle}>Daily Report</Text>
-                  <Text style={styles.reportCardDate}>Today</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.reportCard}>
-                  <Ionicons name="calendar-outline" size={32} color="#4CAF50" />
-                  <Text style={styles.reportCardTitle}>Weekly Report</Text>
-                  <Text style={styles.reportCardDate}>This Week</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.reportCard}>
-                  <Ionicons name="stats-chart" size={32} color="#FF9800" />
-                  <Text style={styles.reportCardTitle}>Monthly Report</Text>
-                  <Text style={styles.reportCardDate}>October 2025</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.reportCard}>
-                  <Ionicons name="document-text" size={32} color="#9C27B0" />
-                  <Text style={styles.reportCardTitle}>Custom Report</Text>
-                  <Text style={styles.reportCardDate}>Generate</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Quick Stats</Text>
-              <View style={styles.quickStats}>
-                <View style={styles.quickStat}>
-                  <Text style={styles.quickStatNumber}>94%</Text>
-                  <Text style={styles.quickStatLabel}>Today&apos;s Attendance</Text>
-                </View>
-                <View style={styles.quickStat}>
-                  <Text style={styles.quickStatNumber}>28</Text>
-                  <Text style={styles.quickStatLabel}>Absent Today</Text>
-                </View>
-                <View style={styles.quickStat}>
-                  <Text style={styles.quickStatNumber}>15</Text>
-                  <Text style={styles.quickStatLabel}>Late Arrivals</Text>
+          </View>
+        </View>
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionGrid}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => setShowStudentList(true)}
+            >
+              <Ionicons name="people" size={32} color="#4a90e2" />
+              <Text style={styles.actionText}>Manage Students</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionCard}>
+              <Ionicons name="calendar" size={32} color="#4a90e2" />
+              <Text style={styles.actionText}>Attendance Reports</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => setShowAddStudent(true)}
+            >
+              <Ionicons name="person-add" size={32} color="#4CAF50" />
+              <Text style={styles.actionText}>Add Student</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionCard}>
+              <Ionicons name="qr-code" size={32} color="#FF9800" />
+              <Text style={styles.actionText}>QR Codes</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <View style={styles.activityList}>
+            {[
+              { action: 'New student registered', time: '10 minutes ago', icon: 'person-add' },
+              { action: 'Attendance report generated', time: '1 hour ago', icon: 'document-text' },
+              { action: 'System update completed', time: '3 hours ago', icon: 'refresh-circle' },
+              { action: 'New announcement posted', time: 'Yesterday', icon: 'megaphone' },
+            ].map((activity, index) => (
+              <View key={index} style={styles.activityItem}>
+                <Ionicons name={activity.icon} size={24} color="#4a90e2" />
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityText}>{activity.action}</Text>
+                  <Text style={styles.activityTime}>{activity.time}</Text>
                 </View>
               </View>
-            </View>
-          </>
-        )}
-
-        {/* Settings View */}
-        {activeView === 'settings' && (
-          <>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>System Settings</Text>
-              
-              {[
-                { title: 'School Information', icon: 'business', color: '#4a90e2' },
-                { title: 'Academic Year Settings', icon: 'calendar', color: '#4CAF50' },
-                { title: 'User Management', icon: 'people', color: '#FF9800' },
-                { title: 'Notification Settings', icon: 'notifications', color: '#9C27B0' },
-                { title: 'Backup & Restore', icon: 'cloud-upload', color: '#00BCD4' },
-                { title: 'System Logs', icon: 'list', color: '#607D8B' },
-              ].map((setting, index) => (
-                <TouchableOpacity key={index} style={styles.settingItem}>
-                  <View style={[styles.settingIcon, { backgroundColor: setting.color + '20' }]}>
-                    <Ionicons name={setting.icon} size={24} color={setting.color} />
-                  </View>
-                  <Text style={styles.settingTitle}>{setting.title}</Text>
-                  <Ionicons name="chevron-forward" size={24} color="#ccc" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
+            ))}
+          </View>
+        </View>
       </ScrollView>
 
       {/* Student List Modal */}
@@ -928,211 +378,7 @@ const AdminPortal = () => {
         />
       </Modal>
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      {/* Add Teacher Modal */}
-      <Modal
-        visible={showAddTeacher}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAddTeacher(false)}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Add New Teacher</Text>
-            <View style={styles.placeholder} />
-          </View>
-          
-          <ScrollView style={styles.formContainer}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Teacher Photo (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.photo}
-                onChangeText={(text) => setNewTeacher({...newTeacher, photo: text})}
-                placeholder="Photo URL (e.g., https://example.com/photo.jpg)"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>First Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.firstName}
-                onChangeText={(text) => setNewTeacher({...newTeacher, firstName: text})}
-                placeholder="Enter first name"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Last Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.lastName}
-                onChangeText={(text) => setNewTeacher({...newTeacher, lastName: text})}
-                placeholder="Enter last name"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email *</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.email}
-                onChangeText={(text) => setNewTeacher({...newTeacher, email: text})}
-                placeholder="teacher@school.edu"
-                keyboardType="email-address"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Phone</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.phone}
-                onChangeText={(text) => setNewTeacher({...newTeacher, phone: text})}
-                placeholder="+64 21 123 4567"
-                keyboardType="phone-pad"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Subject *</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.subject}
-                onChangeText={(text) => setNewTeacher({...newTeacher, subject: text})}
-                placeholder="e.g., Mathematics, English, Science"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Department</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.department}
-                onChangeText={(text) => setNewTeacher({...newTeacher, department: text})}
-                placeholder="e.g., Mathematics Department"
-              />
-            </View>
-            
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleAddTeacher}
-            >
-              <Ionicons name="add-circle" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Add Teacher</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Create Class Modal */}
-      <Modal
-        visible={showAddClass}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAddClass(false)}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Create New Class</Text>
-            <View style={styles.placeholder} />
-          </View>
-          
-          <ScrollView style={styles.formContainer}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Class Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={newClass.name}
-                onChangeText={(text) => setNewClass({...newClass, name: text})}
-                placeholder="e.g., 10A, 9B, Advanced Math"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Subject *</Text>
-              <TextInput
-                style={styles.input}
-                value={newClass.subject}
-                onChangeText={(text) => setNewClass({...newClass, subject: text})}
-                placeholder="e.g., Mathematics, English, Science"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Room</Text>
-              <TextInput
-                style={styles.input}
-                value={newClass.room}
-                onChangeText={(text) => setNewClass({...newClass, room: text})}
-                placeholder="e.g., Room 101, Lab 2"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Schedule</Text>
-              <TextInput
-                style={styles.input}
-                value={newClass.schedule}
-                onChangeText={(text) => setNewClass({...newClass, schedule: text})}
-                placeholder="e.g., Mon, Wed, Fri 9:00-10:00 AM"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Assign Teacher *</Text>
-              <Text style={styles.helperText}>Select from existing teachers or enter teacher ID</Text>
-              <TextInput
-                style={styles.input}
-                value={newClass.teacherId}
-                onChangeText={(text) => setNewClass({...newClass, teacherId: text})}
-                placeholder="e.g., TCH123456"
-              />
-              <TextInput
-                style={[styles.input, styles.marginTop]}
-                value={newClass.teacherName}
-                onChangeText={(text) => setNewClass({...newClass, teacherName: text})}
-                placeholder="Teacher Name (optional)"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Student IDs (Optional)</Text>
-              <Text style={styles.helperText}>Comma-separated list of student IDs to assign to this class</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={newClass.studentIds.join(', ')}
-                onChangeText={(text) => setNewClass({...newClass, studentIds: text.split(',').map(id => id.trim()).filter(id => id)})}
-                placeholder="STU10AJ1234, STU10BS5678, STU10CW9012"
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-            
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleAddClass}
-            >
-              <Ionicons name="add-circle" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Create Class</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
-      {/* Announcements Modal */}
-=======
       {/* Announcements Management Modal */}
->>>>>>> Stashed changes
-=======
-      {/* Announcements Management Modal */}
->>>>>>> Stashed changes
       <Modal
         visible={showAnnouncements}
         animationType="slide"
@@ -1143,53 +389,6 @@ const AdminPortal = () => {
             <TouchableOpacity onPress={() => setShowAnnouncements(false)}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-            <Text style={styles.modalTitle}>Announcements</Text>
-            <TouchableOpacity onPress={() => {/* TODO: Add new announcement form */}}>
-              <Ionicons name="add" size={24} color="#4a90e2" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.announcementContainer}>
-            {announcements.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="megaphone-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyStateText}>No announcements yet</Text>
-                <TouchableOpacity 
-                  style={styles.emptyStateButton}
-                  onPress={() => {/* TODO: Add new announcement form */}}
-                >
-                  <Text style={styles.emptyStateButtonText}>Create First Announcement</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              announcements.map((announcement) => (
-                <View key={announcement.id} style={styles.announcementCard}>
-                  <View style={styles.announcementHeader}>
-                    <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                    <View style={[styles.priorityBadge, 
-                      announcement.priority === 'urgent' ? styles.urgentBadge : 
-                      announcement.priority === 'high' ? styles.highBadge : styles.normalBadge
-                    ]}>
-                      <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.announcementMessage}>{announcement.message}</Text>
-                  <View style={styles.announcementFooter}>
-                    <Text style={styles.announcementTarget}>Target: {announcement.targetAudience}</Text>
-                    <Text style={styles.announcementDate}>
-                      {new Date(announcement.createdAt).toLocaleDateString()}
-                    </Text>
-                  </View>
-                </View>
-              ))
-            )}
-            
-            {/* Add New Announcement Form */}
-=======
-=======
->>>>>>> Stashed changes
             <Text style={styles.modalTitle}>Announcement Management</Text>
             <View style={styles.placeholder} />
           </View>
@@ -1237,10 +436,6 @@ const AdminPortal = () => {
             </View>
             
             {/* Create New Announcement Form */}
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Create New Announcement</Text>
               
@@ -1290,27 +485,6 @@ const AdminPortal = () => {
               </View>
               
               <View style={styles.inputGroup}>
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-                <Text style={styles.inputLabel}>Target Audience</Text>
-                <View style={styles.audienceSelector}>
-                  {['all', 'teachers', 'students', 'parents'].map((audience) => (
-                    <TouchableOpacity
-                      key={audience}
-                      style={[
-                        styles.audienceOption,
-                        newAnnouncement.targetAudience === audience && styles.audienceOptionActive
-                      ]}
-                      onPress={() => setNewAnnouncement({...newAnnouncement, targetAudience: audience})}
-                    >
-                      <Text style={[
-                        styles.audienceOptionText,
-                        newAnnouncement.targetAudience === audience && styles.audienceOptionTextActive
-                      ]}>
-                        {audience.charAt(0).toUpperCase() + audience.slice(1)}
-=======
-=======
->>>>>>> Stashed changes
                 <Text style={styles.inputLabel}>Visibility</Text>
                 <View style={styles.visibilitySelector}>
                   {['all', 'staff', 'students'].map((visibility) => (
@@ -1327,10 +501,6 @@ const AdminPortal = () => {
                         newAnnouncement.visibility === visibility && styles.visibilityOptionTextActive
                       ]}>
                         {visibility.charAt(0).toUpperCase() + visibility.slice(1)}
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1950,21 +1120,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  marginTop: {
-    marginTop: 8,
-=======
-=======
->>>>>>> Stashed changes
   announcementButton: {
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#f0f8ff',
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   },
   // Announcement styles
   announcementContainer: {
@@ -2024,44 +1183,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  },
-  announcementTarget: {
-    fontSize: 12,
-    color: '#999',
-=======
-=======
->>>>>>> Stashed changes
     marginBottom: 8,
   },
   announcementVisibility: {
     fontSize: 12,
     color: '#999',
     fontStyle: 'italic',
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   },
   announcementDate: {
     fontSize: 12,
     color: '#999',
   },
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> Stashed changes
   announcementCreator: {
     fontSize: 11,
     color: '#ccc',
     fontStyle: 'italic',
   },
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   prioritySelector: {
     flexDirection: 'row',
     gap: 8,
@@ -2086,34 +1223,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  audienceSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  audienceOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: '#f5f5f5',
-  },
-  audienceOptionActive: {
-    backgroundColor: '#4CAF50',
-  },
-  audienceOptionText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  audienceOptionTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-=======
-=======
->>>>>>> Stashed changes
   visibilitySelector: {
     flexDirection: 'row',
     gap: 8,
@@ -2147,10 +1256,6 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 16,
   },
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 });
 
 export default AdminPortal;

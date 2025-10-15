@@ -1,17 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
-import DateTimeDisplay from '../components/DateTimeDisplay';
-=======
-import AnnouncementBanner from '../components/AnnouncementBanner';
->>>>>>> Stashed changes
-=======
-import AnnouncementBanner from '../components/AnnouncementBanner';
->>>>>>> Stashed changes
 
 const StudentPortal = () => {
   return (
@@ -23,27 +14,11 @@ const StudentPortal = () => {
         <Text style={styles.headerTitle}>Student Portal</Text>
       </View>
       
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      {/* Date and Time Display */}
-      <View style={styles.dateTimeContainer}>
-        <DateTimeDisplay />
-      </View>
-      
-      {/* Announcements Banner */}
-      <AnnouncementBanner targetAudience="students" />
-=======
-=======
->>>>>>> Stashed changes
       {/* Announcements Banner */}
       <AnnouncementBanner 
         userRole="student" 
         userClass="10A" // This should come from student data
       />
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>
