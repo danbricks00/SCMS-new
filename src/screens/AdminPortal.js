@@ -1,12 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Alert, TextInput, FlatList } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import QRCodeGenerator from '../components/QRCodeGenerator';
 import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
-import { QRCodeUtils } from '../utils/qrCodeUtils';
 
 const AdminPortal = () => {
   const [showQRGenerator, setShowQRGenerator] = useState(false);
