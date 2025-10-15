@@ -7,10 +7,14 @@ import AnnouncementBanner from '../components/AnnouncementBanner';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
 import ActivityScanner from '../components/ActivityScanner';
+import TeacherAnnouncement from '../components/TeacherAnnouncement';
+import ProtectedRoute from '../components/ProtectedRoute';
+import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { QR_SCAN_RESULTS, QRCodeUtils } from '../utils/qrCodeUtils';
 
 const TeacherPortal = () => {
+  const { user, logout } = useAuth();
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showStudentCard, setShowStudentCard] = useState(false);
   const [showActivityScanner, setShowActivityScanner] = useState(false);
@@ -185,13 +189,18 @@ const TeacherPortal = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Teacher Portal</Text>
-      </View>
+    <ProtectedRoute requiredRole="teacher">
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Teacher Portal - {user?.name}</Text>
+          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+            <Ionicons name="log-out" size={20} color="#e74c3c" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       
       {/* Announcements Banner */}
       <AnnouncementBanner 
@@ -497,7 +506,8 @@ const TeacherPortal = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 };
 
@@ -521,6 +531,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
+    textAlign: 'center',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e74c3c',
+    gap: 4,
+  },
+  logoutText: {
+    color: '#e74c3c',
+    fontSize: 12,
+    fontWeight: '600',
   },
   announcementButton: {
     padding: 8,

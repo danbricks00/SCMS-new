@@ -3,16 +3,25 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import ProtectedRoute from '../components/ProtectedRoute';
+import { useAuth } from '../contexts/AuthContext';
 
 const StudentPortal = () => {
+  const { user, logout } = useAuth();
+  
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Student Portal</Text>
-      </View>
+    <ProtectedRoute requiredRole="student">
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Student Portal - {user?.name}</Text>
+          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+            <Ionicons name="log-out" size={20} color="#e74c3c" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       
       {/* Announcements Banner */}
       <AnnouncementBanner 
@@ -63,7 +72,8 @@ const StudentPortal = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 };
 
@@ -89,8 +99,24 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginLeft: 15,
+    flex: 1,
+    textAlign: 'center',
     color: '#333',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e74c3c',
+    gap: 4,
+  },
+  logoutText: {
+    color: '#e74c3c',
+    fontSize: 12,
+    fontWeight: '600',
   },
   dateTimeContainer: {
     padding: 16,

@@ -5,9 +5,12 @@ import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, Toucha
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import QRCodeGenerator from '../components/QRCodeGenerator';
+import ProtectedRoute from '../components/ProtectedRoute';
+import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
 
 const AdminPortal = () => {
+  const { user, logout } = useAuth();
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, students, teachers, classes, reports, settings
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
@@ -274,13 +277,18 @@ const AdminPortal = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Admin Portal</Text>
-      </View>
+    <ProtectedRoute requiredRole="admin">
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Admin Portal - {user?.name}</Text>
+          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+            <Ionicons name="log-out" size={20} color="#e74c3c" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       
       {/* Announcements Banner */}
       <AnnouncementBanner 
@@ -877,7 +885,8 @@ const AdminPortal = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 };
 
@@ -901,6 +910,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
+    textAlign: 'center',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e74c3c',
+    gap: 4,
+  },
+  logoutText: {
+    color: '#e74c3c',
+    fontSize: 12,
+    fontWeight: '600',
   },
   dateTimeContainer: {
     padding: 16,
