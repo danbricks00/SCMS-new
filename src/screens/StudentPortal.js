@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 
 const StudentPortal = () => {
   return (
@@ -13,6 +14,12 @@ const StudentPortal = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Student Portal</Text>
       </View>
+      
+      {/* Announcements Banner */}
+      <AnnouncementBanner 
+        userRole="student" 
+        userClass="10A" // This should come from student data
+      />
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 
 const ParentPortal = () => {
   return (
@@ -12,6 +13,12 @@ const ParentPortal = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Parent Portal</Text>
       </View>
+      
+      {/* Announcements Banner */}
+      <AnnouncementBanner 
+        userRole="parent" 
+        userClass="10A" // This should come from child's data
+      />
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>

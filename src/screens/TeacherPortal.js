@@ -3,9 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
 import ActivityScanner from '../components/ActivityScanner';
+import TeacherAnnouncement from '../components/TeacherAnnouncement';
 import { DatabaseService } from '../services/database';
 import { QR_SCAN_RESULTS, QRCodeUtils } from '../utils/qrCodeUtils';
 
@@ -13,6 +15,7 @@ const TeacherPortal = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showStudentCard, setShowStudentCard] = useState(false);
   const [showActivityScanner, setShowActivityScanner] = useState(false);
+  const [showTeacherAnnouncement, setShowTeacherAnnouncement] = useState(false);
   const [scannedStudent, setScannedStudent] = useState(null);
   const [attendanceType, setAttendanceType] = useState('login');
   const [attendanceSummary, setAttendanceSummary] = useState({
@@ -21,6 +24,7 @@ const TeacherPortal = () => {
     absentStudents: 0
   });
   const [currentClass, setCurrentClass] = useState('10A');
+  const [teacherClasses, setTeacherClasses] = useState(['10A', '8B', '9C']); // Teacher's classes
 
   useEffect(() => {
     loadAttendanceSummary();
@@ -107,7 +111,20 @@ const TeacherPortal = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Teacher Portal</Text>
+        <TouchableOpacity 
+          style={styles.announcementButton}
+          onPress={() => setShowTeacherAnnouncement(true)}
+        >
+          <Ionicons name="megaphone" size={20} color="#4a90e2" />
+        </TouchableOpacity>
       </View>
+      
+      {/* Announcements Banner */}
+      <AnnouncementBanner 
+        userRole="teacher" 
+        userClass={currentClass} 
+        userClasses={teacherClasses} 
+      />
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>
@@ -278,6 +295,14 @@ const TeacherPortal = () => {
           }}
         />
       </Modal>
+
+      {/* Teacher Announcement Modal */}
+      <TeacherAnnouncement
+        isVisible={showTeacherAnnouncement}
+        onClose={() => setShowTeacherAnnouncement(false)}
+        teacherId="TCH001" // This should come from authentication
+        teacherClasses={teacherClasses}
+      />
     </SafeAreaView>
   );
 };
@@ -302,6 +327,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+  },
+  announcementButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f8ff',
   },
   content: {
     flex: 1,

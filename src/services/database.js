@@ -501,6 +501,142 @@ export class DatabaseService {
     const q = query(collection(db, 'students'), orderBy('name'));
     return onSnapshot(q, callback);
   }
+
+  // ===== ANNOUNCEMENT MANAGEMENT =====
+  
+  /**
+   * Add a new announcement
+   * @param {Object} announcementData - Announcement information
+   * @returns {Promise<string>} Document ID of the created announcement
+   */
+  static async addAnnouncement(announcementData) {
+    try {
+      // Add creation timestamp and defaults
+      announcementData.createdAt = new Date().toISOString();
+      announcementData.updatedAt = new Date().toISOString();
+      announcementData.isActive = true;
+      announcementData.visibility = announcementData.visibility || 'all'; // all, staff, students, class
+      announcementData.targetClasses = announcementData.targetClasses || [];
+      announcementData.includeParents = announcementData.includeParents || false;
+
+      const docRef = await addDoc(collection(db, 'announcements'), announcementData);
+      
+      console.log('Announcement added with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding announcement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get announcements based on user role and class
+   * @param {string} userRole - 'admin', 'teacher', 'student', 'parent'
+   * @param {string} userClass - User's class (for students/teachers)
+   * @param {Array} userClasses - Array of classes user has access to (for teachers)
+   * @returns {Promise<Array>} Array of announcement documents
+   */
+  static async getAnnouncementsForUser(userRole, userClass = null, userClasses = []) {
+    try {
+      const q = query(
+        collection(db, 'announcements'),
+        where('isActive', '==', true),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const allAnnouncements = [];
+      querySnapshot.forEach((doc) => {
+        allAnnouncements.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Filter announcements based on user role and class
+      const filteredAnnouncements = allAnnouncements.filter(announcement => {
+        // Admin can see all announcements
+        if (userRole === 'admin') {
+          return true;
+        }
+
+        // Global announcements (everyone sees)
+        if (announcement.visibility === 'all') {
+          return true;
+        }
+
+        // Staff-only announcements (teachers and admin)
+        if (announcement.visibility === 'staff' && (userRole === 'teacher' || userRole === 'admin')) {
+          return true;
+        }
+
+        // Student-only announcements (students and parents)
+        if (announcement.visibility === 'students' && (userRole === 'student' || userRole === 'parent')) {
+          return true;
+        }
+
+        // Class-specific announcements
+        if (announcement.visibility === 'class') {
+          // Teachers can see announcements for their classes
+          if (userRole === 'teacher' && userClasses.some(cls => announcement.targetClasses.includes(cls))) {
+            return true;
+          }
+          
+          // Students can see announcements for their class
+          if (userRole === 'student' && userClass && announcement.targetClasses.includes(userClass)) {
+            return true;
+          }
+          
+          // Parents can see announcements for their child's class (if includeParents is true)
+          if (userRole === 'parent' && userClass && announcement.targetClasses.includes(userClass) && announcement.includeParents) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+
+      return filteredAnnouncements;
+    } catch (error) {
+      console.error('Error getting announcements:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all active announcements (for admin oversight)
+   * @returns {Promise<Array>} Array of all announcement documents
+   */
+  static async getAllAnnouncements() {
+    try {
+      const q = query(
+        collection(db, 'announcements'),
+        where('isActive', '==', true),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const announcements = [];
+      querySnapshot.forEach((doc) => {
+        announcements.push({ id: doc.id, ...doc.data() });
+      });
+      return announcements;
+    } catch (error) {
+      console.error('Error getting all announcements:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get classes for a teacher
+   * @param {string} teacherId - Teacher ID
+   * @returns {Promise<Array>} Array of class names
+   */
+  static async getTeacherClasses(teacherId) {
+    try {
+      // This would typically come from a teachers collection
+      // For now, return sample data
+      return ['10A', '8B', '9C'];
+    } catch (error) {
+      console.error('Error getting teacher classes:', error);
+      return [];
+    }
+  }
 }
 
 // Sample data for testing
