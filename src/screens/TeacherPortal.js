@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityScanner from '../components/ActivityScanner';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 import DateTimeDisplay from '../components/DateTimeDisplay';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
@@ -195,6 +196,9 @@ const TeacherPortal = () => {
       <View style={styles.dateTimeContainer}>
         <DateTimeDisplay />
       </View>
+      
+      {/* Announcements Banner */}
+      <AnnouncementBanner targetAudience="teachers" />
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>

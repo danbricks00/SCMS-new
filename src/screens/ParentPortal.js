@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 import DateTimeDisplay from '../components/DateTimeDisplay';
 
 const ParentPortal = () => {
@@ -17,6 +18,9 @@ const ParentPortal = () => {
       <View style={styles.dateTimeContainer}>
         <DateTimeDisplay />
       </View>
+      
+      {/* Announcements Banner */}
+      <AnnouncementBanner targetAudience="parents" />
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>

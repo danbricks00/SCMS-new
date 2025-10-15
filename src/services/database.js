@@ -6,6 +6,147 @@ import { comprehensiveFraudCheck, logFraudAttempt, formatFraudCheckMessage } fro
 // Database service for managing students and attendance
 export class DatabaseService {
   
+  // ===== TEACHER MANAGEMENT =====
+  
+  /**
+   * Add a new teacher to the database
+   * @param {Object} teacherData - Teacher information
+   * @returns {Promise<string>} Document ID of the created teacher
+   */
+  static async addTeacher(teacherData) {
+    try {
+      // Generate teacher ID if not provided
+      if (!teacherData.teacherId) {
+        teacherData.teacherId = `TCH${Date.now().toString().slice(-6)}`;
+      }
+      
+      // Add creation timestamp
+      teacherData.createdAt = new Date().toISOString();
+      teacherData.updatedAt = new Date().toISOString();
+      teacherData.isActive = true;
+
+      const docRef = await addDoc(collection(db, 'teachers'), teacherData);
+      
+      console.log('Teacher added with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding teacher:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all teachers
+   * @returns {Promise<Array>} Array of teacher documents
+   */
+  static async getAllTeachers() {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'teachers'));
+      const teachers = [];
+      querySnapshot.forEach((doc) => {
+        teachers.push({ id: doc.id, ...doc.data() });
+      });
+      return teachers;
+    } catch (error) {
+      console.error('Error getting teachers:', error);
+      throw error;
+    }
+  }
+
+  // ===== CLASS MANAGEMENT =====
+  
+  /**
+   * Add a new class to the database
+   * @param {Object} classData - Class information
+   * @returns {Promise<string>} Document ID of the created class
+   */
+  static async addClass(classData) {
+    try {
+      // Generate class ID if not provided
+      if (!classData.classId) {
+        classData.classId = `CLS${classData.name.replace(/\s+/g, '')}${Date.now().toString().slice(-4)}`;
+      }
+      
+      // Add creation timestamp
+      classData.createdAt = new Date().toISOString();
+      classData.updatedAt = new Date().toISOString();
+      classData.isActive = true;
+
+      const docRef = await addDoc(collection(db, 'classes'), classData);
+      
+      console.log('Class added with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding class:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all classes
+   * @returns {Promise<Array>} Array of class documents
+   */
+  static async getAllClasses() {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'classes'));
+      const classes = [];
+      querySnapshot.forEach((doc) => {
+        classes.push({ id: doc.id, ...doc.data() });
+      });
+      return classes;
+    } catch (error) {
+      console.error('Error getting classes:', error);
+      throw error;
+    }
+  }
+
+  // ===== ANNOUNCEMENT MANAGEMENT =====
+  
+  /**
+   * Add a new announcement
+   * @param {Object} announcementData - Announcement information
+   * @returns {Promise<string>} Document ID of the created announcement
+   */
+  static async addAnnouncement(announcementData) {
+    try {
+      // Add creation timestamp
+      announcementData.createdAt = new Date().toISOString();
+      announcementData.updatedAt = new Date().toISOString();
+      announcementData.isActive = true;
+
+      const docRef = await addDoc(collection(db, 'announcements'), announcementData);
+      
+      console.log('Announcement added with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding announcement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all active announcements
+   * @returns {Promise<Array>} Array of announcement documents
+   */
+  static async getActiveAnnouncements() {
+    try {
+      const q = query(
+        collection(db, 'announcements'),
+        where('isActive', '==', true),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const announcements = [];
+      querySnapshot.forEach((doc) => {
+        announcements.push({ id: doc.id, ...doc.data() });
+      });
+      return announcements;
+    } catch (error) {
+      console.error('Error getting announcements:', error);
+      throw error;
+    }
+  }
+
   // ===== STUDENT MANAGEMENT =====
   
   /**

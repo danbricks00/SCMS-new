@@ -35,9 +35,39 @@ const AdminPortal = () => {
     emergencyContact: '',
     photo: ''
   });
+  const [newTeacher, setNewTeacher] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    subject: '',
+    department: '',
+    photo: '',
+    classes: []
+  });
+  const [newClass, setNewClass] = useState({
+    name: '',
+    teacherId: '',
+    teacherName: '',
+    subject: '',
+    room: '',
+    schedule: '',
+    studentIds: []
+  });
+  const [announcements, setAnnouncements] = useState([]);
+  const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '',
+    message: '',
+    priority: 'normal', // normal, high, urgent
+    targetAudience: 'all' // all, teachers, students, parents
+  });
 
   useEffect(() => {
     loadStudents();
+    loadTeachers();
+    loadClasses();
+    loadAnnouncements();
   }, []);
 
   const loadStudents = async () => {
@@ -93,6 +123,127 @@ const AdminPortal = () => {
   const handlePrintQR = (uri) => {
     console.log('QR Code printed:', uri);
     Alert.alert('Success', 'QR Code generated successfully');
+  };
+
+  const loadTeachers = async () => {
+    try {
+      const teachersData = await DatabaseService.getAllTeachers();
+      setTeachers(teachersData);
+    } catch (error) {
+      console.error('Error loading teachers:', error);
+      // Keep sample data if database is not available
+    }
+  };
+
+  const loadClasses = async () => {
+    try {
+      const classesData = await DatabaseService.getAllClasses();
+      setClasses(classesData);
+    } catch (error) {
+      console.error('Error loading classes:', error);
+      // Keep sample data if database is not available
+    }
+  };
+
+  const loadAnnouncements = async () => {
+    try {
+      const announcementsData = await DatabaseService.getActiveAnnouncements();
+      setAnnouncements(announcementsData);
+    } catch (error) {
+      console.error('Error loading announcements:', error);
+      // Keep empty array if database is not available
+      setAnnouncements([]);
+    }
+  };
+
+  const handleAddTeacher = async () => {
+    if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.email || !newTeacher.subject) {
+      Alert.alert('Error', 'Please fill in all required fields (First Name, Last Name, Email, Subject)');
+      return;
+    }
+
+    try {
+      const teacherData = {
+        ...newTeacher,
+        name: `${newTeacher.firstName} ${newTeacher.lastName}`
+      };
+
+      await DatabaseService.addTeacher(teacherData);
+      Alert.alert('Success', 'Teacher added successfully');
+      
+      // Reset form
+      setNewTeacher({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        subject: '',
+        department: '',
+        photo: '',
+        classes: []
+      });
+      
+      setShowAddTeacher(false);
+      loadTeachers();
+    } catch (error) {
+      console.error('Error adding teacher:', error);
+      Alert.alert('Error', 'Failed to add teacher');
+    }
+  };
+
+  const handleAddClass = async () => {
+    if (!newClass.name || !newClass.teacherId || !newClass.subject) {
+      Alert.alert('Error', 'Please fill in all required fields (Class Name, Teacher, Subject)');
+      return;
+    }
+
+    try {
+      await DatabaseService.addClass(newClass);
+      Alert.alert('Success', 'Class created successfully');
+      
+      // Reset form
+      setNewClass({
+        name: '',
+        teacherId: '',
+        teacherName: '',
+        subject: '',
+        room: '',
+        schedule: '',
+        studentIds: []
+      });
+      
+      setShowAddClass(false);
+      loadClasses();
+    } catch (error) {
+      console.error('Error adding class:', error);
+      Alert.alert('Error', 'Failed to create class');
+    }
+  };
+
+  const handleAddAnnouncement = async () => {
+    if (!newAnnouncement.title || !newAnnouncement.message) {
+      Alert.alert('Error', 'Please fill in title and message');
+      return;
+    }
+
+    try {
+      await DatabaseService.addAnnouncement(newAnnouncement);
+      Alert.alert('Success', 'Announcement posted successfully');
+      
+      // Reset form
+      setNewAnnouncement({
+        title: '',
+        message: '',
+        priority: 'normal',
+        targetAudience: 'all'
+      });
+      
+      setShowAnnouncements(false);
+      loadAnnouncements();
+    } catch (error) {
+      console.error('Error adding announcement:', error);
+      Alert.alert('Error', 'Failed to post announcement');
+    }
   };
 
   return (
@@ -241,6 +392,7 @@ const AdminPortal = () => {
                 
                 <TouchableOpacity 
                   style={[styles.actionCard, styles.successAction]}
+                  onPress={() => setShowAnnouncements(true)}
                 >
                   <Ionicons name="megaphone" size={32} color="#fff" />
                   <Text style={styles.actionCardTitle}>Announcements</Text>
@@ -663,6 +815,338 @@ const AdminPortal = () => {
           onClose={() => setShowQRGenerator(false)}
           onPrint={handlePrintQR}
         />
+      </Modal>
+
+      {/* Add Teacher Modal */}
+      <Modal
+        visible={showAddTeacher}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAddTeacher(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Add New Teacher</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          <ScrollView style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Teacher Photo (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.photo}
+                onChangeText={(text) => setNewTeacher({...newTeacher, photo: text})}
+                placeholder="Photo URL (e.g., https://example.com/photo.jpg)"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>First Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.firstName}
+                onChangeText={(text) => setNewTeacher({...newTeacher, firstName: text})}
+                placeholder="Enter first name"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Last Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.lastName}
+                onChangeText={(text) => setNewTeacher({...newTeacher, lastName: text})}
+                placeholder="Enter last name"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.email}
+                onChangeText={(text) => setNewTeacher({...newTeacher, email: text})}
+                placeholder="teacher@school.edu"
+                keyboardType="email-address"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Phone</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.phone}
+                onChangeText={(text) => setNewTeacher({...newTeacher, phone: text})}
+                placeholder="+64 21 123 4567"
+                keyboardType="phone-pad"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Subject *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.subject}
+                onChangeText={(text) => setNewTeacher({...newTeacher, subject: text})}
+                placeholder="e.g., Mathematics, English, Science"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Department</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.department}
+                onChangeText={(text) => setNewTeacher({...newTeacher, department: text})}
+                placeholder="e.g., Mathematics Department"
+              />
+            </View>
+            
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddTeacher}
+            >
+              <Ionicons name="add-circle" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Add Teacher</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Create Class Modal */}
+      <Modal
+        visible={showAddClass}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAddClass(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Create New Class</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          <ScrollView style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Class Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.name}
+                onChangeText={(text) => setNewClass({...newClass, name: text})}
+                placeholder="e.g., 10A, 9B, Advanced Math"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Subject *</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.subject}
+                onChangeText={(text) => setNewClass({...newClass, subject: text})}
+                placeholder="e.g., Mathematics, English, Science"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Room</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.room}
+                onChangeText={(text) => setNewClass({...newClass, room: text})}
+                placeholder="e.g., Room 101, Lab 2"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Schedule</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.schedule}
+                onChangeText={(text) => setNewClass({...newClass, schedule: text})}
+                placeholder="e.g., Mon, Wed, Fri 9:00-10:00 AM"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Assign Teacher *</Text>
+              <Text style={styles.helperText}>Select from existing teachers or enter teacher ID</Text>
+              <TextInput
+                style={styles.input}
+                value={newClass.teacherId}
+                onChangeText={(text) => setNewClass({...newClass, teacherId: text})}
+                placeholder="e.g., TCH123456"
+              />
+              <TextInput
+                style={[styles.input, styles.marginTop]}
+                value={newClass.teacherName}
+                onChangeText={(text) => setNewClass({...newClass, teacherName: text})}
+                placeholder="Teacher Name (optional)"
+              />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Student IDs (Optional)</Text>
+              <Text style={styles.helperText}>Comma-separated list of student IDs to assign to this class</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={newClass.studentIds.join(', ')}
+                onChangeText={(text) => setNewClass({...newClass, studentIds: text.split(',').map(id => id.trim()).filter(id => id)})}
+                placeholder="STU10AJ1234, STU10BS5678, STU10CW9012"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+            
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddClass}
+            >
+              <Ionicons name="add-circle" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Create Class</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Announcements Modal */}
+      <Modal
+        visible={showAnnouncements}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAnnouncements(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Announcements</Text>
+            <TouchableOpacity onPress={() => {/* TODO: Add new announcement form */}}>
+              <Ionicons name="add" size={24} color="#4a90e2" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.announcementContainer}>
+            {announcements.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="megaphone-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyStateText}>No announcements yet</Text>
+                <TouchableOpacity 
+                  style={styles.emptyStateButton}
+                  onPress={() => {/* TODO: Add new announcement form */}}
+                >
+                  <Text style={styles.emptyStateButtonText}>Create First Announcement</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              announcements.map((announcement) => (
+                <View key={announcement.id} style={styles.announcementCard}>
+                  <View style={styles.announcementHeader}>
+                    <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                    <View style={[styles.priorityBadge, 
+                      announcement.priority === 'urgent' ? styles.urgentBadge : 
+                      announcement.priority === 'high' ? styles.highBadge : styles.normalBadge
+                    ]}>
+                      <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.announcementMessage}>{announcement.message}</Text>
+                  <View style={styles.announcementFooter}>
+                    <Text style={styles.announcementTarget}>Target: {announcement.targetAudience}</Text>
+                    <Text style={styles.announcementDate}>
+                      {new Date(announcement.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+            
+            {/* Add New Announcement Form */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Create New Announcement</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Title *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newAnnouncement.title}
+                  onChangeText={(text) => setNewAnnouncement({...newAnnouncement, title: text})}
+                  placeholder="Enter announcement title"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Message *</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={newAnnouncement.message}
+                  onChangeText={(text) => setNewAnnouncement({...newAnnouncement, message: text})}
+                  placeholder="Enter announcement message"
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Priority</Text>
+                <View style={styles.prioritySelector}>
+                  {['normal', 'high', 'urgent'].map((priority) => (
+                    <TouchableOpacity
+                      key={priority}
+                      style={[
+                        styles.priorityOption,
+                        newAnnouncement.priority === priority && styles.priorityOptionActive
+                      ]}
+                      onPress={() => setNewAnnouncement({...newAnnouncement, priority})}
+                    >
+                      <Text style={[
+                        styles.priorityOptionText,
+                        newAnnouncement.priority === priority && styles.priorityOptionTextActive
+                      ]}>
+                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Target Audience</Text>
+                <View style={styles.audienceSelector}>
+                  {['all', 'teachers', 'students', 'parents'].map((audience) => (
+                    <TouchableOpacity
+                      key={audience}
+                      style={[
+                        styles.audienceOption,
+                        newAnnouncement.targetAudience === audience && styles.audienceOptionActive
+                      ]}
+                      onPress={() => setNewAnnouncement({...newAnnouncement, targetAudience: audience})}
+                    >
+                      <Text style={[
+                        styles.audienceOptionText,
+                        newAnnouncement.targetAudience === audience && styles.audienceOptionTextActive
+                      ]}>
+                        {audience.charAt(0).toUpperCase() + audience.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={handleAddAnnouncement}
+              >
+                <Ionicons name="megaphone" size={20} color="#fff" />
+                <Text style={styles.addButtonText}>Post Announcement</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -1265,6 +1749,123 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  marginTop: {
+    marginTop: 8,
+  },
+  // Announcement styles
+  announcementContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  announcementCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  announcementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  announcementTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+    marginRight: 12,
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  urgentBadge: {
+    backgroundColor: '#ffebee',
+  },
+  highBadge: {
+    backgroundColor: '#fff3e0',
+  },
+  normalBadge: {
+    backgroundColor: '#e8f5e8',
+  },
+  priorityText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  announcementMessage: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  announcementFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  announcementTarget: {
+    fontSize: 12,
+    color: '#999',
+  },
+  announcementDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  prioritySelector: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  priorityOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+  },
+  priorityOptionActive: {
+    backgroundColor: '#4a90e2',
+  },
+  priorityOptionText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  priorityOptionTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  audienceSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  audienceOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  audienceOptionActive: {
+    backgroundColor: '#4CAF50',
+  },
+  audienceOptionText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  audienceOptionTextActive: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 

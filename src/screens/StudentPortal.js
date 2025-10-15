@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 import DateTimeDisplay from '../components/DateTimeDisplay';
 
 const StudentPortal = () => {
@@ -18,6 +19,9 @@ const StudentPortal = () => {
       <View style={styles.dateTimeContainer}>
         <DateTimeDisplay />
       </View>
+      
+      {/* Announcements Banner */}
+      <AnnouncementBanner targetAudience="students" />
       
       <ScrollView style={styles.content}>
         <View style={styles.section}>
