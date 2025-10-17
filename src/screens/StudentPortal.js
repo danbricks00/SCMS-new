@@ -225,7 +225,7 @@ const StudentPortal = () => {
             const ctx = canvas.getContext('2d');
             
             // Create a more sophisticated pattern
-            const dataString = qrData.substring(0, 100);
+            const dataString = qrData;
             const pattern = dataString.split('').map(char => char.charCodeAt(0));
             
             // Draw background
@@ -238,26 +238,53 @@ const StudentPortal = () => {
             const cols = Math.floor(200 / cellSize);
             const rows = Math.floor(200 / cellSize);
             
-            for (let i = 0; i < pattern.length && i < cols * rows; i++) {
-              const x = (i % cols) * cellSize;
-              const y = Math.floor(i / cols) * cellSize;
-              if (pattern[i] % 2 === 0) {
-                ctx.fillRect(x, y, cellSize, cellSize);
+            // Create a more complex pattern
+            for (let row = 0; row < rows; row++) {
+              for (let col = 0; col < cols; col++) {
+                const index = (row * cols + col) % pattern.length;
+                const charCode = pattern[index];
+                const shouldFill = (charCode + row + col) % 2 === 0;
+                
+                if (shouldFill) {
+                  ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                }
               }
             }
             
-            // Add corner markers
+            // Add corner markers (like real QR codes)
             const markerSize = cellSize * 7;
-            ctx.fillRect(0, 0, markerSize, markerSize);
-            ctx.fillRect(200 - markerSize, 0, markerSize, markerSize);
-            ctx.fillRect(0, 200 - markerSize, markerSize, markerSize);
+            const markerInnerSize = cellSize * 3;
             
-            // Add white squares inside markers
+            // Top-left marker
+            ctx.fillRect(0, 0, markerSize, markerSize);
             ctx.fillStyle = '#FFFFFF';
-            const innerSize = cellSize * 3;
-            ctx.fillRect(cellSize * 2, cellSize * 2, innerSize, innerSize);
-            ctx.fillRect(200 - markerSize + cellSize * 2, cellSize * 2, innerSize, innerSize);
-            ctx.fillRect(cellSize * 2, 200 - markerSize + cellSize * 2, innerSize, innerSize);
+            ctx.fillRect(cellSize * 2, cellSize * 2, markerInnerSize, markerInnerSize);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(cellSize * 3, cellSize * 3, cellSize, cellSize);
+            
+            // Top-right marker
+            ctx.fillRect(200 - markerSize, 0, markerSize, markerSize);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(200 - markerSize + cellSize * 2, cellSize * 2, markerInnerSize, markerInnerSize);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(200 - markerSize + cellSize * 3, cellSize * 3, cellSize, cellSize);
+            
+            // Bottom-left marker
+            ctx.fillRect(0, 200 - markerSize, markerSize, markerSize);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(cellSize * 2, 200 - markerSize + cellSize * 2, markerInnerSize, markerInnerSize);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(cellSize * 3, 200 - markerSize + cellSize * 3, cellSize, cellSize);
+            
+            // Add some data modules in the center
+            ctx.fillStyle = '#000000';
+            for (let i = 0; i < pattern.length && i < 50; i++) {
+              const x = (markerSize + i % (cols - markerSize * 2 / cellSize)) * cellSize;
+              const y = (markerSize + Math.floor(i / (cols - markerSize * 2 / cellSize))) * cellSize;
+              if (x < 200 - markerSize && y < 200 - markerSize && pattern[i] % 3 === 0) {
+                ctx.fillRect(x, y, cellSize, cellSize);
+              }
+            }
             
             // Add border
             ctx.strokeStyle = '#000000';
