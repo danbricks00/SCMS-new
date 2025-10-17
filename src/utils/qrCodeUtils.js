@@ -8,17 +8,22 @@ export class QRCodeUtils {
   /**
    * Generate QR code data for a student
    * @param {Object} studentData - Student information
+   * @param {boolean} includeTimestamp - Whether to include timestamp (default: false for display)
    * @returns {string} Encrypted QR code data
    */
-  static generateStudentQR(studentData) {
+  static generateStudentQR(studentData, includeTimestamp = false) {
     const qrData = {
       studentId: studentData.studentId,
       name: studentData.name,
       class: studentData.class,
-      timestamp: Date.now(),
       type: 'student',
       version: '2.0' // Version for enhanced tracking
     };
+
+    // Only include timestamp if specifically requested (for attendance scanning)
+    if (includeTimestamp) {
+      qrData.timestamp = Date.now();
+    }
 
     // Encrypt the data
     const encryptedData = CryptoJS.AES.encrypt(

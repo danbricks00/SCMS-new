@@ -165,7 +165,7 @@ export class DatabaseService {
         );
       }
 
-      // Generate QR code data
+      // Generate QR code data (without timestamp for display)
       studentData.qrCode = QRCodeUtils.generateStudentQR(studentData);
       
       // Add creation timestamp
@@ -276,7 +276,7 @@ export class DatabaseService {
         throw new Error('Student not found');
       }
 
-      // Update QR code if student data changed
+      // Update QR code if student data changed (without timestamp for display)
       if (updateData.name || updateData.class) {
         const updatedStudentData = { ...student, ...updateData };
         updateData.qrCode = QRCodeUtils.generateStudentQR(updatedStudentData);

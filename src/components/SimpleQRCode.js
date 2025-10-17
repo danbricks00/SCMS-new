@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, StyleSheet, Platform, Text } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
@@ -7,20 +7,26 @@ const SimpleQRCode = ({ studentData, size = 200 }) => {
   const canvasRef = useRef(null);
   const [qrImageUrl, setQrImageUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   if (!studentData) {
     console.log('SimpleQRCode: No studentData provided');
     return null;
   }
 
-  console.log('SimpleQRCode: studentData:', studentData);
-  const qrData = QRCodeUtils.generateStudentQR(studentData);
+  // Memoize QR data to prevent infinite re-renders
+  const qrData = useMemo(() => {
+    console.log('SimpleQRCode: Generating QR data for:', studentData);
+    return QRCodeUtils.generateStudentQR(studentData);
+  }, [studentData.studentId, studentData.name, studentData.class]);
+
   console.log('SimpleQRCode: Generated QR data:', qrData);
 
   // For web, use a different approach - generate QR as image URL
   useEffect(() => {
-    if (Platform.OS === 'web') {
+    if (Platform.OS === 'web' && !hasGenerated) {
       setIsLoading(true);
+      setHasGenerated(true);
       
       // Try multiple QR generation methods
       const generateQR = async () => {
@@ -96,7 +102,7 @@ const SimpleQRCode = ({ studentData, size = 200 }) => {
         generateQR();
       }
     }
-  }, [qrData, size]);
+  }, [qrData, size, hasGenerated]);
 
   if (Platform.OS === 'web') {
     if (isLoading) {
