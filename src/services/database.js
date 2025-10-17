@@ -874,7 +874,8 @@ export class DatabaseService {
       return filteredAnnouncements;
     } catch (error) {
       console.error('Error getting announcements:', error);
-      throw error;
+      // Return empty array instead of throwing error to prevent UI crashes
+      return [];
     }
   }
 
@@ -897,7 +898,8 @@ export class DatabaseService {
       return announcements;
     } catch (error) {
       console.error('Error getting all announcements:', error);
-      throw error;
+      // Return empty array instead of throwing error to prevent UI crashes
+      return [];
     }
   }
 

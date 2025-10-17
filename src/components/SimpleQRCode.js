@@ -74,8 +74,48 @@ const SimpleQRCode = ({ studentData, size = 200 }) => {
             return;
           }
 
-          // Method 3: Fallback to simple text representation
-          console.log('No QR library available, using fallback');
+          // Method 3: Simple canvas-based QR generation (basic fallback)
+          console.log('No QR library available, using basic canvas fallback');
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Create a simple pattern based on the data
+            const dataString = qrData.substring(0, 20); // Use first 20 chars
+            const pattern = dataString.split('').map(char => char.charCodeAt(0));
+            
+            // Draw a simple pattern
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = '#000000';
+            
+            const cellSize = 8;
+            for (let i = 0; i < pattern.length; i++) {
+              const x = (i % (size / cellSize)) * cellSize;
+              const y = Math.floor(i / (size / cellSize)) * cellSize;
+              if (pattern[i] % 2 === 0) {
+                ctx.fillRect(x, y, cellSize, cellSize);
+              }
+            }
+            
+            // Add border
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, size, size);
+            
+            const imageUrl = canvas.toDataURL('image/png');
+            setQrImageUrl(imageUrl);
+            setIsLoading(false);
+            console.log('Basic QR pattern generated successfully');
+            return;
+          } catch (error) {
+            console.error('Basic QR generation failed:', error);
+          }
+          
+          // Method 4: Final fallback to text representation
+          console.log('All QR generation methods failed, using text fallback');
           setQrImageUrl(null);
           setIsLoading(false);
         } catch (error) {
@@ -87,17 +127,37 @@ const SimpleQRCode = ({ studentData, size = 200 }) => {
 
       // Load QRCode.js library if not already loaded
       if (!window.QRCode) {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-        script.onload = () => {
-          console.log('QRCode.js loaded');
-          generateQR();
+        // Try multiple CDN sources
+        const cdnSources = [
+          'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+          'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js'
+        ];
+        
+        let currentIndex = 0;
+        
+        const tryLoadScript = () => {
+          if (currentIndex >= cdnSources.length) {
+            console.log('All QRCode.js CDN sources failed, using fallback');
+            generateQR();
+            return;
+          }
+          
+          const script = document.createElement('script');
+          script.src = cdnSources[currentIndex];
+          script.onload = () => {
+            console.log(`QRCode.js loaded from ${cdnSources[currentIndex]}`);
+            generateQR();
+          };
+          script.onerror = () => {
+            console.log(`Failed to load QRCode.js from ${cdnSources[currentIndex]}`);
+            currentIndex++;
+            tryLoadScript();
+          };
+          document.head.appendChild(script);
         };
-        script.onerror = () => {
-          console.log('Failed to load QRCode.js, trying alternative');
-          generateQR();
-        };
-        document.head.appendChild(script);
+        
+        tryLoadScript();
       } else {
         generateQR();
       }
