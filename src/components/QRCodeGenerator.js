@@ -250,7 +250,7 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
       <body>
         <div class="container">
           <div class="header">
-            <div class="school-name">🏫 School Management System</div>
+            <div class="school-name">🏫 School Class Management System</div>
             <div class="subtitle">Student Identification & Attendance Card</div>
           </div>
           
@@ -331,7 +331,7 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
           <div class="footer">
             <strong>For Teachers:</strong> Use your phone camera to scan this QR code<br>
             Generated: ${new Date().toLocaleString('en-NZ')} • Valid for current academic year<br>
-            © School Management System
+            © School Class Management System
           </div>
         </div>
       </body>

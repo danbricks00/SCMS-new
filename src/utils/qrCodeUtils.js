@@ -174,7 +174,7 @@ export class QRCodeUtils {
       },
       generatedAt: new Date().toISOString(),
       schoolInfo: {
-        name: 'School Management System',
+        name: 'School Class Management System',
         logo: null // Add school logo URL here
       }
     };

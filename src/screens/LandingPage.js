@@ -43,7 +43,7 @@ const LandingPage = ({ navigation }) => {
         <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
           <Ionicons name="menu" size={32} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>School Management System</Text>
+        <Text style={styles.headerTitle}>School Class Management System</Text>
       </View>
 
       {/* Date and Time Display */}

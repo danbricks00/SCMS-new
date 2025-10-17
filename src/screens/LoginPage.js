@@ -104,7 +104,7 @@ const LoginPage = () => {
       
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>School Management System</Text>
+          <Text style={styles.title}>School Class Management System</Text>
           <Text style={styles.subtitle}>Please login to continue</Text>
         </View>
 

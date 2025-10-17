@@ -81,7 +81,7 @@ const StudentPortal = () => {
       </head>
       <body>
         <div class="print-container">
-          <div class="school-header">School Management System</div>
+          <div class="school-header">School Class Management System</div>
           <div class="student-info">
             <div class="student-name">${user?.name || 'Student Name'}</div>
             <div class="student-id">Student ID: ${user?.username || 'STU001'}</div>
