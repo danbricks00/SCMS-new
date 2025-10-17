@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { router } from 'expo-router';
 
 const AuthContext = createContext();
 
@@ -47,6 +48,8 @@ export const AuthProvider = ({ children }) => {
     if (typeof window !== 'undefined' && window.sessionStorage) {
       sessionStorage.removeItem('user');
     }
+    // Redirect to landing page after logout
+    router.replace('/landing');
   };
 
   const isAuthenticated = () => {

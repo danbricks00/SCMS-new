@@ -19,7 +19,7 @@ export default function App() {
   }
 
   try {
-    return <Redirect href="/login" />;
+    return <Redirect href="/landing" />;
   } catch (error) {
     console.error("Error during redirect:", error);
     // In a real app, you might want to show a proper error screen

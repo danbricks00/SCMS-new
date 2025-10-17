@@ -44,19 +44,39 @@ const LoginPage = () => {
           studentId: user.studentId
         });
 
-        // Redirect based on role
-        const roleRoutes = {
-          'admin': '/admin',
-          'teacher': '/teacher',
-          'student': '/student',
-          'parent': '/parent'
-        };
+        // Check for intended destination first
+        let redirectRoute = null;
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          const intendedDestination = sessionStorage.getItem('intendedDestination');
+          if (intendedDestination) {
+            // Map the intended destination to the correct route
+            const destinationMap = {
+              'StudentPortal': '/student',
+              'ParentPortal': '/parent',
+              'TeacherPortal': '/teacher',
+              'AdminPortal': '/admin'
+            };
+            redirectRoute = destinationMap[intendedDestination];
+            // Clear the intended destination
+            sessionStorage.removeItem('intendedDestination');
+          }
+        }
 
-        const redirectRoute = roleRoutes[user.role];
+        // If no intended destination, use role-based routing
+        if (!redirectRoute) {
+          const roleRoutes = {
+            'admin': '/admin',
+            'teacher': '/teacher',
+            'student': '/student',
+            'parent': '/parent'
+          };
+          redirectRoute = roleRoutes[user.role];
+        }
+
         if (redirectRoute) {
           router.replace(redirectRoute);
         } else {
-          Alert.alert('Error', 'Invalid user role');
+          Alert.alert('Error', 'Invalid user role or destination');
         }
       } else {
         Alert.alert('Error', 'Invalid username or password');

@@ -25,16 +25,13 @@ const LandingPage = ({ navigation }) => {
 
   const navigateTo = (route) => {
     setMenuOpen(false);
-    // Map the portal names to the correct routes
-    const routeMap = {
-      'StudentPortal': 'student',
-      'ParentPortal': 'parent',
-      'TeacherPortal': 'teacher',
-      'AdminPortal': 'admin'
-    };
+    // Store the intended destination in session storage
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      sessionStorage.setItem('intendedDestination', route);
+    }
     
-    // Use the router imported at the top level
-    router.push(`/${routeMap[route] || route.toLowerCase()}`);
+    // Redirect to login page
+    router.push('/login');
   };
 
   console.log('[SCMS] Rendering LandingPage, menuOpen:', menuOpen);
