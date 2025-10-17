@@ -87,7 +87,9 @@ const StudentPortal = () => {
             <div class="student-id">Student ID: ${user?.username || 'STU001'}</div>
           </div>
           <div class="qr-code-container">
-            <canvas id="qrcode" width="200" height="200"></canvas>
+            <div id="qrcode" style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid #ccc;">
+              <span id="qr-loading">Generating QR Code...</span>
+            </div>
           </div>
           <div class="instructions">
             <strong>Instructions:</strong><br>
@@ -109,8 +111,15 @@ const StudentPortal = () => {
             timestamp: new Date().toISOString()
           });
           
-          // Generate QR code on canvas
-          QRCode.toCanvas(document.getElementById('qrcode'), qrData, {
+          console.log('Print QR Data:', qrData);
+          
+          // Create canvas element
+          const canvas = document.createElement('canvas');
+          canvas.width = 200;
+          canvas.height = 200;
+          
+          // Generate QR code
+          QRCode.toCanvas(canvas, qrData, {
             width: 200,
             height: 200,
             color: {
@@ -123,14 +132,12 @@ const StudentPortal = () => {
             if (error) {
               console.error('QR code generation error:', error);
               // Fallback: show error message
-              document.getElementById('qrcode').style.display = 'none';
-              const errorDiv = document.createElement('div');
-              errorDiv.innerHTML = 'QR Code generation failed. Please try again.';
-              errorDiv.style.color = 'red';
-              errorDiv.style.fontSize = '14px';
-              document.querySelector('.qr-code-container').appendChild(errorDiv);
+              document.getElementById('qrcode').innerHTML = '<span style="color: red; font-size: 14px;">QR Code generation failed. Please try again.</span>';
             } else {
               console.log('QR code generated successfully');
+              // Replace the loading text with the canvas
+              document.getElementById('qrcode').innerHTML = '';
+              document.getElementById('qrcode').appendChild(canvas);
             }
           });
         </script>
