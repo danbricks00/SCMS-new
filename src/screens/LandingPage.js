@@ -9,17 +9,13 @@ const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    console.log('[SCMS] LandingPage mounted');
-    console.log('[SCMS] Environment:', process.env.NODE_ENV);
-
-    const screenDimensions = Dimensions.get('window');
-    console.log('[SCMS] Window dimensions:', screenDimensions.width, screenDimensions.height);
-
-    return () => console.log('[SCMS] LandingPage unmounted');
+    // LandingPage mounted
+    return () => {
+      // LandingPage unmounted
+    };
   }, []);
 
   const toggleMenu = () => {
-    console.log('[SCMS] Toggle menu clicked, current state:', menuOpen);
     setMenuOpen(!menuOpen);
   };
 
@@ -34,7 +30,6 @@ const LandingPage = ({ navigation }) => {
     router.push('/login');
   };
 
-  console.log('[SCMS] Rendering LandingPage, menuOpen:', menuOpen);
 
   return (
     <SafeAreaView style={styles.container}>

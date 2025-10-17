@@ -171,7 +171,6 @@ const StudentPortal = () => {
           </div>
         </div>
         
-        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
         <script>
           // Use the stable QR code from database
           const qrData = '${studentQRCode || JSON.stringify({
@@ -180,12 +179,29 @@ const StudentPortal = () => {
             class: "10A"
           })}';
           
-          console.log('Print QR Data:', qrData);
+          // Load QRCode.js library dynamically to avoid parser-blocking warnings
+          function loadQRCodeLibrary() {
+            return new Promise((resolve, reject) => {
+              if (typeof QRCode !== 'undefined') {
+                resolve();
+                return;
+              }
+              
+              const script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+              script.async = true;
+              script.onload = () => resolve();
+              script.onerror = () => reject(new Error('Failed to load QRCode library'));
+              document.head.appendChild(script);
+            });
+          }
           
-          // Wait for QRCode library to load, then generate QR code
-          function generateQRCode() {
-            if (typeof QRCode !== 'undefined') {
-              try {
+          // Generate QR code
+          async function generateQRCode() {
+            try {
+              await loadQRCodeLibrary();
+              
+              if (typeof QRCode !== 'undefined') {
                 const canvas = document.createElement('canvas');
                 QRCode.toCanvas(canvas, qrData, {
                   width: 200,
@@ -198,26 +214,21 @@ const StudentPortal = () => {
                   errorCorrectionLevel: 'M'
                 }, function (error) {
                   if (error) {
-                    console.error('QR code generation error:', error);
-                    // Fallback to simple pattern
                     generateFallbackQR();
                   } else {
-                    console.log('QR code generated successfully');
                     document.getElementById('qrcode').innerHTML = '';
                     document.getElementById('qrcode').appendChild(canvas);
                   }
                 });
-              } catch (error) {
-                console.error('QR generation failed:', error);
+              } else {
                 generateFallbackQR();
               }
-            } else {
-              console.log('QRCode library not loaded, using fallback');
+            } catch (error) {
               generateFallbackQR();
             }
           }
           
-          // Fallback QR generation
+          // Fallback QR generation - create a more scannable pattern
           function generateFallbackQR() {
             const canvas = document.createElement('canvas');
             canvas.width = 200;
@@ -232,18 +243,18 @@ const StudentPortal = () => {
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, 200, 200);
             
-            // Draw QR-like pattern
+            // Draw QR-like pattern with better distribution
             ctx.fillStyle = '#000000';
-            const cellSize = 4;
+            const cellSize = 3;
             const cols = Math.floor(200 / cellSize);
             const rows = Math.floor(200 / cellSize);
             
-            // Create a more complex pattern
+            // Create a more complex pattern that looks more like a real QR code
             for (let row = 0; row < rows; row++) {
               for (let col = 0; col < cols; col++) {
                 const index = (row * cols + col) % pattern.length;
                 const charCode = pattern[index];
-                const shouldFill = (charCode + row + col) % 2 === 0;
+                const shouldFill = (charCode + row + col + Math.floor(row / 7) + Math.floor(col / 7)) % 2 === 0;
                 
                 if (shouldFill) {
                   ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
@@ -276,12 +287,18 @@ const StudentPortal = () => {
             ctx.fillStyle = '#000000';
             ctx.fillRect(cellSize * 3, 200 - markerSize + cellSize * 3, cellSize, cellSize);
             
-            // Add some data modules in the center
+            // Add timing patterns (horizontal and vertical lines)
             ctx.fillStyle = '#000000';
-            for (let i = 0; i < pattern.length && i < 50; i++) {
-              const x = (markerSize + i % (cols - markerSize * 2 / cellSize)) * cellSize;
-              const y = (markerSize + Math.floor(i / (cols - markerSize * 2 / cellSize))) * cellSize;
-              if (x < 200 - markerSize && y < 200 - markerSize && pattern[i] % 3 === 0) {
+            for (let i = markerSize + cellSize; i < 200 - markerSize; i += cellSize * 2) {
+              ctx.fillRect(i, markerSize + cellSize * 2, cellSize, cellSize);
+              ctx.fillRect(markerSize + cellSize * 2, i, cellSize, cellSize);
+            }
+            
+            // Add more data modules in the center
+            for (let i = 0; i < pattern.length && i < 100; i++) {
+              const x = (markerSize + cellSize + i % (cols - markerSize * 2 / cellSize - 2)) * cellSize;
+              const y = (markerSize + cellSize + Math.floor(i / (cols - markerSize * 2 / cellSize - 2))) * cellSize;
+              if (x < 200 - markerSize && y < 200 - markerSize && pattern[i] % 2 === 0) {
                 ctx.fillRect(x, y, cellSize, cellSize);
               }
             }
@@ -293,7 +310,6 @@ const StudentPortal = () => {
             
             document.getElementById('qrcode').innerHTML = '';
             document.getElementById('qrcode').appendChild(canvas);
-            console.log('Fallback QR pattern generated');
           }
           
           // Start generation

@@ -7,10 +7,10 @@ export default function App() {
 
   useEffect(() => {
     setIsClient(true);
-    console.log("App component mounted on the client.");
+    // App component mounted on the client
 
     return () => {
-      console.log("App component will unmount.");
+      // App component will unmount
     };
   }, []);
 

@@ -10,21 +10,16 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
   const [hasGenerated, setHasGenerated] = useState(false);
 
   if (!studentData) {
-    console.log('SimpleQRCode: No studentData provided');
     return null;
   }
 
   // Use provided QR code or generate one if not provided
   const qrData = useMemo(() => {
     if (qrCode) {
-      console.log('SimpleQRCode: Using provided QR code');
       return qrCode;
     }
-    console.log('SimpleQRCode: Generating QR data for:', studentData);
     return QRCodeUtils.generateStudentQR(studentData);
   }, [qrCode, studentData?.studentId, studentData?.name, studentData?.class]);
-
-  console.log('SimpleQRCode: Generated QR data:', qrData);
 
   // For web, use a different approach - generate QR as image URL
   useEffect(() => {
@@ -35,28 +30,26 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
       // Generate QR code using a more reliable method
       const generateQR = async () => {
         try {
-          // Method 1: Try QRCode.js with canvas
-          if (window.QRCode) {
-            const canvas = document.createElement('canvas');
-            await window.QRCode.toCanvas(canvas, qrData, {
-              width: size,
-              height: size,
-              color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-              },
-              margin: 2,
-              errorCorrectionLevel: 'M'
-            });
-            const imageUrl = canvas.toDataURL('image/png');
-            setQrImageUrl(imageUrl);
-            setIsLoading(false);
-            console.log('QR Code generated successfully with QRCode.js');
-            return;
-          }
+                  // Method 1: Try QRCode.js with canvas
+                  if (window.QRCode) {
+                    const canvas = document.createElement('canvas');
+                    await window.QRCode.toCanvas(canvas, qrData, {
+                      width: size,
+                      height: size,
+                      color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                      },
+                      margin: 2,
+                      errorCorrectionLevel: 'M'
+                    });
+                    const imageUrl = canvas.toDataURL('image/png');
+                    setQrImageUrl(imageUrl);
+                    setIsLoading(false);
+                    return;
+                  }
 
-          // Method 2: Generate a proper QR-like pattern
-          console.log('No QR library available, generating QR-like pattern');
+                  // Method 2: Generate a proper QR-like pattern
           const canvas = document.createElement('canvas');
           canvas.width = size;
           canvas.height = size;
@@ -129,11 +122,10 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
           ctx.lineWidth = 2;
           ctx.strokeRect(0, 0, size, size);
           
-          const imageUrl = canvas.toDataURL('image/png');
-          setQrImageUrl(imageUrl);
-          setIsLoading(false);
-          console.log('QR-like pattern generated successfully');
-          return;
+                  const imageUrl = canvas.toDataURL('image/png');
+                  setQrImageUrl(imageUrl);
+                  setIsLoading(false);
+                  return;
         } catch (error) {
           console.error('QR Code generation error:', error);
           setQrImageUrl(null);
@@ -141,22 +133,20 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
         }
       };
 
-      // Load QRCode.js library if not already loaded
-      if (!window.QRCode) {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-        script.onload = () => {
-          console.log('QRCode.js loaded');
-          generateQR();
-        };
-        script.onerror = () => {
-          console.log('Failed to load QRCode.js, using fallback');
-          generateQR();
-        };
-        document.head.appendChild(script);
-      } else {
-        generateQR();
-      }
+              // Load QRCode.js library if not already loaded
+              if (!window.QRCode) {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+                script.onload = () => {
+                  generateQR();
+                };
+                script.onerror = () => {
+                  generateQR();
+                };
+                document.head.appendChild(script);
+              } else {
+                generateQR();
+              }
     }
   }, [qrData, size, hasGenerated]);
 
