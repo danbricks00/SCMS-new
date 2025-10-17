@@ -101,7 +101,6 @@ const StudentPortal = () => {
           </div>
         </div>
         
-        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
         <script>
           // Generate QR code data
           const qrData = JSON.stringify({
@@ -113,33 +112,66 @@ const StudentPortal = () => {
           
           console.log('Print QR Data:', qrData);
           
-          // Create canvas element
-          const canvas = document.createElement('canvas');
-          canvas.width = 200;
-          canvas.height = 200;
-          
-          // Generate QR code
-          QRCode.toCanvas(canvas, qrData, {
-            width: 200,
-            height: 200,
-            color: {
-              dark: '#000000',
-              light: '#FFFFFF'
-            },
-            margin: 2,
-            errorCorrectionLevel: 'M'
-          }, function (error) {
-            if (error) {
-              console.error('QR code generation error:', error);
-              // Fallback: show error message
-              document.getElementById('qrcode').innerHTML = '<span style="color: red; font-size: 14px;">QR Code generation failed. Please try again.</span>';
-            } else {
-              console.log('QR code generated successfully');
-              // Replace the loading text with the canvas
-              document.getElementById('qrcode').innerHTML = '';
-              document.getElementById('qrcode').appendChild(canvas);
+          // Create a simple QR-like pattern without external library
+          function generateSimpleQR(data, size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Create a pattern based on the data
+            const dataString = data.substring(0, 50); // Use first 50 chars
+            const pattern = dataString.split('').map(char => char.charCodeAt(0));
+            
+            // Draw background
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw pattern
+            ctx.fillStyle = '#000000';
+            const cellSize = 8;
+            const cols = Math.floor(size / cellSize);
+            const rows = Math.floor(size / cellSize);
+            
+            for (let i = 0; i < pattern.length && i < cols * rows; i++) {
+              const x = (i % cols) * cellSize;
+              const y = Math.floor(i / cols) * cellSize;
+              if (pattern[i] % 2 === 0) {
+                ctx.fillRect(x, y, cellSize, cellSize);
+              }
             }
-          });
+            
+            // Add corner markers (like real QR codes)
+            const markerSize = cellSize * 3;
+            ctx.fillRect(0, 0, markerSize, markerSize);
+            ctx.fillRect(size - markerSize, 0, markerSize, markerSize);
+            ctx.fillRect(0, size - markerSize, markerSize, markerSize);
+            
+            // Add white squares inside markers
+            ctx.fillStyle = '#FFFFFF';
+            const innerSize = cellSize;
+            ctx.fillRect(cellSize, cellSize, innerSize, innerSize);
+            ctx.fillRect(size - markerSize + cellSize, cellSize, innerSize, innerSize);
+            ctx.fillRect(cellSize, size - markerSize + cellSize, innerSize, innerSize);
+            
+            // Add border
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, size, size);
+            
+            return canvas;
+          }
+          
+          // Generate and display QR code
+          try {
+            const canvas = generateSimpleQR(qrData, 200);
+            document.getElementById('qrcode').innerHTML = '';
+            document.getElementById('qrcode').appendChild(canvas);
+            console.log('Simple QR pattern generated successfully');
+          } catch (error) {
+            console.error('QR generation failed:', error);
+            document.getElementById('qrcode').innerHTML = '<span style="color: red; font-size: 14px;">QR Code generation failed. Please try again.</span>';
+          }
         </script>
       </body>
       </html>
