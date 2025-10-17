@@ -44,12 +44,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    setUser(null);
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      sessionStorage.removeItem('user');
-    }
-    // Redirect to landing page after logout
+    // Redirect to landing page first, then clear user after a small delay
     router.replace('/landing');
+    setTimeout(() => {
+      setUser(null);
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.removeItem('user');
+      }
+    }, 100);
   };
 
   const isAuthenticated = () => {
