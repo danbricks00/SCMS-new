@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import QRCodeGenerator from '../components/QRCodeGenerator';
@@ -9,6 +9,129 @@ import { useAuth } from '../contexts/AuthContext';
 
 const StudentPortal = () => {
   const { user, logout } = useAuth();
+  
+  const handlePrintQR = () => {
+    // Create a printable HTML page with the QR code
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Student QR Code - ${user?.name || 'Student'}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+            background: white;
+          }
+          .print-container {
+            max-width: 400px;
+            margin: 0 auto;
+            border: 2px solid #333;
+            padding: 20px;
+            border-radius: 10px;
+          }
+          .school-header {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+          }
+          .student-info {
+            margin: 20px 0;
+          }
+          .student-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4a90e2;
+            margin-bottom: 5px;
+          }
+          .student-id {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+          }
+          .qr-code-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+          }
+          .instructions {
+            font-size: 14px;
+            color: #666;
+            margin-top: 15px;
+            line-height: 1.4;
+          }
+          .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #999;
+          }
+          @media print {
+            body { margin: 0; }
+            .print-container { border: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-container">
+          <div class="school-header">School Management System</div>
+          <div class="student-info">
+            <div class="student-name">${user?.name || 'Student Name'}</div>
+            <div class="student-id">Student ID: ${user?.username || 'STU001'}</div>
+          </div>
+          <div class="qr-code-container">
+            <div id="qrcode"></div>
+          </div>
+          <div class="instructions">
+            <strong>Instructions:</strong><br>
+            Show this QR code to your teacher for attendance marking.<br>
+            Keep this card safe and do not share with others.
+          </div>
+          <div class="footer">
+            Generated on ${new Date().toLocaleDateString()}
+          </div>
+        </div>
+        
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+        <script>
+          // Generate QR code
+          const qrData = JSON.stringify({
+            studentId: '${user?.username || 'STU001'}',
+            studentName: '${user?.name || 'Student Name'}',
+            timestamp: new Date().toISOString()
+          });
+          
+          QRCode.toCanvas(document.getElementById('qrcode'), qrData, {
+            width: 200,
+            height: 200,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            }
+          }, function (error) {
+            if (error) console.error(error);
+            console.log('QR code generated successfully');
+          });
+        </script>
+      </body>
+      </html>
+    `;
+    
+    // Open print dialog
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Wait for QR code to load then print
+    setTimeout(() => {
+      printWindow.print();
+    }, 1000);
+  };
   
   return (
     <ProtectedRoute requiredRole="student">
@@ -51,6 +174,14 @@ const StudentPortal = () => {
             <Text style={styles.studentInfo}>
               Name: {user?.name || "Student Name"}
             </Text>
+            
+            <TouchableOpacity 
+              style={styles.printButton}
+              onPress={handlePrintQR}
+            >
+              <Ionicons name="print" size={20} color="#fff" />
+              <Text style={styles.printButtonText}>Print QR Code</Text>
+            </TouchableOpacity>
           </View>
         </View>
         <View style={styles.section}>
@@ -266,6 +397,27 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 5,
     textAlign: 'center',
+  },
+  printButton: {
+    backgroundColor: '#4a90e2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  printButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

@@ -17,6 +17,8 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
   const [isDesktopWeb, setIsDesktopWeb] = useState(false);
   const [showDebugOverlay, setShowDebugOverlay] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState(null);
+  const [scanResult, setScanResult] = useState(null); // 'success', 'error', 'invalid'
+  const [scanMessage, setScanMessage] = useState('');
 
   // Check if device has camera capability (mobile phones, tablets, etc.)
   const detectDevice = () => {
@@ -245,6 +247,13 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
       if (studentData) {
         // Successful scan
         console.log('Valid student QR code scanned:', studentData.name);
+        setScanResult('success');
+        setScanMessage(`Student: ${studentData.name}`);
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (e) {
+          console.log('Haptics not available');
+        }
         onScan({
           result: QR_SCAN_RESULTS.SUCCESS,
           studentData,
@@ -253,6 +262,8 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
       } else {
         // Invalid QR code
         console.log('Invalid QR code format');
+        setScanResult('invalid');
+        setScanMessage('Invalid QR code format');
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         } catch (e) {
@@ -266,6 +277,8 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
       }
     } catch (error) {
       console.error('QR Scan Error:', error);
+      setScanResult('error');
+      setScanMessage('Error reading QR code');
       try {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } catch (e) {
@@ -283,6 +296,8 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
       console.log('Resetting scanner...');
       setScanned(false);
       setIsScanning(true);
+      setScanResult(null);
+      setScanMessage('');
     }, 2000);
   };
 
@@ -455,6 +470,33 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Visual Feedback Overlay */}
+          {scanResult && (
+            <View style={[
+              styles.feedbackOverlay,
+              scanResult === 'success' && styles.successOverlay,
+              scanResult === 'error' && styles.errorOverlay,
+              scanResult === 'invalid' && styles.invalidOverlay
+            ]}>
+              <View style={styles.feedbackContent}>
+                <Ionicons 
+                  name={
+                    scanResult === 'success' ? 'checkmark-circle' :
+                    scanResult === 'error' ? 'close-circle' :
+                    'warning'
+                  } 
+                  size={48} 
+                  color={
+                    scanResult === 'success' ? '#4CAF50' :
+                    scanResult === 'error' ? '#f44336' :
+                    '#ff9800'
+                  } 
+                />
+                <Text style={styles.feedbackMessage}>{scanMessage}</Text>
+              </View>
+            </View>
+          )}
         </CameraView>
       </View>
 
@@ -726,6 +768,44 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  feedbackOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  successOverlay: {
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+  },
+  errorOverlay: {
+    backgroundColor: 'rgba(244, 67, 54, 0.9)',
+  },
+  invalidOverlay: {
+    backgroundColor: 'rgba(255, 152, 0, 0.9)',
+  },
+  feedbackContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    minWidth: 200,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  feedbackMessage: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginTop: 12,
   },
 });
 
