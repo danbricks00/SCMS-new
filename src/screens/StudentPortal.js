@@ -69,6 +69,37 @@ const StudentPortal = () => {
           }
           .student-info {
             margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+          }
+          .student-photo-container {
+            flex-shrink: 0;
+          }
+          .student-photo {
+            width: 80px;
+            height: 80px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+          }
+          .photo-placeholder {
+            text-align: center;
+          }
+          .photo-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+          }
+          .photo-text {
+            font-size: 10px;
+            color: #666;
+            font-weight: bold;
+          }
+          .student-details {
+            flex: 1;
           }
           .student-name {
             font-size: 20px;
@@ -112,8 +143,18 @@ const StudentPortal = () => {
         <div class="print-container">
           <div class="school-header">School Class Management System</div>
           <div class="student-info">
-            <div class="student-name">${user?.name || 'Student Name'}</div>
-            <div class="student-id">Student ID: ${user?.username || 'STU001'}</div>
+            <div class="student-photo-container">
+              <div class="student-photo">
+                <div class="photo-placeholder">
+                  <div class="photo-icon">📷</div>
+                  <div class="photo-text">Photo</div>
+                </div>
+              </div>
+            </div>
+            <div class="student-details">
+              <div class="student-name">${user?.name || 'Student Name'}</div>
+              <div class="student-id">Student ID: ${user?.username || 'STU001'}</div>
+            </div>
           </div>
           <div class="qr-code-container">
             <div id="qrcode" style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid #ccc;">
@@ -130,6 +171,7 @@ const StudentPortal = () => {
           </div>
         </div>
         
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
         <script>
           // Use the stable QR code from database
           const qrData = '${studentQRCode || JSON.stringify({
@@ -140,26 +182,61 @@ const StudentPortal = () => {
           
           console.log('Print QR Data:', qrData);
           
-          // Create a simple QR-like pattern without external library
-          function generateSimpleQR(data, size) {
+          // Wait for QRCode library to load, then generate QR code
+          function generateQRCode() {
+            if (typeof QRCode !== 'undefined') {
+              try {
+                const canvas = document.createElement('canvas');
+                QRCode.toCanvas(canvas, qrData, {
+                  width: 200,
+                  height: 200,
+                  color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                  },
+                  margin: 2,
+                  errorCorrectionLevel: 'M'
+                }, function (error) {
+                  if (error) {
+                    console.error('QR code generation error:', error);
+                    // Fallback to simple pattern
+                    generateFallbackQR();
+                  } else {
+                    console.log('QR code generated successfully');
+                    document.getElementById('qrcode').innerHTML = '';
+                    document.getElementById('qrcode').appendChild(canvas);
+                  }
+                });
+              } catch (error) {
+                console.error('QR generation failed:', error);
+                generateFallbackQR();
+              }
+            } else {
+              console.log('QRCode library not loaded, using fallback');
+              generateFallbackQR();
+            }
+          }
+          
+          // Fallback QR generation
+          function generateFallbackQR() {
             const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
+            canvas.width = 200;
+            canvas.height = 200;
             const ctx = canvas.getContext('2d');
             
-            // Create a pattern based on the data
-            const dataString = data.substring(0, 50); // Use first 50 chars
+            // Create a more sophisticated pattern
+            const dataString = qrData.substring(0, 100);
             const pattern = dataString.split('').map(char => char.charCodeAt(0));
             
             // Draw background
             ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, size, size);
+            ctx.fillRect(0, 0, 200, 200);
             
-            // Draw pattern
+            // Draw QR-like pattern
             ctx.fillStyle = '#000000';
-            const cellSize = 8;
-            const cols = Math.floor(size / cellSize);
-            const rows = Math.floor(size / cellSize);
+            const cellSize = 4;
+            const cols = Math.floor(200 / cellSize);
+            const rows = Math.floor(200 / cellSize);
             
             for (let i = 0; i < pattern.length && i < cols * rows; i++) {
               const x = (i % cols) * cellSize;
@@ -169,36 +246,34 @@ const StudentPortal = () => {
               }
             }
             
-            // Add corner markers (like real QR codes)
-            const markerSize = cellSize * 3;
+            // Add corner markers
+            const markerSize = cellSize * 7;
             ctx.fillRect(0, 0, markerSize, markerSize);
-            ctx.fillRect(size - markerSize, 0, markerSize, markerSize);
-            ctx.fillRect(0, size - markerSize, markerSize, markerSize);
+            ctx.fillRect(200 - markerSize, 0, markerSize, markerSize);
+            ctx.fillRect(0, 200 - markerSize, markerSize, markerSize);
             
             // Add white squares inside markers
             ctx.fillStyle = '#FFFFFF';
-            const innerSize = cellSize;
-            ctx.fillRect(cellSize, cellSize, innerSize, innerSize);
-            ctx.fillRect(size - markerSize + cellSize, cellSize, innerSize, innerSize);
-            ctx.fillRect(cellSize, size - markerSize + cellSize, innerSize, innerSize);
+            const innerSize = cellSize * 3;
+            ctx.fillRect(cellSize * 2, cellSize * 2, innerSize, innerSize);
+            ctx.fillRect(200 - markerSize + cellSize * 2, cellSize * 2, innerSize, innerSize);
+            ctx.fillRect(cellSize * 2, 200 - markerSize + cellSize * 2, innerSize, innerSize);
             
             // Add border
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 2;
-            ctx.strokeRect(0, 0, size, size);
+            ctx.strokeRect(0, 0, 200, 200);
             
-            return canvas;
-          }
-          
-          // Generate and display QR code
-          try {
-            const canvas = generateSimpleQR(qrData, 200);
             document.getElementById('qrcode').innerHTML = '';
             document.getElementById('qrcode').appendChild(canvas);
-            console.log('Simple QR pattern generated successfully');
-          } catch (error) {
-            console.error('QR generation failed:', error);
-            document.getElementById('qrcode').innerHTML = '<span style="color: red; font-size: 14px;">QR Code generation failed. Please try again.</span>';
+            console.log('Fallback QR pattern generated');
+          }
+          
+          // Start generation
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', generateQRCode);
+          } else {
+            generateQRCode();
           }
         </script>
       </body>
