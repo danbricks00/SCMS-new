@@ -1,47 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimeDisplay from '../components/DateTimeDisplay';
 
 const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dimensions, setDimensions] = useState(null);
 
-  // At the top of your component
-  const [mounted, setMounted] = useState(false);
-  
   useEffect(() => {
-    // Mark as mounted after initial render
-    setMounted(true);
     console.log('[SCMS] LandingPage mounted');
     console.log('[SCMS] Environment:', process.env.NODE_ENV);
-    
-    // Set window dimensions after component mounts (client-side only)
-    if (typeof window !== 'undefined' && mounted) {
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
-      console.log('[SCMS] Window dimensions:', window.innerWidth, window.innerHeight);
-    }
-    
+
+    const screenDimensions = Dimensions.get('window');
+    console.log('[SCMS] Window dimensions:', screenDimensions.width, screenDimensions.height);
+
     return () => console.log('[SCMS] LandingPage unmounted');
-  }, [mounted]);
+  }, []);
 
   const toggleMenu = () => {
+    console.log('[SCMS] Toggle menu clicked, current state:', menuOpen);
     setMenuOpen(!menuOpen);
   };
 
   const navigateTo = (route) => {
     setMenuOpen(false);
-    // Map the portal names to the correct routes
-    const routeMap = {
-      'StudentPortal': 'student',
-      'ParentPortal': 'parent',
-      'TeacherPortal': 'teacher',
-      'AdminPortal': 'admin'
-    };
+    // Store the intended destination in session storage
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      sessionStorage.setItem('intendedDestination', route);
+    }
     
-    // Use the router imported at the top level
-    router.push(`/${routeMap[route] || route.toLowerCase()}`);
+    // Redirect to login page
+    router.push('/login');
   };
+
+  console.log('[SCMS] Rendering LandingPage, menuOpen:', menuOpen);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -50,7 +43,12 @@ const LandingPage = ({ navigation }) => {
         <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
           <Ionicons name="menu" size={32} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>School Management System</Text>
+        <Text style={styles.headerTitle}>School Class Management System</Text>
+      </View>
+
+      {/* Date and Time Display */}
+      <View style={styles.dateTimeContainer}>
+        <DateTimeDisplay />
       </View>
 
       {/* Sidebar Menu */}
@@ -125,7 +123,7 @@ const LandingPage = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f0f0',
   },
   header: {
     flexDirection: 'row',
@@ -140,41 +138,56 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     padding: 5,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 15,
     color: '#333',
+  },
+  dateTimeContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   sideMenu: {
     position: 'absolute',
     top: 0,
     left: 0,
-    width: '70%',
-    height: '100%',
-    backgroundColor: '#333',
-    zIndex: 999,
-    paddingTop: 50,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    zIndex: 1000,
   },
   closeButton: {
     position: 'absolute',
-    top: 15,
-    right: 15,
+    top: 50,
+    right: 20,
+    zIndex: 1001,
   },
   menuItems: {
-    marginTop: 20,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#4a90e2',
     padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#444',
+    marginVertical: 10,
+    borderRadius: 10,
+    width: '80%',
   },
   menuText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '500',
     marginLeft: 15,
   },
   content: {
@@ -183,47 +196,48 @@ const styles = StyleSheet.create({
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    paddingTop: 50,
   },
   heroTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 10,
     textAlign: 'center',
+    marginBottom: 10,
   },
   heroSubtitle: {
     fontSize: 18,
     color: '#666',
-    marginBottom: 30,
     textAlign: 'center',
+    marginBottom: 40,
   },
   featureCards: {
     width: '100%',
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 15,
     padding: 20,
-    marginBottom: 15,
+    marginBottom: 20,
     alignItems: 'center',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 5,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 5,
     color: '#333',
+    marginTop: 15,
+    marginBottom: 10,
   },
   cardDescription: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+    lineHeight: 20,
   },
 });
 

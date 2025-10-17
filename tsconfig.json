@@ -51,7 +51,6 @@
     "**/*.tsx",
     "**/*.js",
     "**/*.jsx",
-    "minimatch.d.ts",
     "types/**/*.d.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"

@@ -1,0 +1,31 @@
+
+services:
+  - type: web
+    name: scms-new
+    runtime: static
+    buildCommand: |
+      npm cache clean --force && 
+      rm -rf node_modules package-lock.json && 
+      npm install && 
+      npm install lightningcss-linux-x64-gnu && 
+      npm rebuild lightningcss --platform=linux --arch=x64 && 
+      npm run build:web
+    staticPublishPath: ./dist
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: EXPO_ROUTER_APP_ROOT
+        value: ./app
+      - key: EXPO_ROUTER_IMPORT_MODE
+        value: sync
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: "s-maxage=31536000, immutable"
+      - path: /static/*
+        name: Cache-Control
+        value: "s-maxage=31536000, immutable"
