@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
-import QRCodeGenerator from '../components/QRCodeGenerator';
+import SimpleQRCode from '../components/SimpleQRCode';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -179,7 +179,7 @@ const StudentPortal = () => {
               Show this QR code to your teacher for attendance
             </Text>
             <View style={styles.qrCodeWrapper}>
-              <QRCodeGenerator
+              <SimpleQRCode
                 studentData={{
                   studentId: user?.username || "STU001",
                   name: user?.name || "Student",
