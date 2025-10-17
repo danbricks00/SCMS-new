@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import QRCodeGenerator from '../components/QRCodeGenerator';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -30,6 +31,28 @@ const StudentPortal = () => {
       />
       
       <ScrollView style={styles.content}>
+        {/* Student QR Code Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My QR Code</Text>
+          <View style={styles.qrCodeContainer}>
+            <Text style={styles.qrCodeDescription}>
+              Show this QR code to your teacher for attendance
+            </Text>
+            <View style={styles.qrCodeWrapper}>
+              <QRCodeGenerator
+                studentId={user?.username || "STU001"}
+                studentName={user?.name || "Student"}
+                size={200}
+              />
+            </View>
+            <Text style={styles.studentInfo}>
+              Student ID: {user?.username || "STU001"}
+            </Text>
+            <Text style={styles.studentInfo}>
+              Name: {user?.name || "Student Name"}
+            </Text>
+          </View>
+        </View>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Attendance Overview</Text>
           <View style={styles.attendanceStats}>
@@ -211,6 +234,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  qrCodeContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  qrCodeDescription: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  qrCodeWrapper: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    marginBottom: 15,
+  },
+  studentInfo: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    textAlign: 'center',
   },
 });
 
