@@ -58,6 +58,9 @@ const StudentPortal = () => {
             border: 2px solid #e0e0e0;
             border-radius: 10px;
             background: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
           }
           .instructions {
             font-size: 14px;
@@ -84,7 +87,7 @@ const StudentPortal = () => {
             <div class="student-id">Student ID: ${user?.username || 'STU001'}</div>
           </div>
           <div class="qr-code-container">
-            <div id="qrcode"></div>
+            <canvas id="qrcode" width="200" height="200"></canvas>
           </div>
           <div class="instructions">
             <strong>Instructions:</strong><br>
@@ -98,23 +101,37 @@ const StudentPortal = () => {
         
         <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
         <script>
-          // Generate QR code
+          // Generate QR code data
           const qrData = JSON.stringify({
             studentId: '${user?.username || 'STU001'}',
             studentName: '${user?.name || 'Student Name'}',
+            class: '10A',
             timestamp: new Date().toISOString()
           });
           
+          // Generate QR code on canvas
           QRCode.toCanvas(document.getElementById('qrcode'), qrData, {
             width: 200,
             height: 200,
             color: {
               dark: '#000000',
               light: '#FFFFFF'
-            }
+            },
+            margin: 2,
+            errorCorrectionLevel: 'M'
           }, function (error) {
-            if (error) console.error(error);
-            console.log('QR code generated successfully');
+            if (error) {
+              console.error('QR code generation error:', error);
+              // Fallback: show error message
+              document.getElementById('qrcode').style.display = 'none';
+              const errorDiv = document.createElement('div');
+              errorDiv.innerHTML = 'QR Code generation failed. Please try again.';
+              errorDiv.style.color = 'red';
+              errorDiv.style.fontSize = '14px';
+              document.querySelector('.qr-code-container').appendChild(errorDiv);
+            } else {
+              console.log('QR code generated successfully');
+            }
           });
         </script>
       </body>
@@ -130,7 +147,7 @@ const StudentPortal = () => {
     // Wait for QR code to load then print
     setTimeout(() => {
       printWindow.print();
-    }, 1000);
+    }, 2000);
   };
   
   return (
@@ -163,8 +180,11 @@ const StudentPortal = () => {
             </Text>
             <View style={styles.qrCodeWrapper}>
               <QRCodeGenerator
-                studentId={user?.username || "STU001"}
-                studentName={user?.name || "Student"}
+                studentData={{
+                  studentId: user?.username || "STU001",
+                  name: user?.name || "Student",
+                  class: "10A" // This should come from user data
+                }}
                 size={200}
               />
             </View>

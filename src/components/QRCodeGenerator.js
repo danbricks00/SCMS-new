@@ -360,15 +360,17 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
         <View style={styles.qrContainer}>
           <Text style={styles.qrTitle}>Student QR Code</Text>
           <View style={styles.qrCodeContainer}>
-            <QRCode
-              value={qrData}
-              size={qrSize}
-              color="#000"
-              backgroundColor="#fff"
-              logoSize={30}
-              logoMargin={2}
-              logoBorderRadius={15}
-            />
+            <View style={styles.qrCodeWrapper}>
+              <QRCode
+                value={qrData}
+                size={qrSize}
+                color="#000000"
+                backgroundColor="#FFFFFF"
+                logoSize={30}
+                logoMargin={2}
+                logoBorderRadius={15}
+              />
+            </View>
           </View>
           <Text style={styles.qrNote}>
             This QR code contains encrypted student information
@@ -504,6 +506,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     marginBottom: 15,
+  },
+  qrCodeWrapper: {
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   qrNote: {
     fontSize: 12,
