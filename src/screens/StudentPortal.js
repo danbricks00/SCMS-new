@@ -2,13 +2,42 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import SimpleQRCode from '../components/SimpleQRCode';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { DatabaseService } from '../services/database';
 
 const StudentPortal = () => {
   const { user, logout } = useAuth();
+  const [studentQRCode, setStudentQRCode] = useState(null);
+  const [studentData, setStudentData] = useState(null);
+
+  // Load student data and QR code from database
+  useEffect(() => {
+    const loadStudentData = async () => {
+      if (user?.username) {
+        try {
+          const student = await DatabaseService.getStudentById(user.username);
+          if (student) {
+            setStudentData(student);
+            setStudentQRCode(student.qrCode);
+          }
+        } catch (error) {
+          console.error('Error loading student data:', error);
+          // Fallback to basic student data
+          setStudentData({
+            studentId: user.username,
+            name: user.name,
+            class: "10A" // Default class
+          });
+        }
+      }
+    };
+
+    loadStudentData();
+  }, [user?.username]);
   
   const handlePrintQR = () => {
     // Create a printable HTML page with the QR code
@@ -102,13 +131,12 @@ const StudentPortal = () => {
         </div>
         
         <script>
-          // Generate QR code data
-          const qrData = JSON.stringify({
-            studentId: '${user?.username || 'STU001'}',
-            studentName: '${user?.name || 'Student Name'}',
-            class: '10A',
-            timestamp: new Date().toISOString()
-          });
+          // Use the stable QR code from database
+          const qrData = '${studentQRCode || JSON.stringify({
+            studentId: user?.username || "STU001",
+            studentName: user?.name || "Student Name",
+            class: "10A"
+          })}';
           
           console.log('Print QR Data:', qrData);
           
@@ -219,11 +247,12 @@ const StudentPortal = () => {
             </Text>
             <View style={styles.qrCodeWrapper}>
               <SimpleQRCode
-                studentData={{
+                studentData={studentData || {
                   studentId: user?.username || "STU001",
                   name: user?.name || "Student",
-                  class: "10A" // This should come from user data
+                  class: "10A"
                 }}
+                qrCode={studentQRCode}
                 size={200}
               />
             </View>

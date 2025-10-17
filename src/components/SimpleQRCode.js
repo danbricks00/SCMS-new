@@ -3,7 +3,7 @@ import { View, StyleSheet, Platform, Text } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
 
-const SimpleQRCode = ({ studentData, size = 200 }) => {
+const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
   const canvasRef = useRef(null);
   const [qrImageUrl, setQrImageUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -14,11 +14,15 @@ const SimpleQRCode = ({ studentData, size = 200 }) => {
     return null;
   }
 
-  // Memoize QR data to prevent infinite re-renders
+  // Use provided QR code or generate one if not provided
   const qrData = useMemo(() => {
+    if (qrCode) {
+      console.log('SimpleQRCode: Using provided QR code');
+      return qrCode;
+    }
     console.log('SimpleQRCode: Generating QR data for:', studentData);
     return QRCodeUtils.generateStudentQR(studentData);
-  }, [studentData.studentId, studentData.name, studentData.class]);
+  }, [qrCode, studentData?.studentId, studentData?.name, studentData?.class]);
 
   console.log('SimpleQRCode: Generated QR data:', qrData);
 
