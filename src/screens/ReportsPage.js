@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { DatabaseService } from '../services/database';
+import { useEffect, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { DatabaseService } from '../services/database';
 
 const ReportsPage = () => {
   const { user } = useAuth();
@@ -208,19 +208,31 @@ const ReportsPage = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => router.push('/reports/attendance')}
+              >
                 <Ionicons name="bar-chart" size={24} color="#4a90e2" />
                 <Text style={styles.actionButtonText}>Attendance Report</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => router.push('/reports/students')}
+              >
                 <Ionicons name="people" size={24} color="#4a90e2" />
                 <Text style={styles.actionButtonText}>Student Report</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => router.push('/reports/events')}
+              >
                 <Ionicons name="calendar" size={24} color="#4a90e2" />
                 <Text style={styles.actionButtonText}>Event Report</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => router.push('/reports/custom')}
+              >
                 <Ionicons name="document-text" size={24} color="#4a90e2" />
                 <Text style={styles.actionButtonText}>Custom Report</Text>
               </TouchableOpacity>

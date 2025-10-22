@@ -28,6 +28,12 @@ const AdminPortal = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [events, setEvents] = useState([]);
   const [absenceRequests, setAbsenceRequests] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState({
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalClasses: 0,
+    attendanceRate: 0
+  });
   const [newStudent, setNewStudent] = useState({
     firstName: '',
     lastName: '',
@@ -71,7 +77,46 @@ const AdminPortal = () => {
     loadAnnouncements();
     loadEvents();
     loadAbsenceRequests();
+    loadDashboardStats();
   }, []);
+
+  const loadDashboardStats = async () => {
+    try {
+      // Load all data
+      const [studentsData, teachersData, classesData] = await Promise.all([
+        DatabaseService.getAllStudents(),
+        DatabaseService.getAllTeachers(),
+        DatabaseService.getAllClasses()
+      ]);
+
+      // Calculate attendance rate
+      const today = new Date().toISOString().split('T')[0];
+      let totalAttendance = 0;
+      let totalStudentsCount = studentsData.length;
+
+      // Get attendance for all classes
+      for (const cls of classesData) {
+        const attendance = await DatabaseService.getClassAttendance(cls.name, today);
+        const presentStudents = new Set(
+          attendance.filter(r => r.type === 'login').map(r => r.studentId)
+        ).size;
+        totalAttendance += presentStudents;
+      }
+
+      const attendanceRate = totalStudentsCount > 0 
+        ? Math.round((totalAttendance / totalStudentsCount) * 100)
+        : 0;
+
+      setDashboardStats({
+        totalStudents: studentsData.length,
+        totalTeachers: teachersData.length,
+        totalClasses: classesData.length,
+        attendanceRate
+      });
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+    }
+  };
 
   const loadStudents = async () => {
     try {
@@ -193,6 +238,7 @@ const AdminPortal = () => {
       
       setShowAddStudent(false);
       loadStudents();
+      loadDashboardStats(); // Refresh dashboard stats
     } catch (error) {
       console.error('Error adding student:', error);
       Alert.alert('Error', 'Failed to add student');
@@ -228,6 +274,7 @@ const AdminPortal = () => {
       
       setShowAddTeacher(false);
       loadTeachers();
+      loadDashboardStats(); // Refresh dashboard stats
     } catch (error) {
       console.error('Error adding teacher:', error);
       Alert.alert('Error', 'Failed to add teacher');
@@ -257,6 +304,7 @@ const AdminPortal = () => {
       
       setShowAddClass(false);
       loadClasses();
+      loadDashboardStats(); // Refresh dashboard stats
     } catch (error) {
       console.error('Error adding class:', error);
       Alert.alert('Error', 'Failed to create class');
@@ -365,19 +413,19 @@ const AdminPortal = () => {
           <Text style={styles.sectionTitle}>School Overview</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>450</Text>
+              <Text style={styles.statNumber}>{dashboardStats.totalStudents}</Text>
               <Text style={styles.statLabel}>Students</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>35</Text>
+              <Text style={styles.statNumber}>{dashboardStats.totalTeachers}</Text>
               <Text style={styles.statLabel}>Teachers</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>15</Text>
+              <Text style={styles.statNumber}>{dashboardStats.totalClasses}</Text>
               <Text style={styles.statLabel}>Classes</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>92%</Text>
+              <Text style={styles.statNumber}>{dashboardStats.attendanceRate}%</Text>
               <Text style={styles.statLabel}>Attendance</Text>
             </View>
           </View>
