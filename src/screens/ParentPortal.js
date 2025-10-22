@@ -107,6 +107,30 @@ const ParentPortal = () => {
           </View>
         </View>
 
+        {/* Recent Notifications */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Notifications</Text>
+          <View style={styles.notificationList}>
+            <View style={styles.notificationItem}>
+              <Ionicons name="alert-circle" size={24} color="#ff9800" />
+              <View style={styles.notificationContent}>
+                <Text style={styles.notificationTitle}>Absence Alert</Text>
+                <Text style={styles.notificationText}>John was absent on Wednesday</Text>
+                <Text style={styles.notificationDate}>2 days ago</Text>
+              </View>
+            </View>
+            
+            <View style={styles.notificationItem}>
+              <Ionicons name="calendar" size={24} color="#4caf50" />
+              <View style={styles.notificationContent}>
+                <Text style={styles.notificationTitle}>Upcoming Event</Text>
+                <Text style={styles.notificationText}>Parent-Teacher Meeting</Text>
+                <Text style={styles.notificationDate}>Next Monday</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* Upcoming Events */}
         {events.length > 0 && (
           <View style={styles.section}>
