@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DatabaseService } from '../services/database';
+import { formatTimestampNZ } from '../utils/dateUtils';
 
 const ActivityLog = ({ userRole, maxItems = 10 }) => {
   const [activities, setActivities] = useState([]);
@@ -63,18 +64,7 @@ const ActivityLog = ({ userRole, maxItems = 10 }) => {
   };
 
   const formatTimestamp = (timestamp) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    return formatTimestampNZ(timestamp);
   };
 
   // Filter activities based on user role

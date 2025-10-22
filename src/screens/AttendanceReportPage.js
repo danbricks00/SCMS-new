@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { DatabaseService } from '../services/database';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { formatDateTimeNZ } from '../utils/dateUtils';
 
 const AttendanceReportPage = () => {
   const { user } = useAuth();
@@ -152,7 +153,7 @@ const AttendanceReportPage = () => {
                     <View style={styles.recordContent}>
                       <Text style={styles.recordName}>{record.studentName}</Text>
                       <Text style={styles.recordDetails}>
-                        {record.type === 'login' ? 'Checked In' : 'Checked Out'} • {new Date(record.timestamp).toLocaleTimeString()}
+                        {record.type === 'login' ? 'Checked In' : 'Checked Out'} • {formatDateTimeNZ(record.timestamp)}
                       </Text>
                     </View>
                     <View style={[

@@ -5,6 +5,7 @@ import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { DatabaseService } from '../services/database';
+import { formatDateNZ } from '../utils/dateUtils';
 
 const EventReportPage = () => {
   const [events, setEvents] = useState([]);
@@ -156,7 +157,7 @@ const EventReportPage = () => {
                     <View style={styles.eventDetails}>
                       <View style={styles.eventDetailRow}>
                         <Ionicons name="calendar-outline" size={14} color="#666" />
-                        <Text style={styles.eventDetailText}>{event.eventDate}</Text>
+                        <Text style={styles.eventDetailText}>{formatDateNZ(event.eventDate)}</Text>
                       </View>
                       <View style={styles.eventDetailRow}>
                         <Ionicons name="time-outline" size={14} color="#666" />

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { formatDateForDB, parseDateNZ } from '../utils/dateUtils';
 
 const EventManager = ({ visible, onClose, onSubmit, userRole, teacherClasses = [], allClasses = [] }) => {
   const isAdmin = userRole === 'admin';
@@ -51,8 +52,13 @@ const EventManager = ({ visible, onClose, onSubmit, userRole, teacherClasses = [
 
   const handleSubmit = () => {
     if (validateForm()) {
+      // Convert DD/MM/YYYY to YYYY-MM-DD for database storage
+      const parsedDate = parseDateNZ(formData.eventDate);
+      const eventDateForDB = parsedDate ? formatDateForDB(parsedDate) : formData.eventDate;
+      
       onSubmit({
         ...formData,
+        eventDate: eventDateForDB, // Store in DB format
         createdAt: new Date().toISOString(),
         createdBy: userRole
       });
@@ -179,7 +185,7 @@ const EventManager = ({ visible, onClose, onSubmit, userRole, teacherClasses = [
               <Text style={styles.label}>Event Date *</Text>
               <TextInput
                 style={[styles.input, errors.eventDate && styles.inputError]}
-                placeholder="YYYY-MM-DD (e.g., 2025-10-25)"
+                placeholder="DD/MM/YYYY (e.g., 25/10/2025)"
                 value={formData.eventDate}
                 onChangeText={(text) => setFormData({ ...formData, eventDate: text })}
               />
