@@ -1,14 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActivityScanner from '../components/ActivityScanner';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import EventManager from '../components/EventManager';
+import ProtectedRoute from '../components/ProtectedRoute';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
-import ActivityScanner from '../components/ActivityScanner';
 import TeacherAnnouncement from '../components/TeacherAnnouncement';
-import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { QR_SCAN_RESULTS, QRCodeUtils } from '../utils/qrCodeUtils';
@@ -19,8 +20,10 @@ const TeacherPortal = () => {
   const [showStudentCard, setShowStudentCard] = useState(false);
   const [showActivityScanner, setShowActivityScanner] = useState(false);
   const [showTeacherAnnouncement, setShowTeacherAnnouncement] = useState(false);
+  const [showEventManager, setShowEventManager] = useState(false);
   const [scannedStudent, setScannedStudent] = useState(null);
   const [attendanceType, setAttendanceType] = useState('login');
+  const [events, setEvents] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState({
     totalStudents: 0,
     presentStudents: 0,
@@ -36,6 +39,7 @@ const TeacherPortal = () => {
   useEffect(() => {
     loadAttendanceSummary();
     loadClassStudents();
+    loadEvents();
   }, [currentClass]);
 
   useEffect(() => {
@@ -81,6 +85,35 @@ const TeacherPortal = () => {
         { studentId: 'STU10BS5678', name: 'Jane Smith', class: currentClass, photo: null },
         { studentId: 'STU10CW9012', name: 'Bob Wilson', class: currentClass, photo: null },
       ]);
+    }
+  };
+
+  const loadEvents = async () => {
+    try {
+      const userEvents = await DatabaseService.getEventsForUser('teacher', teacherClasses);
+      setEvents(userEvents);
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
+  };
+
+  const handleCreateEvent = async (eventData) => {
+    try {
+      await DatabaseService.createEvent(eventData);
+      if (Platform.OS === 'web') {
+        alert('Event created successfully!');
+      } else {
+        Alert.alert('Success', 'Event created successfully!');
+      }
+      setShowEventManager(false);
+      loadEvents();
+    } catch (error) {
+      console.error('Error creating event:', error);
+      if (Platform.OS === 'web') {
+        alert('Error creating event');
+      } else {
+        Alert.alert('Error', 'Failed to create event');
+      }
     }
   };
 
@@ -203,6 +236,13 @@ const TeacherPortal = () => {
             >
               <Ionicons name="megaphone" size={20} color="#4a90e2" />
               <Text style={styles.announcementButtonText}>Announce</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.eventButton}
+              onPress={() => setShowEventManager(true)}
+            >
+              <Ionicons name="calendar" size={20} color="#4a90e2" />
+              <Text style={styles.eventButtonText}>Event</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={logout} style={styles.logoutButton}>
               <Ionicons name="log-out" size={20} color="#e74c3c" />
@@ -351,6 +391,44 @@ const TeacherPortal = () => {
           </View>
         </View>
         
+        {/* Upcoming Events */}
+        {events.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Upcoming Events</Text>
+            <View style={styles.eventsList}>
+              {events.map((event, index) => (
+                <View key={index} style={styles.eventCard}>
+                  <View style={styles.eventCardHeader}>
+                    <Ionicons name="calendar-outline" size={20} color="#4a90e2" />
+                    <Text style={styles.eventCardTitle}>{event.title}</Text>
+                  </View>
+                  <Text style={styles.eventCardDescription}>{event.description}</Text>
+                  <View style={styles.eventCardDetails}>
+                    <View style={styles.eventCardDetailRow}>
+                      <Ionicons name="time-outline" size={16} color="#666" />
+                      <Text style={styles.eventCardDetailText}>
+                        {event.eventDate} | {event.startTime} - {event.endTime}
+                      </Text>
+                    </View>
+                    <View style={styles.eventCardDetailRow}>
+                      <Ionicons name="location-outline" size={16} color="#666" />
+                      <Text style={styles.eventCardDetailText}>{event.location}</Text>
+                    </View>
+                    {event.targetClasses && event.targetClasses.length > 0 && (
+                      <View style={styles.eventCardDetailRow}>
+                        <Ionicons name="people-outline" size={16} color="#666" />
+                        <Text style={styles.eventCardDetailText}>
+                          Classes: {event.targetClasses.join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Announcements</Text>
           <View style={styles.announcementList}>
@@ -527,6 +605,15 @@ const TeacherPortal = () => {
           name: className,
           subject: 'Mathematics' // This should come from actual class data
         }))}
+      />
+
+      {/* Event Manager Modal */}
+      <EventManager
+        visible={showEventManager}
+        onClose={() => setShowEventManager(false)}
+        onSubmit={handleCreateEvent}
+        userRole="teacher"
+        teacherClasses={teacherClasses}
       />
       </SafeAreaView>
     </ProtectedRoute>
@@ -920,6 +1007,64 @@ const styles = StyleSheet.create({
     color: '#f44336',
     fontSize: 12,
     fontWeight: '600',
+  },
+  eventButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#4a90e2',
+    gap: 4,
+    marginRight: 8,
+  },
+  eventButtonText: {
+    color: '#4a90e2',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  eventsList: {
+    gap: 10,
+  },
+  eventCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  eventCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  eventCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  eventCardDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  eventCardDetails: {
+    gap: 5,
+  },
+  eventCardDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  eventCardDetailText: {
+    fontSize: 13,
+    color: '#666',
   },
 });
 

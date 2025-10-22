@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -18,11 +18,15 @@ const AdminPortal = () => {
   const [showAddTeacher, setShowAddTeacher] = useState(false);
   const [showAddClass, setShowAddClass] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const [showEventManager, setShowEventManager] = useState(false);
+  const [showAbsenceRequests, setShowAbsenceRequests] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [absenceRequests, setAbsenceRequests] = useState([]);
   const [newStudent, setNewStudent] = useState({
     firstName: '',
     lastName: '',
@@ -64,6 +68,8 @@ const AdminPortal = () => {
     loadTeachers();
     loadClasses();
     loadAnnouncements();
+    loadEvents();
+    loadAbsenceRequests();
   }, []);
 
   const loadStudents = async () => {
@@ -96,6 +102,65 @@ const AdminPortal = () => {
       console.error('Error loading classes:', error);
       // Keep empty array if database is not available
       setClasses([]);
+    }
+  };
+
+  const loadEvents = async () => {
+    try {
+      const eventsData = await DatabaseService.getAllEvents();
+      setEvents(eventsData);
+    } catch (error) {
+      console.error('Error loading events:', error);
+      setEvents([]);
+    }
+  };
+
+  const loadAbsenceRequests = async () => {
+    try {
+      const requestsData = await DatabaseService.getAllAbsenceRequests();
+      setAbsenceRequests(requestsData);
+    } catch (error) {
+      console.error('Error loading absence requests:', error);
+      setAbsenceRequests([]);
+    }
+  };
+
+  const handleCreateEvent = async (eventData) => {
+    try {
+      await DatabaseService.createEvent(eventData);
+      if (Platform.OS === 'web') {
+        alert('Event created successfully!');
+      } else {
+        Alert.alert('Success', 'Event created successfully!');
+      }
+      setShowEventManager(false);
+      loadEvents();
+    } catch (error) {
+      console.error('Error creating event:', error);
+      if (Platform.OS === 'web') {
+        alert('Error creating event');
+      } else {
+        Alert.alert('Error', 'Failed to create event');
+      }
+    }
+  };
+
+  const handleReviewAbsenceRequest = async (requestId, status, reviewNotes = '') => {
+    try {
+      await DatabaseService.updateAbsenceRequestStatus(requestId, status, user?.name || 'Admin', reviewNotes);
+      if (Platform.OS === 'web') {
+        alert(`Absence request ${status}!`);
+      } else {
+        Alert.alert('Success', `Absence request ${status}!`);
+      }
+      loadAbsenceRequests();
+    } catch (error) {
+      console.error('Error updating absence request:', error);
+      if (Platform.OS === 'web') {
+        alert('Error updating absence request');
+      } else {
+        Alert.alert('Error', 'Failed to update absence request');
+      }
     }
   };
 

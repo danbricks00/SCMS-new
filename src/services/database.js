@@ -918,6 +918,278 @@ export class DatabaseService {
       return [];
     }
   }
+
+  // ===== ABSENCE REQUEST MANAGEMENT =====
+
+  /**
+   * Submit an absence request
+   * @param {Object} requestData - Absence request information
+   * @returns {Promise<string>} Document ID of the created request
+   */
+  static async submitAbsenceRequest(requestData) {
+    try {
+      const docRef = await addDoc(collection(db, 'absenceRequests'), {
+        ...requestData,
+        status: 'pending', // pending, approved, rejected
+        submittedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      console.log('Absence request submitted with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error submitting absence request:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all absence requests
+   * @param {string} status - Filter by status (optional: 'pending', 'approved', 'rejected')
+   * @returns {Promise<Array>} Array of absence request documents
+   */
+  static async getAllAbsenceRequests(status = null) {
+    try {
+      let q;
+      if (status) {
+        q = query(
+          collection(db, 'absenceRequests'),
+          where('status', '==', status),
+          orderBy('submittedAt', 'desc')
+        );
+      } else {
+        q = query(
+          collection(db, 'absenceRequests'),
+          orderBy('submittedAt', 'desc')
+        );
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const requests = [];
+      querySnapshot.forEach((doc) => {
+        requests.push({ id: doc.id, ...doc.data() });
+      });
+      return requests;
+    } catch (error) {
+      console.error('Error getting absence requests:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get absence requests for a specific student
+   * @param {string} studentName - Student name
+   * @returns {Promise<Array>} Array of absence request documents
+   */
+  static async getAbsenceRequestsByStudent(studentName) {
+    try {
+      const q = query(
+        collection(db, 'absenceRequests'),
+        where('studentName', '==', studentName),
+        orderBy('submittedAt', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const requests = [];
+      querySnapshot.forEach((doc) => {
+        requests.push({ id: doc.id, ...doc.data() });
+      });
+      return requests;
+    } catch (error) {
+      console.error('Error getting absence requests by student:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update absence request status
+   * @param {string} requestId - Request document ID
+   * @param {string} status - New status ('approved' or 'rejected')
+   * @param {string} reviewedBy - Name of person reviewing
+   * @param {string} reviewNotes - Optional review notes
+   * @returns {Promise<void>}
+   */
+  static async updateAbsenceRequestStatus(requestId, status, reviewedBy, reviewNotes = '') {
+    try {
+      await updateDoc(doc(db, 'absenceRequests', requestId), {
+        status,
+        reviewedBy,
+        reviewNotes,
+        reviewedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      console.log('Absence request status updated');
+    } catch (error) {
+      console.error('Error updating absence request status:', error);
+      throw error;
+    }
+  }
+
+  // ===== EVENT MANAGEMENT =====
+
+  /**
+   * Create an event
+   * @param {Object} eventData - Event information
+   * @returns {Promise<string>} Document ID of the created event
+   */
+  static async createEvent(eventData) {
+    try {
+      const docRef = await addDoc(collection(db, 'events'), {
+        ...eventData,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      console.log('Event created with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating event:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all events
+   * @param {string} eventType - Filter by event type (optional)
+   * @returns {Promise<Array>} Array of event documents
+   */
+  static async getAllEvents(eventType = null) {
+    try {
+      let q;
+      if (eventType) {
+        q = query(
+          collection(db, 'events'),
+          where('isActive', '==', true),
+          where('eventType', '==', eventType),
+          orderBy('eventDate', 'asc')
+        );
+      } else {
+        q = query(
+          collection(db, 'events'),
+          where('isActive', '==', true),
+          orderBy('eventDate', 'asc')
+        );
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const events = [];
+      querySnapshot.forEach((doc) => {
+        events.push({ id: doc.id, ...doc.data() });
+      });
+      return events;
+    } catch (error) {
+      console.error('Error getting events:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get events for a specific user based on their role
+   * @param {string} userRole - 'admin', 'teacher', 'student', 'parent'
+   * @param {Array} userClasses - Classes the user has access to
+   * @returns {Promise<Array>} Array of event documents
+   */
+  static async getEventsForUser(userRole, userClasses = []) {
+    try {
+      const q = query(
+        collection(db, 'events'),
+        where('isActive', '==', true),
+        orderBy('eventDate', 'asc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const allEvents = [];
+      querySnapshot.forEach((doc) => {
+        allEvents.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Filter events based on user role and event type
+      const filteredEvents = allEvents.filter(event => {
+        // Admin sees all events
+        if (userRole === 'admin') {
+          return true;
+        }
+
+        // Teachers see staff and school-wide events, plus their class events
+        if (userRole === 'teacher') {
+          if (event.eventType === 'staff' || event.eventType === 'school-wide') {
+            return true;
+          }
+          if (event.eventType === 'class') {
+            return event.targetClasses.some(cls => userClasses.includes(cls));
+          }
+          return false;
+        }
+
+        // Students see school-wide and student-parent events, plus their class events
+        if (userRole === 'student') {
+          if (event.eventType === 'school-wide' || event.eventType === 'student-parent') {
+            return true;
+          }
+          if (event.eventType === 'class') {
+            return event.targetClasses.some(cls => userClasses.includes(cls));
+          }
+          return false;
+        }
+
+        // Parents see student-parent events and class events (if includeParents is true)
+        if (userRole === 'parent') {
+          if (event.eventType === 'student-parent') {
+            return true;
+          }
+          if (event.eventType === 'class' && event.includeParents) {
+            return event.targetClasses.some(cls => userClasses.includes(cls));
+          }
+          return false;
+        }
+
+        return false;
+      });
+
+      return filteredEvents;
+    } catch (error) {
+      console.error('Error getting events for user:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update an event
+   * @param {string} eventId - Event document ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<void>}
+   */
+  static async updateEvent(eventId, updateData) {
+    try {
+      await updateDoc(doc(db, 'events', eventId), {
+        ...updateData,
+        updatedAt: new Date().toISOString()
+      });
+      console.log('Event updated successfully');
+    } catch (error) {
+      console.error('Error updating event:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete an event (soft delete)
+   * @param {string} eventId - Event document ID
+   * @returns {Promise<void>}
+   */
+  static async deleteEvent(eventId) {
+    try {
+      await updateDoc(doc(db, 'events', eventId), {
+        isActive: false,
+        updatedAt: new Date().toISOString()
+      });
+      console.log('Event deleted successfully');
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      throw error;
+    }
+  }
 }
 
 // Sample data for testing
