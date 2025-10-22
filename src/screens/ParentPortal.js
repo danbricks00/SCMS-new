@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AbsenceRequestForm from '../components/AbsenceRequestForm';
+import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
@@ -173,6 +174,14 @@ const ParentPortal = () => {
               ))}
             </View>
           )}
+        </View>
+
+        {/* Recent Updates */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Updates</Text>
+          <View style={styles.activityLogContainer}>
+            <ActivityLog userRole="parent" maxItems={5} />
+          </View>
         </View>
       </ScrollView>
 
@@ -434,6 +443,16 @@ const styles = StyleSheet.create({
   eventDetailText: {
     fontSize: 13,
     color: '#666',
+  },
+  activityLogContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    minHeight: 200,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
 });
 

@@ -1,7 +1,7 @@
+import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, getDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { comprehensiveFraudCheck, formatFraudCheckMessage, logFraudAttempt } from '../utils/fraudDetection';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
-import { comprehensiveFraudCheck, logFraudAttempt, formatFraudCheckMessage } from '../utils/fraudDetection';
 
 // Database service for managing students and attendance
 export class DatabaseService {
@@ -26,6 +26,17 @@ export class DatabaseService {
       teacherData.isActive = true;
 
       const docRef = await addDoc(collection(db, 'teachers'), teacherData);
+      
+      // Log activity
+      await this.logActivity({
+        type: 'teacher_added',
+        details: {
+          teacherName: teacherData.name || `${teacherData.firstName} ${teacherData.lastName}`,
+          teacherId: teacherData.teacherId,
+          subject: teacherData.subject,
+          description: `New teacher ${teacherData.name || `${teacherData.firstName} ${teacherData.lastName}`} added - ${teacherData.subject || 'Subject not specified'}`
+        }
+      });
       
       console.log('Teacher added with ID:', docRef.id);
       return docRef.id;
@@ -73,6 +84,17 @@ export class DatabaseService {
       classData.isActive = true;
 
       const docRef = await addDoc(collection(db, 'classes'), classData);
+      
+      // Log activity
+      await this.logActivity({
+        type: 'class_added',
+        details: {
+          className: classData.name,
+          classId: classData.classId,
+          teacherName: classData.teacherName,
+          description: `New class ${classData.name} created with teacher ${classData.teacherName || 'TBD'}`
+        }
+      });
       
       console.log('Class added with ID:', docRef.id);
       return docRef.id;
@@ -173,6 +195,17 @@ export class DatabaseService {
       studentData.updatedAt = new Date().toISOString();
 
       const docRef = await addDoc(collection(db, 'students'), studentData);
+      
+      // Log activity
+      await this.logActivity({
+        type: 'student_added',
+        details: {
+          studentName: studentData.name || `${studentData.firstName} ${studentData.lastName}`,
+          studentId: studentData.studentId,
+          class: studentData.class,
+          description: `New student ${studentData.name || `${studentData.firstName} ${studentData.lastName}`} added to class ${studentData.class}`
+        }
+      });
       
       console.log('Student added with ID:', docRef.id);
       return docRef.id;
@@ -800,6 +833,17 @@ export class DatabaseService {
 
       const docRef = await addDoc(collection(db, 'announcements'), announcementData);
       
+      // Log activity
+      await this.logActivity({
+        type: 'announcement_created',
+        details: {
+          announcementTitle: announcementData.title,
+          visibility: announcementData.visibility,
+          targetClasses: announcementData.targetClasses,
+          description: `Announcement "${announcementData.title}" posted for ${announcementData.visibility === 'all' ? 'everyone' : announcementData.visibility}`
+        }
+      });
+      
       console.log('Announcement added with ID:', docRef.id);
       return docRef.id;
     } catch (error) {
@@ -935,6 +979,18 @@ export class DatabaseService {
         updatedAt: new Date().toISOString()
       });
       
+      // Log activity
+      await this.logActivity({
+        type: 'absence_request',
+        details: {
+          studentName: requestData.studentName,
+          parentName: requestData.parentName,
+          startDate: requestData.startDate,
+          endDate: requestData.endDate,
+          description: `Absence request for ${requestData.studentName} from ${requestData.startDate} to ${requestData.endDate}`
+        }
+      });
+      
       console.log('Absence request submitted with ID:', docRef.id);
       return docRef.id;
     } catch (error) {
@@ -1039,6 +1095,17 @@ export class DatabaseService {
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
+      });
+      
+      // Log activity
+      await this.logActivity({
+        type: 'event_created',
+        details: {
+          eventTitle: eventData.title,
+          eventDate: eventData.eventDate,
+          eventType: eventData.eventType,
+          description: `Event "${eventData.title}" scheduled for ${eventData.eventDate} at ${eventData.location}`
+        }
       });
       
       console.log('Event created with ID:', docRef.id);
@@ -1188,6 +1255,77 @@ export class DatabaseService {
     } catch (error) {
       console.error('Error deleting event:', error);
       throw error;
+    }
+  }
+
+  // ===== ACTIVITY LOG MANAGEMENT =====
+
+  /**
+   * Log an activity
+   * @param {Object} activityData - Activity information
+   * @returns {Promise<string>} Document ID of the logged activity
+   */
+  static async logActivity(activityData) {
+    try {
+      const docRef = await addDoc(collection(db, 'activityLog'), {
+        ...activityData,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('Activity logged with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error logging activity:', error);
+      // Don't throw error to prevent breaking the main operation
+      return null;
+    }
+  }
+
+  /**
+   * Get activity log
+   * @param {string} userRole - User role for filtering
+   * @param {string} filter - Activity type filter
+   * @param {number} limit - Maximum number of activities to return
+   * @returns {Promise<Array>} Array of activity documents
+   */
+  static async getActivityLog(userRole = 'admin', filter = 'all', limit = 50) {
+    try {
+      let q;
+      
+      if (filter === 'all') {
+        q = query(
+          collection(db, 'activityLog'),
+          orderBy('timestamp', 'desc'),
+          limit(limit)
+        );
+      } else {
+        // Map filter to activity types
+        const typeMap = {
+          'students': ['student_added', 'student_updated'],
+          'teachers': ['teacher_added', 'teacher_updated'],
+          'events': ['event_created', 'event_updated'],
+          'announcements': ['announcement_created'],
+        };
+        
+        const types = typeMap[filter] || [filter];
+        q = query(
+          collection(db, 'activityLog'),
+          where('type', 'in', types),
+          orderBy('timestamp', 'desc'),
+          limit(limit)
+        );
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const activities = [];
+      querySnapshot.forEach((doc) => {
+        activities.push({ id: doc.id, ...doc.data() });
+      });
+      
+      return activities;
+    } catch (error) {
+      console.error('Error getting activity log:', error);
+      return [];
     }
   }
 }

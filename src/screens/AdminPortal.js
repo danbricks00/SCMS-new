@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import ProtectedRoute from '../components/ProtectedRoute';
 import QRCodeGenerator from '../components/QRCodeGenerator';
@@ -420,8 +421,11 @@ const AdminPortal = () => {
               <Ionicons name="megaphone" size={32} color="#00BCD4" />
               <Text style={styles.actionText}>Announcements</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <Ionicons name="calendar" size={32} color="#607D8B" />
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => router.push('/reports')}
+            >
+              <Ionicons name="bar-chart" size={32} color="#607D8B" />
               <Text style={styles.actionText}>Reports</Text>
             </TouchableOpacity>
           </View>
@@ -429,21 +433,8 @@ const AdminPortal = () => {
         
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <View style={styles.activityList}>
-            {[
-              { action: 'New student registered', time: '10 minutes ago', icon: 'person-add' },
-              { action: 'Attendance report generated', time: '1 hour ago', icon: 'document-text' },
-              { action: 'System update completed', time: '3 hours ago', icon: 'refresh-circle' },
-              { action: 'New announcement posted', time: 'Yesterday', icon: 'megaphone' },
-            ].map((activity, index) => (
-              <View key={index} style={styles.activityItem}>
-                <Ionicons name={activity.icon} size={24} color="#4a90e2" />
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>{activity.action}</Text>
-                  <Text style={styles.activityTime}>{activity.time}</Text>
-                </View>
-              </View>
-            ))}
+          <View style={styles.activityLogContainer}>
+            <ActivityLog userRole="admin" maxItems={5} />
           </View>
         </View>
       </ScrollView>
@@ -1152,6 +1143,16 @@ const styles = StyleSheet.create({
   },
   activityList: {
     gap: 12,
+  },
+  activityLogContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    minHeight: 200,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   activityItem: {
     flexDirection: 'row',

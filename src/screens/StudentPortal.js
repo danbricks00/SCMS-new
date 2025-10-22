@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SimpleQRCode from '../components/SimpleQRCode';
@@ -470,6 +471,13 @@ const StudentPortal = () => {
         )}
         
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Updates</Text>
+          <View style={styles.activityLogContainer}>
+            <ActivityLog userRole="student" maxItems={5} />
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Request Absence</Text>
           <TouchableOpacity style={styles.requestButton}>
             <Text style={styles.requestButtonText}>Submit Absence Request</Text>
@@ -710,6 +718,16 @@ const styles = StyleSheet.create({
   eventCardDetailText: {
     fontSize: 13,
     color: '#666',
+  },
+  activityLogContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    minHeight: 200,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
 });
 
