@@ -9,6 +9,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import SimpleQRCode from '../components/SimpleQRCode';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
+import { QRCodeUtils } from '../utils/qrCodeUtils';
 
 const StudentPortal = () => {
   const { user, logout } = useAuth();
@@ -55,6 +56,13 @@ const StudentPortal = () => {
   };
   
   const handlePrintQR = () => {
+    // Generate the same QR code that's displayed on screen
+    const qrDataForPrint = studentQRCode || QRCodeUtils.generateStudentQR(studentData || {
+      studentId: user?.username || "STU001",
+      name: user?.name || "Student Name",
+      class: "10A"
+    });
+    
     // Create a printable HTML page with the QR code
     const printContent = `
       <!DOCTYPE html>
@@ -187,12 +195,8 @@ const StudentPortal = () => {
         </div>
         
         <script>
-          // Use the stable QR code from database
-          const qrData = '${studentQRCode || JSON.stringify({
-            studentId: user?.username || "STU001",
-            studentName: user?.name || "Student Name",
-            class: "10A"
-          })}';
+          // Use the EXACT SAME QR code that's displayed on screen
+          const qrData = '${qrDataForPrint}';
           
           // Load QRCode.js library dynamically to avoid parser-blocking warnings
           function loadQRCodeLibrary() {
