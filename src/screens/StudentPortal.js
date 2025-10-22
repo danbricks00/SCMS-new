@@ -25,7 +25,14 @@ const StudentPortal = () => {
           const student = await DatabaseService.getStudentById(user.username);
           if (student) {
             setStudentData(student);
-            setStudentQRCode(student.qrCode);
+            // Use QR code from database, or generate ONE stable QR code if not available
+            if (student.qrCode) {
+              setStudentQRCode(student.qrCode);
+            } else {
+              // Generate QR code ONCE and store it in state
+              const generatedQR = QRCodeUtils.generateStudentQR(student);
+              setStudentQRCode(generatedQR);
+            }
             // Load events for student's class
             loadEvents(student.class);
           }
@@ -38,6 +45,9 @@ const StudentPortal = () => {
             class: "10A" // Default class
           };
           setStudentData(fallbackData);
+          // Generate QR code ONCE for fallback data
+          const generatedQR = QRCodeUtils.generateStudentQR(fallbackData);
+          setStudentQRCode(generatedQR);
           loadEvents(fallbackData.class);
         }
       }
@@ -56,12 +66,8 @@ const StudentPortal = () => {
   };
   
   const handlePrintQR = () => {
-    // Generate the same QR code that's displayed on screen
-    const qrDataForPrint = studentQRCode || QRCodeUtils.generateStudentQR(studentData || {
-      studentId: user?.username || "STU001",
-      name: user?.name || "Student Name",
-      class: "10A"
-    });
+    // Use the EXACT SAME QR code that's already generated and displayed on screen
+    const qrDataForPrint = studentQRCode;
     
     // Create a printable HTML page with the QR code
     const printContent = `
@@ -383,15 +389,15 @@ const StudentPortal = () => {
               Show this QR code to your teacher for attendance
             </Text>
             <View style={styles.qrCodeWrapper}>
-              <SimpleQRCode
-                studentData={studentData || {
-                  studentId: user?.username || "STU001",
-                  name: user?.name || "Student",
-                  class: "10A"
-                }}
-                qrCode={studentQRCode}
-                size={200}
-              />
+              {studentQRCode ? (
+                <SimpleQRCode
+                  studentData={studentData}
+                  qrCode={studentQRCode}
+                  size={200}
+                />
+              ) : (
+                <Text style={styles.loadingText}>Loading QR Code...</Text>
+              )}
             </View>
             <Text style={styles.studentInfo}>
               Student ID: {user?.username || "STU001"}

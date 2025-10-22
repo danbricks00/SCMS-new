@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { View, StyleSheet, Platform, Text } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { QRCodeUtils } from '../utils/qrCodeUtils';
 
 const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
   const canvasRef = useRef(null);
@@ -13,13 +12,9 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
     return null;
   }
 
-  // Use provided QR code or generate one if not provided
-  const qrData = useMemo(() => {
-    if (qrCode) {
-      return qrCode;
-    }
-    return QRCodeUtils.generateStudentQR(studentData);
-  }, [qrCode, studentData?.studentId, studentData?.name, studentData?.class]);
+  // Use provided QR code - DO NOT generate a new one
+  // The QR code should be generated ONCE in the parent component and passed down
+  const qrData = qrCode;
 
   // For web, use a different approach - generate QR as image URL
   useEffect(() => {
