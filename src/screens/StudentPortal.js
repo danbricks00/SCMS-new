@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
@@ -20,17 +20,19 @@ const StudentPortal = () => {
   // Load student data and QR code from database
   useEffect(() => {
     const loadStudentData = async () => {
-      if (user?.username) {
+      if (user?.username && !studentQRCode) { // Only load if QR code not already set
         try {
           const student = await DatabaseService.getStudentById(user.username);
           if (student) {
             setStudentData(student);
             // Use QR code from database, or generate ONE stable QR code if not available
             if (student.qrCode) {
+              console.log('[QR] Using QR from database:', student.qrCode.substring(0, 30));
               setStudentQRCode(student.qrCode);
             } else {
               // Generate QR code ONCE and store it in state
               const generatedQR = QRCodeUtils.generateStudentQR(student);
+              console.log('[QR] Generated new QR code:', generatedQR.substring(0, 30));
               setStudentQRCode(generatedQR);
             }
             // Load events for student's class
@@ -47,6 +49,7 @@ const StudentPortal = () => {
           setStudentData(fallbackData);
           // Generate QR code ONCE for fallback data
           const generatedQR = QRCodeUtils.generateStudentQR(fallbackData);
+          console.log('[QR] Generated fallback QR code:', generatedQR.substring(0, 30));
           setStudentQRCode(generatedQR);
           loadEvents(fallbackData.class);
         }
@@ -54,7 +57,7 @@ const StudentPortal = () => {
     };
 
     loadStudentData();
-  }, [user?.username]);
+  }, [user?.username, studentQRCode]);
 
   const loadEvents = async (userClass) => {
     try {
@@ -68,6 +71,90 @@ const StudentPortal = () => {
   const handlePrintQR = () => {
     // Use the EXACT SAME QR code that's already generated and displayed on screen
     const qrDataForPrint = studentQRCode;
+    console.log('[QR Print] Using QR code:', qrDataForPrint ? qrDataForPrint.substring(0, 30) : 'NULL');
+    
+    if (!qrDataForPrint) {
+      alert('QR code is not ready yet. Please wait a moment and try again.');
+      return;
+    }
+
+    // For web, we need to generate a QR code image using canvas
+    // Use the EXACT SAME algorithm as SimpleQRCode component
+    let qrImageDataUrl = '';
+    
+    if (Platform.OS === 'web') {
+      try {
+        // Create a temporary canvas to generate QR code
+        const canvas = document.createElement('canvas');
+        const size = 200; // MUST BE SAME AS SCREEN (SimpleQRCode uses 200)
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        // Use the EXACT SAME pattern generation as SimpleQRCode.js
+        const dataString = qrDataForPrint;
+        const pattern = dataString.split('').map(char => char.charCodeAt(0));
+        
+        // Draw background
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, size, size);
+        
+        // Draw QR-like pattern - SAME AS SimpleQRCode
+        ctx.fillStyle = '#000000';
+        const cellSize = 4; // MUST BE SAME AS SimpleQRCode
+        const cols = Math.floor(size / cellSize);
+        const rows = Math.floor(size / cellSize);
+        
+        // Create pattern - EXACT SAME ALGORITHM
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < cols; col++) {
+            const index = (row * cols + col) % pattern.length;
+            const charCode = pattern[index];
+            const shouldFill = (charCode + row + col) % 2 === 0; // SAME FORMULA
+            
+            if (shouldFill) {
+              ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+            }
+          }
+        }
+        
+        // Add corner markers - SAME AS SimpleQRCode
+        const markerSize = cellSize * 7;
+        const markerInnerSize = cellSize * 3;
+        
+        // Top-left marker
+        ctx.fillRect(0, 0, markerSize, markerSize);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(cellSize * 2, cellSize * 2, markerInnerSize, markerInnerSize);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(cellSize * 3, cellSize * 3, cellSize, cellSize);
+        
+        // Top-right marker
+        ctx.fillRect(size - markerSize, 0, markerSize, markerSize);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(size - markerSize + cellSize * 2, cellSize * 2, markerInnerSize, markerInnerSize);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(size - markerSize + cellSize * 3, cellSize * 3, cellSize, cellSize);
+        
+        // Bottom-left marker
+        ctx.fillRect(0, size - markerSize, markerSize, markerSize);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(cellSize * 2, size - markerSize + cellSize * 2, markerInnerSize, markerInnerSize);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(cellSize * 3, size - markerSize + cellSize * 3, cellSize, cellSize);
+        
+        // Convert canvas to data URL
+        qrImageDataUrl = canvas.toDataURL('image/png');
+        console.log('[QR Print] Generated QR image successfully using same algorithm as screen');
+      } catch (error) {
+        console.error('[QR Print] Failed to generate QR image:', error);
+        alert('Failed to generate QR code for printing. Please try again.');
+        return;
+      }
+    } else {
+      alert('Print is only available on web platform.');
+      return;
+    }
     
     // Create a printable HTML page with the QR code
     const printContent = `
@@ -186,9 +273,7 @@ const StudentPortal = () => {
             </div>
           </div>
           <div class="qr-code-container">
-            <div id="qrcode" style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; background: white; border: 1px solid #ccc;">
-              <span id="qr-loading">Generating QR Code...</span>
-            </div>
+            <img src="${qrImageDataUrl}" alt="Student QR Code" style="width: 200px; height: 200px; display: block; margin: 0 auto;" />
           </div>
           <div class="instructions">
             <strong>Instructions:</strong><br>
@@ -201,148 +286,12 @@ const StudentPortal = () => {
         </div>
         
         <script>
-          // Use the EXACT SAME QR code that's displayed on screen
-          const qrData = '${qrDataForPrint}';
-          
-          // Load QRCode.js library dynamically to avoid parser-blocking warnings
-          function loadQRCodeLibrary() {
-            return new Promise((resolve, reject) => {
-              if (typeof QRCode !== 'undefined') {
-                resolve();
-                return;
-              }
-              
-              const script = document.createElement('script');
-              script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-              script.async = true;
-              script.onload = () => resolve();
-              script.onerror = () => reject(new Error('Failed to load QRCode library'));
-              document.head.appendChild(script);
-            });
-          }
-          
-          // Generate QR code
-          async function generateQRCode() {
-            try {
-              await loadQRCodeLibrary();
-              
-              if (typeof QRCode !== 'undefined') {
-                const canvas = document.createElement('canvas');
-                QRCode.toCanvas(canvas, qrData, {
-                  width: 200,
-                  height: 200,
-                  color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                  },
-                  margin: 2,
-                  errorCorrectionLevel: 'M'
-                }, function (error) {
-                  if (error) {
-                    generateFallbackQR();
-                  } else {
-                    document.getElementById('qrcode').innerHTML = '';
-                    document.getElementById('qrcode').appendChild(canvas);
-                  }
-                });
-              } else {
-                generateFallbackQR();
-              }
-            } catch (error) {
-              generateFallbackQR();
-            }
-          }
-          
-          // Fallback QR generation - create a more scannable pattern
-          function generateFallbackQR() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 200;
-            canvas.height = 200;
-            const ctx = canvas.getContext('2d');
-            
-            // Create a more sophisticated pattern
-            const dataString = qrData;
-            const pattern = dataString.split('').map(char => char.charCodeAt(0));
-            
-            // Draw background
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, 200, 200);
-            
-            // Draw QR-like pattern with better distribution
-            ctx.fillStyle = '#000000';
-            const cellSize = 3;
-            const cols = Math.floor(200 / cellSize);
-            const rows = Math.floor(200 / cellSize);
-            
-            // Create a more complex pattern that looks more like a real QR code
-            for (let row = 0; row < rows; row++) {
-              for (let col = 0; col < cols; col++) {
-                const index = (row * cols + col) % pattern.length;
-                const charCode = pattern[index];
-                const shouldFill = (charCode + row + col + Math.floor(row / 7) + Math.floor(col / 7)) % 2 === 0;
-                
-                if (shouldFill) {
-                  ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-                }
-              }
-            }
-            
-            // Add corner markers (like real QR codes)
-            const markerSize = cellSize * 7;
-            const markerInnerSize = cellSize * 3;
-            
-            // Top-left marker
-            ctx.fillRect(0, 0, markerSize, markerSize);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(cellSize * 2, cellSize * 2, markerInnerSize, markerInnerSize);
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(cellSize * 3, cellSize * 3, cellSize, cellSize);
-            
-            // Top-right marker
-            ctx.fillRect(200 - markerSize, 0, markerSize, markerSize);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(200 - markerSize + cellSize * 2, cellSize * 2, markerInnerSize, markerInnerSize);
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(200 - markerSize + cellSize * 3, cellSize * 3, cellSize, cellSize);
-            
-            // Bottom-left marker
-            ctx.fillRect(0, 200 - markerSize, markerSize, markerSize);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(cellSize * 2, 200 - markerSize + cellSize * 2, markerInnerSize, markerInnerSize);
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(cellSize * 3, 200 - markerSize + cellSize * 3, cellSize, cellSize);
-            
-            // Add timing patterns (horizontal and vertical lines)
-            ctx.fillStyle = '#000000';
-            for (let i = markerSize + cellSize; i < 200 - markerSize; i += cellSize * 2) {
-              ctx.fillRect(i, markerSize + cellSize * 2, cellSize, cellSize);
-              ctx.fillRect(markerSize + cellSize * 2, i, cellSize, cellSize);
-            }
-            
-            // Add more data modules in the center
-            for (let i = 0; i < pattern.length && i < 100; i++) {
-              const x = (markerSize + cellSize + i % (cols - markerSize * 2 / cellSize - 2)) * cellSize;
-              const y = (markerSize + cellSize + Math.floor(i / (cols - markerSize * 2 / cellSize - 2))) * cellSize;
-              if (x < 200 - markerSize && y < 200 - markerSize && pattern[i] % 2 === 0) {
-                ctx.fillRect(x, y, cellSize, cellSize);
-              }
-            }
-            
-            // Add border
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(0, 0, 200, 200);
-            
-            document.getElementById('qrcode').innerHTML = '';
-            document.getElementById('qrcode').appendChild(canvas);
-          }
-          
-          // Start generation
-          if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', generateQRCode);
-          } else {
-            generateQRCode();
-          }
+          // QR code is already embedded as an image, no need to generate it
+          console.log('[Print Window] QR Code image loaded successfully');
+          // Automatically trigger print dialog after a short delay
+          setTimeout(() => {
+            window.print();
+          }, 500);
         </script>
       </body>
       </html>
@@ -350,14 +299,13 @@ const StudentPortal = () => {
     
     // Open print dialog
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.focus();
-    
-    // Wait for QR code to load then print
-    setTimeout(() => {
-      printWindow.print();
-    }, 2000);
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+    } else {
+      alert('Please allow pop-ups to print the QR code.');
+    }
   };
   
   return (
@@ -389,15 +337,11 @@ const StudentPortal = () => {
               Show this QR code to your teacher for attendance
             </Text>
             <View style={styles.qrCodeWrapper}>
-              {studentQRCode ? (
-                <SimpleQRCode
-                  studentData={studentData}
-                  qrCode={studentQRCode}
-                  size={200}
-                />
-              ) : (
-                <Text style={styles.loadingText}>Loading QR Code...</Text>
-              )}
+              <SimpleQRCode
+                studentData={studentData}
+                qrCode={studentQRCode}
+                size={200}
+              />
             </View>
             <Text style={styles.studentInfo}>
               Student ID: {user?.username || "STU001"}

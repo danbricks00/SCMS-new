@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, limit as firestoreLimit, getDocs, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { comprehensiveFraudCheck, formatFraudCheckMessage, logFraudAttempt } from '../utils/fraudDetection';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
@@ -1295,10 +1295,10 @@ export class DatabaseService {
    * Get activity log
    * @param {string} userRole - User role for filtering
    * @param {string} filter - Activity type filter
-   * @param {number} limit - Maximum number of activities to return
+   * @param {number} maxResults - Maximum number of activities to return
    * @returns {Promise<Array>} Array of activity documents
    */
-  static async getActivityLog(userRole = 'admin', filter = 'all', limit = 50) {
+  static async getActivityLog(userRole = 'admin', filter = 'all', maxResults = 50) {
     try {
       let q;
       
@@ -1306,7 +1306,7 @@ export class DatabaseService {
         q = query(
           collection(db, 'activityLog'),
           orderBy('timestamp', 'desc'),
-          limit(limit)
+          firestoreLimit(maxResults)
         );
       } else {
         // Map filter to activity types
@@ -1322,7 +1322,7 @@ export class DatabaseService {
           collection(db, 'activityLog'),
           where('type', 'in', types),
           orderBy('timestamp', 'desc'),
-          limit(limit)
+          firestoreLimit(maxResults)
         );
       }
       

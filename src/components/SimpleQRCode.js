@@ -8,17 +8,15 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasGenerated, setHasGenerated] = useState(false);
 
-  if (!studentData) {
-    return null;
-  }
-
   // Use provided QR code - DO NOT generate a new one
   // The QR code should be generated ONCE in the parent component and passed down
   const qrData = qrCode;
+  
+  console.log('[SimpleQRCode] Received qrCode prop:', qrCode ? qrCode.substring(0, 30) : 'NULL');
 
   // For web, use a different approach - generate QR as image URL
   useEffect(() => {
-    if (Platform.OS === 'web' && !hasGenerated) {
+    if (Platform.OS === 'web' && !hasGenerated && qrData) {
       setIsLoading(true);
       setHasGenerated(true);
       
@@ -145,6 +143,17 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
     }
   }, [qrData, size, hasGenerated]);
 
+  // Show loading state if no data or QR code yet
+  if (!studentData || !qrCode) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.qrWrapper}>
+          <Text style={styles.loadingText}>Loading QR Code...</Text>
+        </View>
+      </View>
+    );
+  }
+
   if (Platform.OS === 'web') {
     if (isLoading) {
       return (
@@ -177,7 +186,7 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
       <View style={styles.container}>
         <View style={styles.qrWrapper}>
           <Text style={styles.fallbackText}>QR Code</Text>
-          <Text style={styles.fallbackData}>{qrData.substring(0, 20)}...</Text>
+          <Text style={styles.fallbackData}>{qrCode ? qrCode.substring(0, 20) : ''}...</Text>
         </View>
       </View>
     );
@@ -188,7 +197,7 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200 }) => {
     <View style={styles.container}>
       <View style={styles.qrWrapper}>
         <QRCode
-          value={qrData}
+          value={qrCode || ''}
           size={size}
           color="#000000"
           backgroundColor="#FFFFFF"
