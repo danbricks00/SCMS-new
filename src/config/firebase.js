@@ -17,8 +17,13 @@ let app, db, auth;
 
 try {
   // Check if all required config values are present
-  const hasAllConfig = Object.values(firebaseConfig).every(value => 
-    value && value !== 'your_api_key' && value !== 'undefined');
+  const placeholder = (v) =>
+    !v ||
+    v === 'undefined' ||
+    v === 'your_api_key' ||
+    v === 'your_firebase_api_key' ||
+    v === 'your_app_id';
+  const hasAllConfig = Object.values(firebaseConfig).every((value) => !placeholder(value));
   
   if (hasAllConfig) {
     app = initializeApp(firebaseConfig);

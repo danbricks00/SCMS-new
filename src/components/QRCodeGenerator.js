@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
+import { canUseServerPdf, generatePdfUrlFromHtml, openPrintDialogWithHtml } from '../utils/pdfFromHtml';
 
 const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
   const [qrSize, setQrSize] = useState(200);
@@ -20,7 +21,26 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
     
     try {
       const html = generatePrintableHTML(studentData, qrData);
-      
+
+      if (Platform.OS === 'web' && canUseServerPdf()) {
+        try {
+          const pdfUrl = await generatePdfUrlFromHtml(html);
+          if (typeof window !== 'undefined') {
+            window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+          }
+          if (onPrint) {
+            onPrint(pdfUrl);
+          }
+        } catch (apiErr) {
+          console.warn('[QR Print] Server PDF failed, using print dialog', apiErr);
+          openPrintDialogWithHtml(html);
+          if (onPrint) {
+            onPrint(null);
+          }
+        }
+        return;
+      }
+
       const { uri } = await Print.printToFileAsync({ 
         html,
         base64: false 
