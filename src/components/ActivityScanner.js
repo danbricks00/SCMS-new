@@ -76,6 +76,7 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
       const activityData = {
         studentId: studentData.studentId,
         studentName: studentData.name,
+        studentDocId: studentData.firestoreDocId || null,
         class: studentData.class,
         teacherId: 'TCH001', // This should come from teacher authentication
         teacherName: 'Ms. Johnson', // This should come from teacher authentication
@@ -94,7 +95,7 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
       // Check if blocked by fraud detection
       if (result.blocked) {
         Alert.alert(
-          '🚨 Activity Blocked',
+          'Activity blocked',
           result.message,
           [{ text: 'OK', onPress: () => {
             setShowStudentCard(false);
@@ -106,22 +107,13 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
       
       const timeText = QRCodeUtils.formatNZTTime(new Date().toISOString());
       
-      const statusEmoji = {
-        present: '✅',
-        late: '⏰',
-        absent: '❌',
-        checkout: '👋',
-        'left-early': '⚠️'
-      };
-      
-      const emoji = statusEmoji[status] || '📝';
       const action = type === 'login' 
         ? (status === 'late' ? 'started (late)' : 'started') 
         : (status === 'left-early' ? 'left early from' : 'completed');
       
       Alert.alert(
-        'Activity Recorded',
-        `${emoji} ${studentData.name} ${action} ${selectedActivity || customActivity} at ${timeText}`,
+        'Activity recorded',
+        `${studentData.name} ${action} ${selectedActivity || customActivity} at ${timeText}`,
         [
           {
             text: 'OK',
@@ -320,11 +312,11 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
           {scheduleData.startTime && scheduleData.endTime && (
             <View style={styles.scheduleInfo}>
               <Text style={styles.scheduleInfoText}>
-                ⏰ Scheduled: {scheduleData.startTime} - {scheduleData.endTime}
+                Scheduled: {scheduleData.startTime} - {scheduleData.endTime}
               </Text>
               {scheduleData.autoCheckout && (
                 <Text style={styles.scheduleInfoSubtext}>
-                  🤖 Students will auto-checkout at {scheduleData.endTime}
+                  Students will auto-checkout at {scheduleData.endTime}
                 </Text>
               )}
             </View>

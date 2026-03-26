@@ -152,6 +152,7 @@ const TeacherPortal = () => {
       const attendanceData = {
         studentId: studentData.studentId,
         studentName: studentData.name,
+        studentDocId: studentData.firestoreDocId || null,
         class: studentData.class,
         teacherId: 'TCH001', // This should come from teacher authentication
         teacherName: 'Ms. Johnson', // This should come from teacher authentication
@@ -166,7 +167,7 @@ const TeacherPortal = () => {
       // Check if attendance was blocked due to fraud detection
       if (result.blocked) {
         Alert.alert(
-          '🚨 Attendance Blocked',
+          'Attendance blocked',
           result.message,
           [{ text: 'OK', onPress: () => {
             setShowStudentCard(false);
@@ -179,17 +180,9 @@ const TeacherPortal = () => {
       const timeText = QRCodeUtils.formatNZTTime(new Date().toISOString());
       const timezone = QRCodeUtils.getNZTimezoneAbbreviation();
       
-      const statusEmoji = {
-        present: '✅',
-        late: '⏰',
-        absent: '❌',
-        checkout: '👋',
-        'left-early': '⚠️'
-      };
-      
       Alert.alert(
-        'Attendance Recorded',
-        `${statusEmoji[status]} ${studentData.name} marked as ${statusLabels[status]} at ${timeText} (${timezone})`,
+        'Attendance recorded',
+        `${studentData.name} marked as ${statusLabels[status]} at ${timeText} (${timezone})`,
         [
           {
             text: 'OK',
@@ -273,9 +266,9 @@ const TeacherPortal = () => {
                   Today&apos;s Attendance: {attendanceSummary.presentStudents}/{attendanceSummary.totalStudents}
                 </Text>
                 <View style={styles.statusBreakdown}>
-                  <Text style={styles.presentText}>✅ Present: {attendanceSummary.presentStudents}</Text>
-                  <Text style={styles.lateText}>⏰ Late: {attendanceSummary.lateStudents || 0}</Text>
-                  <Text style={styles.absentText}>❌ Absent: {attendanceSummary.absentStudents}</Text>
+                  <Text style={styles.presentText}>Present: {attendanceSummary.presentStudents}</Text>
+                  <Text style={styles.lateText}>Late: {attendanceSummary.lateStudents || 0}</Text>
+                  <Text style={styles.absentText}>Absent: {attendanceSummary.absentStudents}</Text>
                 </View>
               </View>
 
@@ -317,9 +310,9 @@ const TeacherPortal = () => {
               <View style={styles.attendanceIndicator}>
                 <Text style={styles.attendanceText}>Today&apos;s Attendance: 26/28</Text>
                 <View style={styles.statusBreakdown}>
-                  <Text style={styles.presentText}>✅ Present: 26</Text>
-                  <Text style={styles.lateText}>⏰ Late: 0</Text>
-                  <Text style={styles.absentText}>❌ Absent: 2</Text>
+                  <Text style={styles.presentText}>Present: 26</Text>
+                  <Text style={styles.lateText}>Late: 0</Text>
+                  <Text style={styles.absentText}>Absent: 2</Text>
                 </View>
               </View>
 

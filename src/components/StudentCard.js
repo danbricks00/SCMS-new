@@ -51,7 +51,7 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
           {/* QR Code Info */}
           <View style={styles.qrInfoContainer}>
             <Ionicons name="qr-code" size={16} color="#4a90e2" />
-            <Text style={styles.qrInfoText}>QR Code Verified ✓</Text>
+            <Text style={styles.qrInfoText}>QR code verified</Text>
           </View>
         </View>
 

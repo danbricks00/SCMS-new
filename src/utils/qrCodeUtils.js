@@ -1,3 +1,4 @@
+import './cryptoGetRandomValuesPolyfill';
 import CryptoJS from 'crypto-js';
 
 // QR Code generation and validation utilities
@@ -16,6 +17,7 @@ export class QRCodeUtils {
       studentId: studentData.studentId,
       name: studentData.name,
       class: studentData.class,
+      firestoreDocId: studentData.firestoreDocId || studentData.id || null,
       type: 'student',
       version: '2.0' // Version for enhanced tracking
     };

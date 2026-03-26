@@ -366,7 +366,7 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
           </Text>
           
           <View style={styles.webInstructions}>
-            <Text style={styles.webInstructionsTitle}>📱 Supported Devices:</Text>
+            <Text style={styles.webInstructionsTitle}>Supported devices</Text>
             <View style={styles.instructionItem}>
               <Text style={styles.bulletPoint}>✓</Text>
               <Text style={styles.instructionText}>iPhone (all models) - Safari or Chrome</Text>
@@ -427,9 +427,9 @@ const QRScanner = ({ onScan, onClose, isVisible }) => {
         <View style={styles.platformNotice}>
           <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
           <Text style={styles.platformNoticeText}>
-            {Platform.OS === 'ios' ? '📱 iOS Device' : 
-             Platform.OS === 'android' ? '📱 Android Device' : 
-             '📱 Camera-Enabled Device'} - Ready to scan QR codes!
+            {Platform.OS === 'ios' ? 'iOS device' : 
+             Platform.OS === 'android' ? 'Android device' : 
+             'Camera-enabled device'} — ready to scan QR codes.
           </Text>
         </View>
       )}

@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, limit as firestoreLimit, getDocs, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, limit as firestoreLimit, getDocs, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { comprehensiveFraudCheck, formatFraudCheckMessage, logFraudAttempt } from '../utils/fraudDetection';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
@@ -282,25 +282,59 @@ export class DatabaseService {
    */
   static async getStudentById(studentId) {
     try {
+      if (!db) {
+        return null;
+      }
       const q = query(
         collection(db, 'students'),
         where('studentId', '==', studentId)
       );
-      
+
       const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        return null;
+
+      if (!querySnapshot.empty) {
+        const d = querySnapshot.docs[0];
+        return {
+          id: d.id,
+          ...d.data()
+        };
       }
-      
-      const doc = querySnapshot.docs[0];
-      return {
-        id: doc.id,
-        ...doc.data()
-      };
+
+      // Doc may use login id or name as document id (e.g. students/John Doe with only isCheckedIn)
+      const byDocId = await getDoc(doc(db, 'students', studentId));
+      if (byDocId.exists) {
+        return {
+          id: byDocId.id,
+          ...byDocId.data()
+        };
+      }
+
+      return null;
     } catch (error) {
       console.error('Error getting student by ID:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Load student by Firestore document id (e.g. display name when doc id is "John Doe").
+   */
+  static async getStudentByDocumentId(documentId) {
+    try {
+      if (!db || !documentId) {
+        return null;
+      }
+      const snap = await getDoc(doc(db, 'students', documentId));
+      if (!snap.exists) {
+        return null;
+      }
+      return {
+        id: snap.id,
+        ...snap.data()
+      };
+    } catch (error) {
+      console.error('Error getting student by document id:', error);
+      return null;
     }
   }
 
@@ -329,6 +363,25 @@ export class DatabaseService {
       console.log('Student updated successfully');
     } catch (error) {
       console.error('Error updating student:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save a new QR payload on a student document (by Firestore document id).
+   * Used when the student regenerates their display QR; scanning still resolves the same account.
+   */
+  static async setStudentQrCodeByDocId(firestoreDocId, qrCode) {
+    if (!db || !firestoreDocId || qrCode == null) {
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'students', firestoreDocId), {
+        qrCode,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.warn('Could not persist qrCode to Firestore:', error);
       throw error;
     }
   }
@@ -512,6 +565,93 @@ export class DatabaseService {
       };
 
       const docRef = await addDoc(collection(db, 'attendance'), attendance);
+
+      // Keep `students.isCheckedIn` in sync with *daily attendance* scans.
+      // We intentionally only update for "Class Attendance" style scans (i.e. no custom activity passed)
+      // so that activity login/logout tracking doesn't toggle this field unexpectedly.
+      try {
+        const isDailyAttendance =
+          attendanceData.activity === undefined &&
+          attendanceData.activityType === undefined;
+
+        if (isDailyAttendance) {
+          let nextCheckedIn = null;
+          if (attendanceData.type === 'login') {
+            // Present/Late => checked in, Absent => not checked in
+            nextCheckedIn = (attendanceData.status || 'present') !== 'absent';
+          } else if (attendanceData.type === 'logout') {
+            nextCheckedIn = false;
+          }
+
+          if (typeof nextCheckedIn === 'boolean') {
+            const updateData = {
+              isCheckedIn: nextCheckedIn
+            };
+            if (nextCheckedIn) {
+              updateData.lastCheckedInAt = nztDetails.timestamp;
+            } else {
+              updateData.lastCheckedOutAt = nztDetails.timestamp;
+            }
+
+            let studentDoc = null;
+
+            // First try direct document id from QR payload.
+            if (attendanceData.studentDocId) {
+              try {
+                await updateDoc(doc(db, 'students', attendanceData.studentDocId), updateData);
+                studentDoc = { id: attendanceData.studentDocId };
+              } catch (e) {
+                // Fall through to other lookup strategies.
+              }
+            }
+
+            if (!studentDoc) {
+              studentDoc = await this.getStudentById(attendanceData.studentId);
+            }
+
+            // Fallback: if a student doc was created without `studentId`, try matching by name.
+            if (!studentDoc && attendanceData.studentName) {
+              const studentsByNameQuery = query(
+                collection(db, 'students'),
+                where('name', '==', attendanceData.studentName)
+              );
+              const nameSnapshot = await getDocs(studentsByNameQuery);
+              if (!nameSnapshot.empty) {
+                const doc = nameSnapshot.docs[0];
+                studentDoc = { id: doc.id, ...doc.data() };
+              }
+            }
+
+            if (studentDoc) {
+              await updateDoc(doc(db, 'students', studentDoc.id), updateData);
+            } else {
+              // Last-resort fallback: some deployments store student docs where the document id
+              // is the student's display name or generated studentId (instead of storing `studentId` in fields).
+              const updateData = {
+                isCheckedIn: nextCheckedIn
+              };
+              if (nextCheckedIn) {
+                updateData.lastCheckedInAt = nztDetails.timestamp;
+              } else {
+                updateData.lastCheckedOutAt = nztDetails.timestamp;
+              }
+
+              const candidateIds = [attendanceData.studentId, attendanceData.studentName].filter(Boolean);
+              for (const candidateId of candidateIds) {
+                try {
+                  await updateDoc(doc(db, 'students', candidateId), updateData);
+                  break; // stop once we successfully updated
+                } catch (e) {
+                  // If the doc doesn't exist, continue to next candidate.
+                }
+              }
+            }
+          }
+        }
+      } catch (syncError) {
+        // Attendance should still be recorded even if this sync fails.
+        console.warn('Failed to sync students.isCheckedIn:', syncError);
+      }
       
       console.log('✅ Attendance recorded with ID:', docRef.id);
       return {

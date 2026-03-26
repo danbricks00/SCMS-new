@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SimpleQRCode from '../components/SimpleQRCode';
+import * as Print from 'expo-print';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
@@ -16,48 +17,68 @@ const StudentPortal = () => {
   const [studentQRCode, setStudentQRCode] = useState(null);
   const [studentData, setStudentData] = useState(null);
   const [events, setEvents] = useState([]);
+  const [qrImageDataUrlForPrint, setQrImageDataUrlForPrint] = useState(null);
 
   // Load student data and QR code from database
   useEffect(() => {
     const loadStudentData = async () => {
-      if (user?.username && !studentQRCode) { // Only load if QR code not already set
-        try {
-          const student = await DatabaseService.getStudentById(user.username);
-          if (student) {
-            setStudentData(student);
-            // Use QR code from database, or generate ONE stable QR code if not available
-            if (student.qrCode) {
-              console.log('[QR] Using QR from database:', student.qrCode.substring(0, 30));
-              setStudentQRCode(student.qrCode);
-            } else {
-              // Generate QR code ONCE and store it in state
-              const generatedQR = QRCodeUtils.generateStudentQR(student);
-              console.log('[QR] Generated new QR code:', generatedQR.substring(0, 30));
-              setStudentQRCode(generatedQR);
-            }
-            // Load events for student's class
-            loadEvents(student.class);
-          }
-        } catch (error) {
-          console.error('Error loading student data:', error);
-          // Fallback to basic student data
+      if (!user?.username || studentQRCode) {
+        return;
+      }
+
+      const applyStudent = (student) => {
+        const normalizedStudent = {
+          ...student,
+          studentId: student.studentId || user.username,
+          name: student.name || user.name,
+          class: student.class || user.class || '10A',
+          firestoreDocId: student.id || user.name || user.username
+        };
+        setStudentData(normalizedStudent);
+        if (student.qrCode) {
+          setStudentQRCode(student.qrCode);
+        } else {
+          setStudentQRCode(QRCodeUtils.generateStudentQR(normalizedStudent));
+        }
+        loadEvents(normalizedStudent.class);
+      };
+
+      try {
+        let student = await DatabaseService.getStudentById(user.username);
+        // e.g. Firestore doc id "John Doe" but login username is student1 — no studentId field on doc
+        if (!student && user.name) {
+          student = await DatabaseService.getStudentByDocumentId(user.name);
+        }
+
+        if (student) {
+          applyStudent(student);
+        } else {
           const fallbackData = {
             studentId: user.username,
             name: user.name,
-            class: "10A" // Default class
+            firestoreDocId: user.name || user.username,
+            class: user.class || '10A'
           };
           setStudentData(fallbackData);
-          // Generate QR code ONCE for fallback data
-          const generatedQR = QRCodeUtils.generateStudentQR(fallbackData);
-          console.log('[QR] Generated fallback QR code:', generatedQR.substring(0, 30));
-          setStudentQRCode(generatedQR);
+          setStudentQRCode(QRCodeUtils.generateStudentQR(fallbackData));
           loadEvents(fallbackData.class);
         }
+      } catch (error) {
+        console.error('Error loading student data:', error);
+        const fallbackData = {
+          studentId: user.username,
+          name: user.name,
+          firestoreDocId: user.name || user.username,
+          class: user.class || '10A'
+        };
+        setStudentData(fallbackData);
+        setStudentQRCode(QRCodeUtils.generateStudentQR(fallbackData));
+        loadEvents(fallbackData.class);
       }
     };
 
     loadStudentData();
-  }, [user?.username, studentQRCode]);
+  }, [user?.username, user?.name, user?.class, studentQRCode]);
 
   const loadEvents = async (userClass) => {
     try {
@@ -67,193 +88,89 @@ const StudentPortal = () => {
       console.error('Error loading events:', error);
     }
   };
+
+  const handleGenerateNewQR = async () => {
+    if (!user?.username) {
+      return;
+    }
+    const base = studentData || {
+      studentId: user.username,
+      name: user.name,
+      firestoreDocId: user.name || user.username,
+      class: user.class || '10A'
+    };
+    const normalized = {
+      ...base,
+      studentId: base.studentId || user.username,
+      name: base.name || user.name,
+      class: base.class || user.class || '10A',
+      firestoreDocId: base.firestoreDocId || base.id || user.name || user.username
+    };
+    const newQr = QRCodeUtils.generateStudentQR(normalized);
+    setStudentQRCode(newQr);
+
+    const docId = normalized.firestoreDocId;
+    if (docId) {
+      try {
+        await DatabaseService.setStudentQrCodeByDocId(docId, newQr);
+      } catch {
+        // Still show the new QR locally if Firestore write fails (e.g. rules or missing doc fields).
+      }
+    }
+
+    if (Platform.OS === 'web') {
+      window.alert('A new QR code was generated. Show this code to your teacher for attendance.');
+    } else {
+      Alert.alert(
+        'New QR code',
+        'A new QR code was generated. It works the same for attendance; use this one from now on (or print again if you use a printed card).'
+      );
+    }
+  };
   
-  const handlePrintQR = () => {
-    // Use the EXACT SAME QR code that's already generated and displayed on screen
+  const handlePrintQR = async () => {
     const qrDataForPrint = studentQRCode;
     console.log('[QR Print] Using QR code:', qrDataForPrint ? qrDataForPrint.substring(0, 30) : 'NULL');
-    
+
     if (!qrDataForPrint) {
       alert('QR code is not ready yet. Please wait a moment and try again.');
       return;
     }
 
-    // For web, we need to generate a QR code image using canvas
-    // Use the EXACT SAME algorithm as SimpleQRCode component
-    let qrImageDataUrl = '';
-    
-    if (Platform.OS === 'web') {
-      try {
-        // Create a temporary canvas to generate QR code
-        const canvas = document.createElement('canvas');
-        const size = 200; // MUST BE SAME AS SCREEN (SimpleQRCode uses 200)
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        
-        // Use the EXACT SAME pattern generation as SimpleQRCode.js
-        const dataString = qrDataForPrint;
-        const pattern = dataString.split('').map(char => char.charCodeAt(0));
-        
-        // Draw background
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, size, size);
-        
-        // Draw QR-like pattern - SAME AS SimpleQRCode
-        ctx.fillStyle = '#000000';
-        const cellSize = 4; // MUST BE SAME AS SimpleQRCode
-        const cols = Math.floor(size / cellSize);
-        const rows = Math.floor(size / cellSize);
-        
-        // Create pattern - EXACT SAME ALGORITHM
-        for (let row = 0; row < rows; row++) {
-          for (let col = 0; col < cols; col++) {
-            const index = (row * cols + col) % pattern.length;
-            const charCode = pattern[index];
-            const shouldFill = (charCode + row + col) % 2 === 0; // SAME FORMULA
-            
-            if (shouldFill) {
-              ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-            }
-          }
-        }
-        
-        // Add corner markers - SAME AS SimpleQRCode
-        const markerSize = cellSize * 7;
-        const markerInnerSize = cellSize * 3;
-        
-        // Top-left marker
-        ctx.fillRect(0, 0, markerSize, markerSize);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(cellSize * 2, cellSize * 2, markerInnerSize, markerInnerSize);
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(cellSize * 3, cellSize * 3, cellSize, cellSize);
-        
-        // Top-right marker
-        ctx.fillRect(size - markerSize, 0, markerSize, markerSize);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(size - markerSize + cellSize * 2, cellSize * 2, markerInnerSize, markerInnerSize);
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(size - markerSize + cellSize * 3, cellSize * 3, cellSize, cellSize);
-        
-        // Bottom-left marker
-        ctx.fillRect(0, size - markerSize, markerSize, markerSize);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(cellSize * 2, size - markerSize + cellSize * 2, markerInnerSize, markerInnerSize);
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(cellSize * 3, size - markerSize + cellSize * 3, cellSize, cellSize);
-        
-        // Convert canvas to data URL
-        qrImageDataUrl = canvas.toDataURL('image/png');
-        console.log('[QR Print] Generated QR image successfully using same algorithm as screen');
-      } catch (error) {
-        console.error('[QR Print] Failed to generate QR image:', error);
-        alert('Failed to generate QR code for printing. Please try again.');
-        return;
-      }
-    } else {
-      alert('Print is only available on web platform.');
+    if (Platform.OS !== 'web' && !qrImageDataUrlForPrint) {
+      Alert.alert('Print', 'QR image is not ready yet. Please wait a moment and try again.');
       return;
     }
-    
-    // Create a printable HTML page with the QR code
+
+    const qrValueLiteral = JSON.stringify(qrDataForPrint);
+    const shouldAutoPrint = Platform.OS === 'web';
+    const studentName = user?.name || 'Student Name';
+    const studentId = user?.username || 'STU001';
+
     const printContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Student QR Code - ${user?.name || 'Student'}</title>
+        <title>Student QR Code - ${studentName}</title>
         <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
-            background: white;
-          }
-          .print-container {
-            max-width: 400px;
-            margin: 0 auto;
-            border: 2px solid #333;
-            padding: 20px;
-            border-radius: 10px;
-          }
-          .school-header {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 10px;
-          }
-          .student-info {
-            margin: 20px 0;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-          }
-          .student-photo-container {
-            flex-shrink: 0;
-          }
-          .student-photo {
-            width: 80px;
-            height: 80px;
-            border: 2px solid #333;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f5f5f5;
-          }
-          .photo-placeholder {
-            text-align: center;
-          }
-          .photo-icon {
-            font-size: 24px;
-            margin-bottom: 4px;
-          }
-          .photo-text {
-            font-size: 10px;
-            color: #666;
-            font-weight: bold;
-          }
-          .student-details {
-            flex: 1;
-          }
-          .student-name {
-            font-size: 20px;
-            font-weight: bold;
-            color: #4a90e2;
-            margin-bottom: 5px;
-          }
-          .student-id {
-            font-size: 16px;
-            color: #666;
-            margin-bottom: 20px;
-          }
-          .qr-code-container {
-            margin: 20px 0;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            background: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-          }
-          .instructions {
-            font-size: 14px;
-            color: #666;
-            margin-top: 15px;
-            line-height: 1.4;
-          }
-          .footer {
-            margin-top: 20px;
-            font-size: 12px;
-            color: #999;
-          }
-          @media print {
-            body { margin: 0; }
-            .print-container { border: none; }
-          }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; text-align: center; background: white; }
+          .print-container { max-width: 400px; margin: 0 auto; border: 2px solid #333; padding: 20px; border-radius: 10px; }
+          .school-header { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 10px; }
+          .student-info { margin: 20px 0; display: flex; align-items: center; gap: 20px; }
+          .student-photo-container { flex-shrink: 0; }
+          .student-photo { width: 80px; height: 80px; border: 2px solid #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; }
+          .photo-placeholder { text-align: center; }
+          .photo-icon { font-size: 24px; margin-bottom: 4px; }
+          .photo-text { font-size: 10px; color: #666; font-weight: bold; }
+          .student-details { flex: 1; }
+          .student-name { font-size: 20px; font-weight: bold; color: #4a90e2; margin-bottom: 5px; }
+          .student-id { font-size: 16px; color: #666; margin-bottom: 20px; }
+          .qr-code-container { margin: 20px 0; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; background: white; display: flex; justify-content: center; align-items: center; }
+          .instructions { font-size: 14px; color: #666; margin-top: 15px; line-height: 1.4; }
+          .footer { margin-top: 20px; font-size: 12px; color: #999; }
+          @media print { body { margin: 0; } .print-container { border: none; } }
         </style>
+        ${Platform.OS === 'web' ? '<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>' : ''}
       </head>
       <body>
         <div class="print-container">
@@ -268,12 +185,16 @@ const StudentPortal = () => {
               </div>
             </div>
             <div class="student-details">
-              <div class="student-name">${user?.name || 'Student Name'}</div>
-              <div class="student-id">Student ID: ${user?.username || 'STU001'}</div>
+              <div class="student-name">${studentName}</div>
+              <div class="student-id">Student ID: ${studentId}</div>
             </div>
           </div>
           <div class="qr-code-container">
-            <img src="${qrImageDataUrl}" alt="Student QR Code" style="width: 200px; height: 200px; display: block; margin: 0 auto;" />
+            ${
+              Platform.OS === 'web'
+                ? '<canvas id="qr-canvas" width="200" height="200" style="width: 200px; height: 200px; display: block; margin: 0 auto;"></canvas>'
+                : `<img src="${qrImageDataUrlForPrint}" alt="Student QR Code" style="width: 200px; height: 200px; display: block; margin: 0 auto;" />`
+            }
           </div>
           <div class="instructions">
             <strong>Instructions:</strong><br>
@@ -284,27 +205,66 @@ const StudentPortal = () => {
             Generated on ${new Date().toLocaleDateString()}
           </div>
         </div>
-        
+
+        ${
+          Platform.OS === 'web'
+            ? `
         <script>
-          // QR code is already embedded as an image, no need to generate it
-          console.log('[Print Window] QR Code image loaded successfully');
-          // Automatically trigger print dialog after a short delay
+          const qrValue = ${qrValueLiteral};
+          const SHOULD_AUTO_PRINT = true;
+
+          function renderQr() {
+            if (!window.QRCode || !window.QRCode.toCanvas) return false;
+            const canvas = document.getElementById('qr-canvas');
+            if (!canvas) return false;
+            window.QRCode.toCanvas(canvas, qrValue, {
+              width: 200,
+              height: 200,
+              color: { dark: '#000000', light: '#FFFFFF' },
+              margin: 2,
+              errorCorrectionLevel: 'M'
+            });
+            return true;
+          }
+
+          // Render, then print
+          try {
+            const rendered = renderQr();
+            if (!rendered) {
+              setTimeout(renderQr, 250);
+            }
+          } catch (e) {
+            // no-op
+          }
+
           setTimeout(() => {
-            window.print();
-          }, 500);
+            if (window && window.print) window.print();
+          }, 600);
         </script>
+        `
+            : ''
+        }
       </body>
       </html>
     `;
-    
-    // Open print dialog
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.focus();
-    } else {
-      alert('Please allow pop-ups to print the QR code.');
+
+    if (Platform.OS === 'web') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+      } else {
+        alert('Please allow pop-ups to print the QR code.');
+      }
+      return;
+    }
+
+    try {
+      await Print.printAsync({ html: printContent });
+    } catch (error) {
+      console.error('[QR Print] Native print failed:', error);
+      Alert.alert('Print error', 'Could not open the print menu. Please try again.');
     }
   };
   
@@ -341,8 +301,17 @@ const StudentPortal = () => {
                 studentData={studentData}
                 qrCode={studentQRCode}
                 size={200}
+                onQrImageDataUrl={setQrImageDataUrlForPrint}
               />
             </View>
+            <TouchableOpacity
+              style={styles.regenerateQrButton}
+              onPress={handleGenerateNewQR}
+              disabled={!studentQRCode}
+            >
+              <Ionicons name="refresh" size={20} color="#4a90e2" />
+              <Text style={styles.regenerateQrButtonText}>Generate new QR code</Text>
+            </TouchableOpacity>
             <Text style={styles.studentInfo}>
               Student ID: {user?.username || "STU001"}
             </Text>
@@ -353,6 +322,7 @@ const StudentPortal = () => {
             <TouchableOpacity 
               style={styles.printButton}
               onPress={handlePrintQR}
+              disabled={Platform.OS !== 'web' && !qrImageDataUrlForPrint}
             >
               <Ionicons name="print" size={20} color="#fff" />
               <Text style={styles.printButtonText}>Print QR Code</Text>
@@ -602,7 +572,25 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#e0e0e0',
+    marginBottom: 12,
+  },
+  regenerateQrButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#4a90e2',
+    backgroundColor: '#fff',
     marginBottom: 15,
+    gap: 8,
+  },
+  regenerateQrButtonText: {
+    color: '#4a90e2',
+    fontSize: 16,
+    fontWeight: '600',
   },
   studentInfo: {
     fontSize: 14,
