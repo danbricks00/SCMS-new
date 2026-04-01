@@ -1,6 +1,17 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+
+/** Web dark mode can make SVG strokes read as white on white; opt this block out of that. */
+const QR_LIGHT_ENCLAVE = Platform.select({
+  web: {
+    backgroundColor: '#FFFFFF',
+    colorScheme: 'light',
+    // Windows high-contrast / forced colors can hide QR modules
+    forcedColorAdjust: 'none',
+  },
+  default: {},
+});
 
 const SimpleQRCode = ({ studentData, qrCode, size = 200, onQrImageDataUrl }) => {
   const qrRef = useRef(null);
@@ -32,7 +43,7 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200, onQrImageDataUrl }) => 
   if (!studentData || !qrCode) {
     return (
       <View style={styles.container}>
-        <View style={styles.qrWrapper}>
+        <View style={[styles.qrWrapper, QR_LIGHT_ENCLAVE]}>
           <Text style={styles.loadingText}>Loading QR Code...</Text>
         </View>
       </View>
@@ -41,7 +52,7 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200, onQrImageDataUrl }) => 
 
   return (
     <View style={styles.container}>
-      <View style={styles.qrWrapper}>
+      <View style={[styles.qrWrapper, QR_LIGHT_ENCLAVE]}>
         <QRCode
           value={qrCode || ''}
           size={size}
