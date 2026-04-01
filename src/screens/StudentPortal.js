@@ -13,6 +13,27 @@ import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
 
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Same options as SimpleQRCode web raster — print must match on-screen QR. */
+async function qrPayloadToDataUrl(qrPayload, size = 200) {
+  const mod = await import('qrcode');
+  const QRCodeLib = mod.default ?? mod;
+  return QRCodeLib.toDataURL(qrPayload, {
+    width: size,
+    margin: 1,
+    color: { dark: '#000000', light: '#ffffff' },
+    errorCorrectionLevel: 'M',
+  });
+}
+
 const StudentPortal = () => {
   const { user, logout } = useAuth();
   const [studentQRCode, setStudentQRCode] = useState(null);
@@ -138,24 +159,43 @@ const StudentPortal = () => {
       return;
     }
 
-    if (Platform.OS !== 'web' && !qrImageDataUrlForPrint) {
-      Alert.alert('Print', 'QR image is not ready yet. Please wait a moment and try again.');
+    let qrImageDataUrl = qrImageDataUrlForPrint;
+    try {
+      if (!qrImageDataUrl) {
+        qrImageDataUrl = await qrPayloadToDataUrl(qrDataForPrint, 200);
+      }
+    } catch (e) {
+      console.error('[QR Print] Failed to build QR image:', e);
+      if (Platform.OS === 'web') {
+        window.alert('Could not prepare the QR image for printing. Please try again.');
+      } else {
+        Alert.alert('Print', 'Could not prepare the QR image for printing. Please try again.');
+      }
       return;
     }
 
-    const qrValueLiteral = JSON.stringify(qrDataForPrint);
-    const shouldAutoPrint = Platform.OS === 'web';
+    if (!qrImageDataUrl) {
+      if (Platform.OS === 'web') {
+        window.alert('QR image is not ready yet. Please wait a moment and try again.');
+      } else {
+        Alert.alert('Print', 'QR image is not ready yet. Please wait a moment and try again.');
+      }
+      return;
+    }
+
     const studentName = user?.name || 'Student Name';
     const studentId = user?.username || 'STU001';
+    const safeName = escapeHtml(studentName);
+    const safeId = escapeHtml(studentId);
 
     const printContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Student QR Code - ${studentName}</title>
+        <title>Student QR Code - ${safeName}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; text-align: center; background: white; }
-          .print-container { max-width: 400px; margin: 0 auto; border: 2px solid #333; padding: 20px; border-radius: 10px; }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; text-align: center; background: white; color: #333; }
+          .print-container { max-width: 400px; margin: 0 auto; border: 2px solid #333; padding: 20px; border-radius: 10px; background: white; }
           .school-header { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 10px; }
           .student-info { margin: 20px 0; display: flex; align-items: center; gap: 20px; }
           .student-photo-container { flex-shrink: 0; }
@@ -163,15 +203,15 @@ const StudentPortal = () => {
           .photo-placeholder { text-align: center; }
           .photo-icon { font-size: 24px; margin-bottom: 4px; }
           .photo-text { font-size: 10px; color: #666; font-weight: bold; }
-          .student-details { flex: 1; }
+          .student-details { flex: 1; text-align: left; }
           .student-name { font-size: 20px; font-weight: bold; color: #4a90e2; margin-bottom: 5px; }
           .student-id { font-size: 16px; color: #666; margin-bottom: 20px; }
-          .qr-code-container { margin: 20px 0; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; background: white; display: flex; justify-content: center; align-items: center; }
+          .qr-code-container { margin: 20px 0; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; background: #ffffff; display: flex; justify-content: center; align-items: center; }
+          .qr-code-container img { width: 200px; height: 200px; display: block; margin: 0 auto; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
           .instructions { font-size: 14px; color: #666; margin-top: 15px; line-height: 1.4; }
           .footer { margin-top: 20px; font-size: 12px; color: #999; }
           @media print { body { margin: 0; } .print-container { border: none; } }
         </style>
-        ${Platform.OS === 'web' ? '<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>' : ''}
       </head>
       <body>
         <div class="print-container">
@@ -186,16 +226,12 @@ const StudentPortal = () => {
               </div>
             </div>
             <div class="student-details">
-              <div class="student-name">${studentName}</div>
-              <div class="student-id">Student ID: ${studentId}</div>
+              <div class="student-name">${safeName}</div>
+              <div class="student-id">Student ID: ${safeId}</div>
             </div>
           </div>
           <div class="qr-code-container">
-            ${
-              Platform.OS === 'web'
-                ? '<canvas id="qr-canvas" width="200" height="200" style="width: 200px; height: 200px; display: block; margin: 0 auto;"></canvas>'
-                : `<img src="${qrImageDataUrlForPrint}" alt="Student QR Code" style="width: 200px; height: 200px; display: block; margin: 0 auto;" />`
-            }
+            <img src="${qrImageDataUrl}" alt="Student QR Code" width="200" height="200" />
           </div>
           <div class="instructions">
             <strong>Instructions:</strong><br>
@@ -206,45 +242,6 @@ const StudentPortal = () => {
             Generated on ${new Date().toLocaleDateString()}
           </div>
         </div>
-
-        ${
-          Platform.OS === 'web'
-            ? `
-        <script>
-          const qrValue = ${qrValueLiteral};
-          const SHOULD_AUTO_PRINT = true;
-
-          function renderQr() {
-            if (!window.QRCode || !window.QRCode.toCanvas) return false;
-            const canvas = document.getElementById('qr-canvas');
-            if (!canvas) return false;
-            window.QRCode.toCanvas(canvas, qrValue, {
-              width: 200,
-              height: 200,
-              color: { dark: '#000000', light: '#FFFFFF' },
-              margin: 2,
-              errorCorrectionLevel: 'M'
-            });
-            return true;
-          }
-
-          // Render, then print
-          try {
-            const rendered = renderQr();
-            if (!rendered) {
-              setTimeout(renderQr, 250);
-            }
-          } catch (e) {
-            // no-op
-          }
-
-          setTimeout(() => {
-            if (window && window.print) window.print();
-          }, 600);
-        </script>
-        `
-            : ''
-        }
       </body>
       </html>
     `;
@@ -255,6 +252,15 @@ const StudentPortal = () => {
         printWindow.document.write(printContent);
         printWindow.document.close();
         printWindow.focus();
+        const triggerPrint = () => {
+          try {
+            printWindow.print();
+          } catch (e) {
+            console.warn('[QR Print] print() failed:', e);
+          }
+        };
+        printWindow.addEventListener('load', () => setTimeout(triggerPrint, 150));
+        setTimeout(triggerPrint, 500);
       } else {
         alert('Please allow pop-ups to print the QR code.');
       }
@@ -324,7 +330,7 @@ const StudentPortal = () => {
             <TouchableOpacity 
               style={styles.printButton}
               onPress={handlePrintQR}
-              disabled={Platform.OS !== 'web' && !qrImageDataUrlForPrint}
+              disabled={!studentQRCode}
             >
               <Ionicons name="print" size={20} color="#fff" />
               <Text style={styles.printButtonText}>Print QR Code</Text>
