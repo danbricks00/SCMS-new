@@ -31,10 +31,15 @@ try {
     auth = getAuth(app);
     console.log('[Firebase] Successfully initialized');
   } else {
-    console.error('[Firebase] Missing configuration values');
+    console.warn(
+      '[Firebase] Not initialized — set EXPO_PUBLIC_FIREBASE_* in .env or Vercel Project → Settings → Environment Variables.'
+    );
   }
 } catch (error) {
   console.error('[Firebase] Initialization error:', error);
 }
 
-export { app, db, auth };
+/** True when Firestore can be used (set EXPO_PUBLIC_* in Vercel / .env). */
+const isFirebaseConfigured = Boolean(db);
+
+export { app, auth, db, isFirebaseConfigured };

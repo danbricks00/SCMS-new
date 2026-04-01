@@ -3,6 +3,11 @@ import { db } from '../config/firebase';
 import { comprehensiveFraudCheck, formatFraudCheckMessage, logFraudAttempt } from '../utils/fraudDetection';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
 
+/** When EXPO_PUBLIC_FIREBASE_* are missing (local/Vercel), `db` is undefined — never pass it to collection(). */
+function hasFirestore() {
+  return db != null;
+}
+
 // Database service for managing students and attendance
 export class DatabaseService {
   
@@ -14,6 +19,7 @@ export class DatabaseService {
    * @returns {Promise<string>} Document ID of the created teacher
    */
   static async addTeacher(teacherData) {
+    if (!hasFirestore()) return null;
     try {
       // Generate teacher ID if not provided
       if (!teacherData.teacherId) {
@@ -51,6 +57,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of teacher documents
    */
   static async getAllTeachers() {
+    if (!hasFirestore()) return this.getSampleTeachers();
     try {
       const querySnapshot = await getDocs(collection(db, 'teachers'));
       const teachers = [];
@@ -73,6 +80,7 @@ export class DatabaseService {
    * @returns {Promise<string>} Document ID of the created class
    */
   static async addClass(classData) {
+    if (!hasFirestore()) return null;
     try {
       // Generate class ID if not provided
       if (!classData.classId) {
@@ -110,6 +118,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of class documents
    */
   static async getAllClasses() {
+    if (!hasFirestore()) return this.getSampleClasses();
     try {
       const querySnapshot = await getDocs(collection(db, 'classes'));
       const classes = [];
@@ -125,34 +134,13 @@ export class DatabaseService {
   }
 
   // ===== ANNOUNCEMENT MANAGEMENT =====
-  
-  /**
-   * Add a new announcement
-   * @param {Object} announcementData - Announcement information
-   * @returns {Promise<string>} Document ID of the created announcement
-   */
-  static async addAnnouncement(announcementData) {
-    try {
-      // Add creation timestamp
-      announcementData.createdAt = new Date().toISOString();
-      announcementData.updatedAt = new Date().toISOString();
-      announcementData.isActive = true;
-
-      const docRef = await addDoc(collection(db, 'announcements'), announcementData);
-      
-      console.log('Announcement added with ID:', docRef.id);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error adding announcement:', error);
-      throw error;
-    }
-  }
 
   /**
    * Get all active announcements
    * @returns {Promise<Array>} Array of announcement documents
    */
   static async getActiveAnnouncements() {
+    if (!hasFirestore()) return [];
     try {
       const q = query(
         collection(db, 'announcements'),
@@ -167,7 +155,7 @@ export class DatabaseService {
       return announcements;
     } catch (error) {
       console.error('Error getting announcements:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -179,6 +167,7 @@ export class DatabaseService {
    * @returns {Promise<string>} Document ID of the created student
    */
   static async addStudent(studentData) {
+    if (!hasFirestore()) return null;
     try {
       // Generate student ID if not provided
       if (!studentData.studentId) {
@@ -222,6 +211,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of student documents
    */
   static async getAllStudents() {
+    if (!hasFirestore()) return this.getSampleStudents();
     try {
       const querySnapshot = await getDocs(collection(db, 'students'));
       const students = [];
@@ -252,6 +242,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of student documents
    */
   static async getStudentsByClass(className) {
+    if (!hasFirestore()) return [];
     try {
       const q = query(
         collection(db, 'students'),
@@ -271,7 +262,7 @@ export class DatabaseService {
       return students.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
       console.error('Error getting students by class:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -282,7 +273,7 @@ export class DatabaseService {
    */
   static async getStudentById(studentId) {
     try {
-      if (!db) {
+      if (!hasFirestore()) {
         return null;
       }
       const q = query(
@@ -311,8 +302,9 @@ export class DatabaseService {
 
       return null;
     } catch (error) {
-      console.error('Error getting student by ID:', error);
-      throw error;
+      // Permission denied / offline / bad rules — avoid throwing; callers use local fallback.
+      console.warn('Error getting student by ID:', error?.code || error?.message || error);
+      return null;
     }
   }
 
@@ -321,7 +313,7 @@ export class DatabaseService {
    */
   static async getStudentByDocumentId(documentId) {
     try {
-      if (!db || !documentId) {
+      if (!hasFirestore() || !documentId) {
         return null;
       }
       const snap = await getDoc(doc(db, 'students', documentId));
@@ -345,6 +337,7 @@ export class DatabaseService {
    * @returns {Promise<void>}
    */
   static async updateStudent(studentId, updateData) {
+    if (!hasFirestore()) return;
     try {
       const student = await this.getStudentById(studentId);
       if (!student) {
@@ -372,7 +365,7 @@ export class DatabaseService {
    * Used when the student regenerates their display QR; scanning still resolves the same account.
    */
   static async setStudentQrCodeByDocId(firestoreDocId, qrCode) {
-    if (!db || !firestoreDocId || qrCode == null) {
+    if (!hasFirestore() || !firestoreDocId || qrCode == null) {
       return;
     }
     try {
@@ -392,6 +385,7 @@ export class DatabaseService {
    * @returns {Promise<void>}
    */
   static async deleteStudent(studentId) {
+    if (!hasFirestore()) return;
     try {
       const student = await this.getStudentById(studentId);
       if (!student) {
@@ -415,6 +409,15 @@ export class DatabaseService {
    * @returns {Promise<Object>} { success: boolean, docId: string|null, fraudCheck: Object }
    */
   static async recordAttendance(attendanceData, options = {}) {
+    if (!hasFirestore()) {
+      return {
+        success: false,
+        docId: null,
+        fraudCheck: null,
+        message: 'Firebase is not configured. Set EXPO_PUBLIC_FIREBASE_* environment variables.',
+        blocked: true,
+      };
+    }
     try {
       const { QRCodeUtils } = await import('../utils/qrCodeUtils');
       const nztDetails = QRCodeUtils.getNZTDetails();
@@ -675,6 +678,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of attendance records
    */
   static async getStudentAttendance(studentId, startDate, endDate) {
+    if (!hasFirestore()) return [];
     try {
       let q = query(
         collection(db, 'attendance'),
@@ -717,6 +721,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of attendance records
    */
   static async getClassAttendance(className, date) {
+    if (!hasFirestore()) return [];
     try {
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
@@ -750,58 +755,25 @@ export class DatabaseService {
   }
 
   /**
-   * Get today's attendance summary for a class
-   * @param {string} className - Class name
-   * @returns {Promise<Object>} Attendance summary
-   */
-  static async getTodayAttendanceSummary(className) {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const attendance = await this.getClassAttendance(className, today);
-      
-      const summary = {
-        totalStudents: 0,
-        presentStudents: 0,
-        absentStudents: 0,
-        lateStudents: 0,
-        attendance: attendance
-      };
-
-      // Get total students in class
-      const students = await this.getStudentsByClass(className);
-      summary.totalStudents = students.length;
-
-      // Process attendance records
-      const presentToday = new Set();
-      const lateToday = new Set();
-      
-      attendance.forEach(record => {
-        if (record.type === 'login') {
-          presentToday.add(record.studentId);
-          if (record.status === 'late') {
-            lateToday.add(record.studentId);
-          }
-        }
-      });
-
-      summary.presentStudents = presentToday.size;
-      summary.lateStudents = lateToday.size;
-      summary.absentStudents = summary.totalStudents - summary.presentStudents;
-
-      return summary;
-    } catch (error) {
-      console.error('Error getting attendance summary:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get activity summary for a specific activity
    * @param {string} activity - Activity name (e.g., 'Football Practice', 'Library Study')
    * @param {string} date - Date (ISO string)
    * @returns {Promise<Object>} Activity summary
    */
   static async getActivitySummary(activity, date) {
+    if (!hasFirestore()) {
+      return {
+        activity,
+        date,
+        totalParticipants: 0,
+        completedSessions: 0,
+        ongoingSessions: 0,
+        totalDuration: 0,
+        averageDuration: 0,
+        sessions: [],
+        ongoingStudents: [],
+      };
+    }
     try {
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
@@ -887,6 +859,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Activity history
    */
   static async getStudentActivityHistory(studentId, activityType = null, days = 30) {
+    if (!hasFirestore()) return [];
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
@@ -934,6 +907,9 @@ export class DatabaseService {
    * @returns {Function} Unsubscribe function
    */
   static subscribeToClassAttendance(className, callback) {
+    if (!hasFirestore()) {
+      return () => {};
+    }
     const today = new Date().toISOString().split('T')[0];
     const startOfDay = new Date(today);
     startOfDay.setHours(0, 0, 0, 0);
@@ -958,6 +934,9 @@ export class DatabaseService {
    * @returns {Function} Unsubscribe function
    */
   static subscribeToStudents(callback) {
+    if (!hasFirestore()) {
+      return () => {};
+    }
     const q = query(collection(db, 'students'), orderBy('name'));
     return onSnapshot(q, callback);
   }
@@ -970,6 +949,7 @@ export class DatabaseService {
    * @returns {Promise<string>} Document ID of the created announcement
    */
   static async addAnnouncement(announcementData) {
+    if (!hasFirestore()) return null;
     try {
       // Add creation timestamp and defaults
       announcementData.createdAt = new Date().toISOString();
@@ -1008,6 +988,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of announcement documents
    */
   static async getAnnouncementsForUser(userRole, userClass = null, userClasses = []) {
+    if (!hasFirestore()) return [];
     try {
       const q = query(
         collection(db, 'announcements'),
@@ -1076,6 +1057,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of all announcement documents
    */
   static async getAllAnnouncements() {
+    if (!hasFirestore()) return this.getSampleAnnouncements();
     try {
       const q = query(
         collection(db, 'announcements'),
@@ -1120,6 +1102,7 @@ export class DatabaseService {
    * @returns {Promise<string>} Document ID of the created request
    */
   static async submitAbsenceRequest(requestData) {
+    if (!hasFirestore()) return null;
     try {
       const docRef = await addDoc(collection(db, 'absenceRequests'), {
         ...requestData,
@@ -1154,6 +1137,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of absence request documents
    */
   static async getAllAbsenceRequests(status = null) {
+    if (!hasFirestore()) return [];
     try {
       let q;
       if (status) {
@@ -1187,6 +1171,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of absence request documents
    */
   static async getAbsenceRequestsByStudent(studentName) {
+    if (!hasFirestore()) return [];
     try {
       const q = query(
         collection(db, 'absenceRequests'),
@@ -1215,6 +1200,7 @@ export class DatabaseService {
    * @returns {Promise<void>}
    */
   static async updateAbsenceRequestStatus(requestId, status, reviewedBy, reviewNotes = '') {
+    if (!hasFirestore()) return;
     try {
       await updateDoc(doc(db, 'absenceRequests', requestId), {
         status,
@@ -1238,6 +1224,7 @@ export class DatabaseService {
    * @returns {Promise<string>} Document ID of the created event
    */
   static async createEvent(eventData) {
+    if (!hasFirestore()) return null;
     try {
       const docRef = await addDoc(collection(db, 'events'), {
         ...eventData,
@@ -1271,6 +1258,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of event documents
    */
   static async getAllEvents(eventType = null) {
+    if (!hasFirestore()) return this.getSampleEvents();
     try {
       let q;
       if (eventType) {
@@ -1308,6 +1296,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of event documents
    */
   static async getEventsForUser(userRole, userClasses = []) {
+    if (!hasFirestore()) return [];
     try {
       const q = query(
         collection(db, 'events'),
@@ -1378,6 +1367,7 @@ export class DatabaseService {
    * @returns {Promise<void>}
    */
   static async updateEvent(eventId, updateData) {
+    if (!hasFirestore()) return;
     try {
       await updateDoc(doc(db, 'events', eventId), {
         ...updateData,
@@ -1396,6 +1386,7 @@ export class DatabaseService {
    * @returns {Promise<void>}
    */
   static async deleteEvent(eventId) {
+    if (!hasFirestore()) return;
     try {
       await updateDoc(doc(db, 'events', eventId), {
         isActive: false,
@@ -1416,6 +1407,7 @@ export class DatabaseService {
    * @returns {Promise<string>} Document ID of the logged activity
    */
   static async logActivity(activityData) {
+    if (!hasFirestore()) return null;
     try {
       const docRef = await addDoc(collection(db, 'activityLog'), {
         ...activityData,
@@ -1439,6 +1431,7 @@ export class DatabaseService {
    * @returns {Promise<Array>} Array of activity documents
    */
   static async getActivityLog(userRole = 'admin', filter = 'all', maxResults = 50) {
+    if (!hasFirestore()) return [];
     try {
       let q;
       
@@ -1487,6 +1480,15 @@ export class DatabaseService {
    * @returns {Promise<Object>} Attendance summary
    */
   static async getTodayAttendanceSummary(className) {
+    if (!hasFirestore()) {
+      return {
+        totalStudents: 15,
+        presentStudents: 13,
+        absentStudents: 2,
+        lateStudents: 2,
+        attendance: this.generateSampleAttendance(className, 13, 2),
+      };
+    }
     try {
       const today = new Date().toISOString().split('T')[0];
       
