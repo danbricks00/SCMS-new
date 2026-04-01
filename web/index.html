@@ -45,6 +45,25 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    /*
+      Dark mode / forced-colors: react-native-svg QR strokes can render as white on white.
+      Class is applied from SimpleQRCode (web). RN StyleSheet colorScheme alone is not always enough on Vercel.
+    */
+    .scms-qr-light {
+      color-scheme: light !important;
+      forced-color-adjust: none !important;
+      isolation: isolate;
+      position: relative;
+    }
+    .scms-qr-light svg {
+      color-scheme: light !important;
+    }
+    .scms-qr-light svg path {
+      stroke: #000000 !important;
+    }
+    .scms-qr-light svg rect[fill] {
+      fill: #ffffff !important;
+    }
   </style>
   <script>
     // Platform detection with iPad Safari fix
