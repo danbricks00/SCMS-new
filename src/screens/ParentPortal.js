@@ -6,6 +6,7 @@ import AbsenceRequestForm from '../components/AbsenceRequestForm';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import ProtectedRoute from '../components/ProtectedRoute';
+import ResponsiveScreen from '../components/ResponsiveScreen';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 
@@ -74,6 +75,7 @@ const ParentPortal = () => {
   return (
     <ProtectedRoute requiredRole="parent">
       <SafeAreaView style={styles.container}>
+        <ResponsiveScreen>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -208,6 +210,7 @@ const ParentPortal = () => {
           </View>
         </View>
       </ScrollView>
+        </ResponsiveScreen>
 
       {/* Absence Request Form Modal */}
       <AbsenceRequestForm

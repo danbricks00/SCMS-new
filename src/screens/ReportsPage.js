@@ -4,11 +4,14 @@ import { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
+import ResponsiveScreen from '../components/ResponsiveScreen';
 import { useAuth } from '../contexts/AuthContext';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { DatabaseService } from '../services/database';
 
 const ReportsPage = () => {
   const { user } = useAuth();
+  const { statCardWidthPct } = useResponsiveLayout();
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalTeachers: 0,
@@ -153,7 +156,7 @@ const ReportsPage = () => {
   };
 
   const StatCard = ({ icon, iconColor, title, value, subtitle }) => (
-    <View style={styles.statCard}>
+    <View style={[styles.statCard, { width: statCardWidthPct }]}>
       <View style={[styles.statIconContainer, { backgroundColor: iconColor + '20' }]}>
         <Ionicons name={icon} size={28} color={iconColor} />
       </View>
@@ -174,6 +177,7 @@ const ReportsPage = () => {
   return (
     <ProtectedRoute requiredRole="admin">
       <SafeAreaView style={styles.container}>
+        <ResponsiveScreen>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -317,6 +321,7 @@ const ReportsPage = () => {
             </View>
           </View>
         </ScrollView>
+        </ResponsiveScreen>
       </SafeAreaView>
     </ProtectedRoute>
   );

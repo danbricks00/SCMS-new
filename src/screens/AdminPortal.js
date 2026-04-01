@@ -6,12 +6,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import ProtectedRoute from '../components/ProtectedRoute';
+import ResponsiveScreen from '../components/ResponsiveScreen';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import QRCodeGenerator from '../components/QRCodeGenerator';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
 
 const AdminPortal = () => {
   const { user, logout } = useAuth();
+  const { statCardWidthPct, actionCardWidthPct } = useResponsiveLayout();
   const [activeView, setActiveView] = useState('dashboard'); // dashboard, students, teachers, classes, reports, settings
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
@@ -409,6 +412,7 @@ const AdminPortal = () => {
   return (
     <ProtectedRoute requiredRole="admin">
       <SafeAreaView style={styles.container}>
+        <ResponsiveScreen>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -428,19 +432,19 @@ const AdminPortal = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>School Overview</Text>
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { width: statCardWidthPct }]}>
               <Text style={styles.statNumber}>{dashboardStats.totalStudents}</Text>
               <Text style={styles.statLabel}>Students</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { width: statCardWidthPct }]}>
               <Text style={styles.statNumber}>{dashboardStats.totalTeachers}</Text>
               <Text style={styles.statLabel}>Teachers</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { width: statCardWidthPct }]}>
               <Text style={styles.statNumber}>{dashboardStats.totalClasses}</Text>
               <Text style={styles.statLabel}>Classes</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { width: statCardWidthPct }]}>
               <Text style={styles.statNumber}>{dashboardStats.attendanceRate}%</Text>
               <Text style={styles.statLabel}>Attendance</Text>
             </View>
@@ -451,42 +455,42 @@ const AdminPortal = () => {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionGrid}>
             <TouchableOpacity 
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: actionCardWidthPct }]}
               onPress={() => setShowStudentList(true)}
             >
               <Ionicons name="people" size={32} color="#4a90e2" />
               <Text style={styles.actionText}>Manage Students</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: actionCardWidthPct }]}
               onPress={() => setShowAddTeacher(true)}
             >
               <Ionicons name="person-add" size={32} color="#4CAF50" />
               <Text style={styles.actionText}>Add Teacher</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: actionCardWidthPct }]}
               onPress={() => setShowAddClass(true)}
             >
               <Ionicons name="school" size={32} color="#FF9800" />
               <Text style={styles.actionText}>Create Class</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: actionCardWidthPct }]}
               onPress={() => setShowAddStudent(true)}
             >
               <Ionicons name="person-add-outline" size={32} color="#9C27B0" />
               <Text style={styles.actionText}>Add Student</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: actionCardWidthPct }]}
               onPress={() => setShowAnnouncements(true)}
             >
               <Ionicons name="megaphone" size={32} color="#00BCD4" />
               <Text style={styles.actionText}>Announcements</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.actionCard}
+              style={[styles.actionCard, { width: actionCardWidthPct }]}
               onPress={() => router.push('/reports')}
             >
               <Ionicons name="bar-chart" size={32} color="#607D8B" />
@@ -502,6 +506,7 @@ const AdminPortal = () => {
           </View>
         </View>
       </ScrollView>
+        </ResponsiveScreen>
 
       {/* Student List Modal */}
       <Modal

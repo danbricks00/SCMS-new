@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimeDisplay from '../components/DateTimeDisplay';
+import ResponsiveScreen from '../components/ResponsiveScreen';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage = () => {
@@ -101,7 +102,7 @@ const LoginPage = () => {
   return (
     <SafeAreaView style={styles.container}>
       <DateTimeDisplay />
-      
+      <ResponsiveScreen>
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>School Class Management System</Text>
@@ -193,6 +194,7 @@ const LoginPage = () => {
           <Text style={styles.credentialsText}>Parent: parent1 / parent123</Text>
         </View>
       </View>
+      </ResponsiveScreen>
     </SafeAreaView>
   );
 };
@@ -204,8 +206,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingVertical: 20,
     justifyContent: 'center',
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
   },
   header: {
     alignItems: 'center',

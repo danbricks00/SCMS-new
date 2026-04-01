@@ -7,6 +7,7 @@ import ActivityScanner from '../components/ActivityScanner';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import EventManager from '../components/EventManager';
 import ProtectedRoute from '../components/ProtectedRoute';
+import ResponsiveScreen from '../components/ResponsiveScreen';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
 import TeacherAnnouncement from '../components/TeacherAnnouncement';
@@ -217,6 +218,7 @@ const TeacherPortal = () => {
   return (
     <ProtectedRoute requiredRole="teacher">
       <SafeAreaView style={styles.container}>
+        <ResponsiveScreen>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -439,6 +441,7 @@ const TeacherPortal = () => {
           </View>
         </View>
       </ScrollView>
+        </ResponsiveScreen>
 
       {/* QR Scanner Modal */}
       <Modal
@@ -621,6 +624,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -638,8 +643,11 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 8,
+    flex: 1,
   },
   logoutButton: {
     flexDirection: 'row',

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import ProtectedRoute from '../components/ProtectedRoute';
+import ResponsiveScreen from '../components/ResponsiveScreen';
 import SimpleQRCode from '../components/SimpleQRCode';
 import * as Print from 'expo-print';
 import { useAuth } from '../contexts/AuthContext';
@@ -271,6 +272,7 @@ const StudentPortal = () => {
   return (
     <ProtectedRoute requiredRole="student">
       <SafeAreaView style={styles.container}>
+        <ResponsiveScreen>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -408,6 +410,7 @@ const StudentPortal = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+        </ResponsiveScreen>
       </SafeAreaView>
     </ProtectedRoute>
   );
