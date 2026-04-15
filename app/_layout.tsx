@@ -19,6 +19,7 @@ export default function RootLayout() {
           <Stack.Screen name="student" options={{ headerShown: false }} />
           <Stack.Screen name="parent" options={{ headerShown: false }} />
           <Stack.Screen name="teacher" options={{ headerShown: false }} />
+          <Stack.Screen name="nfc-kiosk" options={{ headerShown: false }} />
           <Stack.Screen name="admin" options={{ headerShown: false }} />
           <Stack.Screen name="test-platform" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

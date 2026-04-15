@@ -39,7 +39,14 @@
       }
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Read NFC tags for attendance check-in and check-out.",
+          "includeNdefEntitlement": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

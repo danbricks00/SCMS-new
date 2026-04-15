@@ -377,6 +377,14 @@ const TeacherPortal = () => {
         
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Activity Tracking</Text>
+          <TouchableOpacity
+            style={styles.nfcPrepButton}
+            onPress={() => router.push('/nfc-kiosk')}
+          >
+            <Ionicons name="phone-portrait-outline" size={22} color="#1565c0" />
+            <Text style={styles.nfcPrepButtonText}>NFC kiosk (prep)</Text>
+            <Ionicons name="chevron-forward" size={20} color="#1565c0" />
+          </TouchableOpacity>
           <TouchableOpacity 
             style={styles.activityButton}
             onPress={() => setShowActivityScanner(true)}
@@ -826,6 +834,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  nfcPrepButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e3f2fd',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#90caf9',
+    gap: 10,
+  },
+  nfcPrepButtonText: {
+    flex: 1,
+    color: '#1565c0',
+    fontSize: 15,
+    fontWeight: '600',
   },
   activityButton: {
     flexDirection: 'row',
