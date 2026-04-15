@@ -7,8 +7,12 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
   if (!studentData) return null;
 
   const handleMarkAttendance = (status) => {
-    // status can be: 'present', 'late', 'absent'
+    // attendanceType: 'login' | 'logout' | 'absent'
     onMarkAttendance(studentData, attendanceType, status);
+  };
+
+  const handleConfirmAbsentOnly = () => {
+    onMarkAttendance(studentData, 'login', 'absent');
   };
 
   return (
@@ -57,27 +61,37 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          {attendanceType === 'login' ? (
+          {attendanceType === 'absent' ? (
             <>
-              {/* Present Button */}
+              <Text style={styles.modeHint}>
+                Mark this student as absent for today&apos;s class session.
+              </Text>
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.absentButton]}
+                onPress={handleConfirmAbsentOnly}
+              >
+                <Ionicons name="close-circle" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Confirm Absent</Text>
+              </TouchableOpacity>
+            </>
+          ) : attendanceType === 'login' ? (
+            <>
               <TouchableOpacity
                 style={[styles.attendanceButton, styles.presentButton]}
                 onPress={() => handleMarkAttendance('present')}
               >
                 <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={styles.attendanceButtonText}>Mark Present</Text>
+                <Text style={styles.attendanceButtonText}>Check In</Text>
               </TouchableOpacity>
 
-              {/* Late Button */}
               <TouchableOpacity
                 style={[styles.attendanceButton, styles.lateButton]}
                 onPress={() => handleMarkAttendance('late')}
               >
                 <Ionicons name="time" size={20} color="#fff" />
-                <Text style={styles.attendanceButtonText}>Mark Late</Text>
+                <Text style={styles.attendanceButtonText}>Late</Text>
               </TouchableOpacity>
 
-              {/* Absent Button */}
               <TouchableOpacity
                 style={[styles.attendanceButton, styles.absentButton]}
                 onPress={() => handleMarkAttendance('absent')}
@@ -87,14 +101,16 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
               </TouchableOpacity>
             </>
           ) : (
-            /* Logout/Checkout Buttons */
             <>
+              <Text style={styles.modeHint}>
+                Record the student leaving class (check out).
+              </Text>
               <TouchableOpacity
                 style={[styles.attendanceButton, styles.checkoutButton]}
                 onPress={() => handleMarkAttendance('checkout')}
               >
-                <Ionicons name="checkmark-done" size={20} color="#fff" />
-                <Text style={styles.attendanceButtonText}>Check Out (Completed)</Text>
+                <Ionicons name="log-out" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Check Out</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -247,6 +263,13 @@ const styles = StyleSheet.create({
   actionsContainer: {
     width: '100%',
     marginBottom: 20,
+  },
+  modeHint: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 14,
+    lineHeight: 20,
   },
   attendanceButton: {
     flexDirection: 'row',

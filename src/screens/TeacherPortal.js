@@ -286,19 +286,27 @@ const TeacherPortal = () => {
 
               <View style={styles.qrScanButtons}>
                 <TouchableOpacity 
-                  style={[styles.scanButton, styles.presentButton]}
+                  style={[styles.scanButton, styles.checkInButton]}
                   onPress={() => openQRScanner('login')}
                 >
-                  <Ionicons name="qr-code" size={20} color="#fff" />
-                  <Text style={styles.scanButtonText}>Mark Present</Text>
+                  <Ionicons name="log-in" size={18} color="#fff" />
+                  <Text style={styles.scanButtonText}>Check In</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={[styles.scanButton, styles.absentButton]}
+                  onPress={() => openQRScanner('absent')}
+                >
+                  <Ionicons name="close-circle" size={18} color="#fff" />
+                  <Text style={styles.scanButtonText}>Mark Absent</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.scanButton, styles.checkOutButton]}
                   onPress={() => openQRScanner('logout')}
                 >
-                  <Ionicons name="close-circle" size={20} color="#fff" />
-                  <Text style={styles.scanButtonText}>Mark Absent</Text>
+                  <Ionicons name="log-out" size={18} color="#fff" />
+                  <Text style={styles.scanButtonText}>Check Out</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -331,25 +339,36 @@ const TeacherPortal = () => {
 
               <View style={styles.qrScanButtons}>
                 <TouchableOpacity 
-                  style={[styles.scanButton, styles.presentButton]}
+                  style={[styles.scanButton, styles.checkInButton]}
                   onPress={() => {
                     setCurrentClass('8B');
                     openQRScanner('login');
                   }}
                 >
-                  <Ionicons name="qr-code" size={20} color="#fff" />
-                  <Text style={styles.scanButtonText}>Mark Present</Text>
+                  <Ionicons name="log-in" size={18} color="#fff" />
+                  <Text style={styles.scanButtonText}>Check In</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={[styles.scanButton, styles.absentButton]}
                   onPress={() => {
                     setCurrentClass('8B');
+                    openQRScanner('absent');
+                  }}
+                >
+                  <Ionicons name="close-circle" size={18} color="#fff" />
+                  <Text style={styles.scanButtonText}>Mark Absent</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.scanButton, styles.checkOutButton]}
+                  onPress={() => {
+                    setCurrentClass('8B');
                     openQRScanner('logout');
                   }}
                 >
-                  <Ionicons name="close-circle" size={20} color="#fff" />
-                  <Text style={styles.scanButtonText}>Mark Absent</Text>
+                  <Ionicons name="log-out" size={18} color="#fff" />
+                  <Text style={styles.scanButtonText}>Check Out</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -771,23 +790,31 @@ const styles = StyleSheet.create({
   },
   qrScanButtons: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 8,
+    marginTop: 4,
   },
   scanButton: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 96,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 6,
     borderRadius: 8,
-    gap: 6,
+    gap: 4,
   },
-  presentButton: {
+  checkInButton: {
     backgroundColor: '#4CAF50',
   },
   absentButton: {
     backgroundColor: '#FF9800',
+  },
+  checkOutButton: {
+    backgroundColor: '#2196F3',
   },
   scanButtonText: {
     color: '#fff',
