@@ -17,4 +17,20 @@ resolver.extraNodeModules = {
   'src': path.resolve(__dirname, 'src')
 };
 
+// Performance optimizations
+config.transformer.minifierConfig = {
+  keep_fnames: true,
+  mangle: {
+    keep_fnames: true,
+  },
+};
+
+// Optimize bundle size
+config.resolver.platforms = ['ios', 'android', 'web'];
+
+// Enable tree shaking for web
+if (process.env.EXPO_PLATFORM === 'web') {
+  config.transformer.enableBabelRCLookup = false;
+}
+
 module.exports = config;

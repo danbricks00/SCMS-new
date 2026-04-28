@@ -1,29 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimeDisplay from '../components/DateTimeDisplay';
+import ResponsiveScreen from '../components/ResponsiveScreen';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const LandingPage = ({ navigation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dimensions, setDimensions] = useState(null);
+  const { isMobile, isTablet, isDesktop } = useResponsiveLayout();
+  const showInlineNav = !isMobile;
 
-  // At the top of your component
-  const [mounted, setMounted] = useState(false);
-  
   useEffect(() => {
-    // Mark as mounted after initial render
-    setMounted(true);
-    console.log('[SCMS] LandingPage mounted');
-    console.log('[SCMS] Environment:', process.env.NODE_ENV);
-    
-    // Set window dimensions after component mounts (client-side only)
-    if (typeof window !== 'undefined' && mounted) {
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
-      console.log('[SCMS] Window dimensions:', window.innerWidth, window.innerHeight);
-    }
-    
-    return () => console.log('[SCMS] LandingPage unmounted');
-  }, [mounted]);
+    return () => {};
+  }, []);
 
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
@@ -31,93 +22,114 @@ const LandingPage = ({ navigation }) => {
 
   const navigateTo = (route) => {
     setMenuOpen(false);
-    // Map the portal names to the correct routes
-    const routeMap = {
-      'StudentPortal': 'student',
-      'ParentPortal': 'parent',
-      'TeacherPortal': 'teacher',
-      'AdminPortal': 'admin'
-    };
-    
-    // Use the router imported at the top level
-    router.push(`/${routeMap[route] || route.toLowerCase()}`);
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      sessionStorage.setItem('intendedDestination', route);
+    }
+    router.push('/login');
   };
+
+  const navItems = [
+    { key: 'StudentPortal', label: 'Student', icon: 'school' },
+    { key: 'ParentPortal', label: 'Parent', icon: 'people' },
+    { key: 'TeacherPortal', label: 'Teacher', icon: 'book' },
+    { key: 'AdminPortal', label: 'Admin', icon: 'settings' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with hamburger icon */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
-          <Ionicons name="menu" size={32} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>School Management System</Text>
-      </View>
-
-      {/* Sidebar Menu */}
-      {menuOpen && (
-        <View style={styles.sideMenu}>
-          <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
-            <Ionicons name="close" size={32} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.menuItems}>
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => navigateTo('StudentPortal')}>
-              <Ionicons name="school" size={24} color="#fff" />
-              <Text style={styles.menuText}>Student Portal</Text>
+      <ResponsiveScreen>
+        <View style={[styles.header, showInlineNav && styles.headerDesktop]}>
+          {!showInlineNav ? (
+            <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
+              <Ionicons name="menu" size={32} color="#333" />
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => navigateTo('ParentPortal')}>
-              <Ionicons name="people" size={24} color="#fff" />
-              <Text style={styles.menuText}>Parent Portal</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => navigateTo('TeacherPortal')}>
-              <Ionicons name="book" size={24} color="#fff" />
-              <Text style={styles.menuText}>Teacher Portal</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => navigateTo('AdminPortal')}>
-              <Ionicons name="settings" size={24} color="#fff" />
-              <Text style={styles.menuText}>Admin Portal</Text>
-            </TouchableOpacity>
-          </View>
+          ) : (
+            <View style={styles.headerBrand}>
+              <Ionicons name="school" size={28} color="#4a90e2" />
+            </View>
+          )}
+          <Text
+            style={[styles.headerTitle, showInlineNav && styles.headerTitleDesktop]}
+            numberOfLines={showInlineNav ? 1 : 2}
+          >
+            School Class Management System
+          </Text>
+          {showInlineNav ? (
+            <View style={styles.inlineNav}>
+              {navItems.map((item) => (
+                <TouchableOpacity
+                  key={item.key}
+                  style={styles.inlineNavButton}
+                  onPress={() => navigateTo(item.key)}
+                >
+                  <Ionicons name={item.icon} size={18} color="#4a90e2" />
+                  <Text style={styles.inlineNavText}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
-      )}
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Welcome to Our School</Text>
-          <Text style={styles.heroSubtitle}>Attendance Management System</Text>
-          
-          <View style={styles.featureCards}>
-            <View style={styles.card}>
-              <Ionicons name="calendar" size={40} color="#4a90e2" />
-              <Text style={styles.cardTitle}>Attendance Tracking</Text>
-              <Text style={styles.cardDescription}>Real-time attendance monitoring for students</Text>
-            </View>
-            
-            <View style={styles.card}>
-              <Ionicons name="stats-chart" size={40} color="#4a90e2" />
-              <Text style={styles.cardTitle}>Performance Analytics</Text>
-              <Text style={styles.cardDescription}>Detailed reports and analytics</Text>
-            </View>
-            
-            <View style={styles.card}>
-              <Ionicons name="notifications" size={40} color="#4a90e2" />
-              <Text style={styles.cardTitle}>Instant Notifications</Text>
-              <Text style={styles.cardDescription}>Get alerts for absences and events</Text>
+        <View style={styles.dateTimeContainer}>
+          <DateTimeDisplay />
+        </View>
+
+        {menuOpen && !showInlineNav && (
+          <View style={styles.sideMenu}>
+            <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
+              <Ionicons name="close" size={32} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.menuItems}>
+              {navItems.map((item) => (
+                <TouchableOpacity
+                  key={item.key}
+                  style={styles.menuItem}
+                  onPress={() => navigateTo(item.key)}
+                >
+                  <Ionicons name={item.icon} size={24} color="#fff" />
+                  <Text style={styles.menuText}>{item.label} Portal</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
+        )}
+
+        <View style={styles.content}>
+          <View style={styles.heroSection}>
+            <Text style={[styles.heroTitle, isDesktop && styles.heroTitleLarge]}>Welcome to Our School</Text>
+            <Text style={[styles.heroSubtitle, isTablet && styles.heroSubtitleLarge]}>
+              Attendance Management System
+            </Text>
+
+            <View
+              style={[
+                styles.featureCards,
+                !isMobile && styles.featureCardsRow,
+              ]}
+            >
+              <View style={[styles.card, !isMobile && styles.cardGrid]}>
+                <Ionicons name="calendar" size={40} color="#4a90e2" />
+                <Text style={styles.cardTitle}>Attendance Tracking</Text>
+                <Text style={styles.cardDescription}>Real-time attendance monitoring for students</Text>
+              </View>
+
+              <View style={[styles.card, !isMobile && styles.cardGrid]}>
+                <Ionicons name="stats-chart" size={40} color="#4a90e2" />
+                <Text style={styles.cardTitle}>Performance Analytics</Text>
+                <Text style={styles.cardDescription}>Detailed reports and analytics</Text>
+              </View>
+
+              <View style={[styles.card, !isMobile && styles.cardGrid]}>
+                <Ionicons name="notifications" size={40} color="#4a90e2" />
+                <Text style={styles.cardTitle}>Instant Notifications</Text>
+                <Text style={styles.cardDescription}>Get alerts for absences and events</Text>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
+      </ResponsiveScreen>
     </SafeAreaView>
   );
 };
@@ -125,7 +137,7 @@ const LandingPage = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f0f0',
   },
   header: {
     flexDirection: 'row',
@@ -138,92 +150,168 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
+  headerDesktop: {
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  headerBrand: {
+    marginRight: 8,
+  },
+  headerSpacer: {
+    width: 40,
+  },
   menuButton: {
     padding: 5,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   headerTitle: {
-    fontSize: 20,
+    flex: 1,
+    fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 15,
     color: '#333',
+  },
+  headerTitleDesktop: {
+    flexGrow: 1,
+    flexBasis: 120,
+    fontSize: 20,
+    marginLeft: 8,
+  },
+  inlineNav: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    flexShrink: 1,
+  },
+  inlineNavButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f4fd',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    gap: 4,
+  },
+  inlineNavText: {
+    color: '#2c5282',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  dateTimeContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   sideMenu: {
     position: 'absolute',
     top: 0,
     left: 0,
-    width: '70%',
-    height: '100%',
-    backgroundColor: '#333',
-    zIndex: 999,
-    paddingTop: 50,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    zIndex: 1000,
   },
   closeButton: {
     position: 'absolute',
-    top: 15,
-    right: 15,
+    top: 50,
+    right: 20,
+    zIndex: 1001,
   },
   menuItems: {
-    marginTop: 20,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#4a90e2',
     padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#444',
+    marginVertical: 10,
+    borderRadius: 10,
+    width: '80%',
   },
   menuText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '500',
     marginLeft: 15,
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingVertical: 20,
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    paddingTop: 24,
   },
   heroTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 10,
     textAlign: 'center',
+    marginBottom: 10,
+  },
+  heroTitleLarge: {
+    fontSize: 36,
   },
   heroSubtitle: {
     fontSize: 18,
     color: '#666',
-    marginBottom: 30,
     textAlign: 'center',
+    marginBottom: 32,
+  },
+  heroSubtitleLarge: {
+    fontSize: 20,
+    marginBottom: 40,
   },
   featureCards: {
     width: '100%',
   },
+  featureCardsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 16,
+  },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 15,
     padding: 20,
-    marginBottom: 15,
+    marginBottom: 20,
     alignItems: 'center',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 5,
+  },
+  cardGrid: {
+    width: '30%',
+    minWidth: 220,
+    maxWidth: 360,
+    marginBottom: 0,
+    flexGrow: 1,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 5,
     color: '#333',
+    marginTop: 15,
+    marginBottom: 10,
   },
   cardDescription: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+    lineHeight: 20,
   },
 });
 
