@@ -611,7 +611,9 @@ const AdminPortal = () => {
           
             <FlatList
               data={students}
-              keyExtractor={(item) => item.studentId}
+              keyExtractor={(item, index) =>
+                String(item.studentId || item.id || `${item.name || 'student'}-${index}`)
+              }
               renderItem={({ item }) => (
                 <View style={styles.studentItem}>
                   <View style={styles.studentInfo}>

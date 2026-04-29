@@ -1520,40 +1520,35 @@ export class DatabaseService {
   static async getActivityLog(userRole = 'admin', filter = 'all', maxResults = 50) {
     if (!hasFirestore()) return [];
     try {
-      let q;
-      
-      if (filter === 'all') {
-        q = query(
-          collection(db, 'activityLog'),
-          orderBy('timestamp', 'desc'),
-          firestoreLimit(maxResults)
-        );
-      } else {
-        // Map filter to activity types
-        const typeMap = {
-          'students': ['student_added', 'student_updated'],
-          'teachers': ['teacher_added', 'teacher_updated'],
-          'events': ['event_created', 'event_updated'],
-          'announcements': ['announcement_created'],
-        };
-        
-        const types = typeMap[filter] || [filter];
-        q = query(
-          collection(db, 'activityLog'),
-          where('type', 'in', types),
-          orderBy('timestamp', 'desc'),
-          firestoreLimit(maxResults)
-        );
-      }
-      
-      const querySnapshot = await getDocs(q);
+      // Always use a non-index-dependent query, then filter client-side.
+      // This avoids runtime errors when composite indexes are missing.
+      const querySnapshot = await getDocs(
+        query(collection(db, 'activityLog'), orderBy('timestamp', 'desc'), firestoreLimit(200))
+      );
       const activities = [];
       querySnapshot.forEach((doc) => {
         activities.push({ id: doc.id, ...doc.data() });
       });
-      return activities;
+
+      if (filter === 'all') {
+        return activities.slice(0, maxResults);
+      }
+
+      const typeMap = {
+        students: ['student_added', 'student_updated'],
+        teachers: ['teacher_added', 'teacher_updated'],
+        events: ['event_created', 'event_updated'],
+        announcements: ['announcement_created'],
+      };
+      const types = typeMap[filter] || [filter];
+      return activities.filter((activity) => types.includes(activity.type)).slice(0, maxResults);
     } catch (error) {
-      console.error('Error getting activity log:', error);
+      const message = String(error?.message || '');
+      if (message.includes('requires an index')) {
+        console.warn('Activity log index missing, using fallback query.');
+      } else {
+        console.error('Error getting activity log:', error);
+      }
       // Fallback for missing composite indexes: query broad set, then filter/sort client-side.
       try {
         const fallbackSnapshot = await getDocs(
