@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { DatabaseService } from '../services/database';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { DatabaseService } from '../services/database';
 import { formatDateTimeNZ } from '../utils/dateUtils';
+import { canUseServerPdf, generatePdfUrlFromHtml, openPrintDialogWithHtml } from '../utils/pdfFromHtml';
 
 const AttendanceReportPage = () => {
   const { user } = useAuth();
@@ -64,9 +65,109 @@ const AttendanceReportPage = () => {
     }
   };
 
-  const exportReport = () => {
-    if (Platform.OS === 'web') {
-      alert(`Exporting attendance report for ${selectedClass}...\n\nThis will generate a PDF with:\n- Daily attendance records\n- Student-wise attendance\n- Attendance trends\n- Late arrivals summary`);
+  const buildReportHtml = () => {
+    const dateStr = new Date().toLocaleDateString('en-NZ');
+
+    const recordRows = attendanceData.length > 0
+      ? attendanceData.map((r, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${r.studentName || '-'}</td>
+            <td>${r.type === 'login' ? 'Checked In' : 'Checked Out'}</td>
+            <td>${r.timestamp ? formatDateTimeNZ(r.timestamp) : '-'}</td>
+            <td><span class="badge badge-${r.status === 'late' ? 'late' : 'present'}">${r.status === 'late' ? 'Late' : 'On Time'}</span></td>
+          </tr>`).join('')
+      : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#888;">No attendance records for today</td></tr>`;
+
+    return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #222; padding: 40px; margin: 0; }
+          .header { text-align: center; border-bottom: 3px solid #4a90e2; padding-bottom: 16px; margin-bottom: 24px; }
+          .header h1 { margin: 0; color: #4a90e2; font-size: 24px; }
+          .header p { margin: 4px 0; color: #555; font-size: 12px; }
+          .meta { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 13px; color: #555; }
+          .stats { display: flex; gap: 12px; margin-bottom: 20px; }
+          .stat { flex: 1; padding: 14px; border-radius: 8px; text-align: center; }
+          .stat .value { font-size: 22px; font-weight: bold; }
+          .stat .label { font-size: 11px; color: #666; text-transform: uppercase; }
+          .stat-present { background: #e8f5e9; }
+          .stat-present .value { color: #4CAF50; }
+          .stat-absent { background: #ffebee; }
+          .stat-absent .value { color: #f44336; }
+          .stat-late { background: #fff3e0; }
+          .stat-late .value { color: #FF9800; }
+          .stat-rate { background: #e3f2fd; }
+          .stat-rate .value { color: #2196F3; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th { background: #4a90e2; color: white; text-align: left; padding: 8px; }
+          td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
+          tr:nth-child(even) td { background: #fafafa; }
+          .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+          .badge-present { background: #e8f5e9; color: #2e7d32; }
+          .badge-late { background: #fff3e0; color: #e65100; }
+          .footer { text-align: center; font-size: 10px; color: #888; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SCMS — Attendance Report</h1>
+          <p>School Class Management System</p>
+        </div>
+
+        <div class="meta">
+          <div><strong>Generated:</strong> ${dateStr}</div>
+          <div><strong>Class:</strong> ${selectedClass || '-'}</div>
+        </div>
+
+        <div class="stats">
+          <div class="stat stat-present"><div class="value">${summary.presentToday}</div><div class="label">Present</div></div>
+          <div class="stat stat-absent"><div class="value">${summary.absentToday}</div><div class="label">Absent</div></div>
+          <div class="stat stat-late"><div class="value">${summary.lateToday}</div><div class="label">Late</div></div>
+          <div class="stat stat-rate"><div class="value">${summary.attendanceRate}%</div><div class="label">Rate</div></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student Name</th>
+              <th>Action</th>
+              <th>Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${recordRows}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Generated by SCMS · ${new Date().toLocaleString('en-NZ')}
+        </div>
+      </body>
+    </html>`;
+  };
+
+  const exportReport = async () => {
+    const html = buildReportHtml();
+
+    try {
+      if (canUseServerPdf()) {
+        const url = await generatePdfUrlFromHtml(html);
+        if (typeof window !== 'undefined') {
+          window.open(url, '_blank');
+        }
+      } else {
+        openPrintDialogWithHtml(html);
+      }
+    } catch (err) {
+      console.warn('Server PDF failed, using print dialog fallback:', err);
+      openPrintDialogWithHtml(html);
     }
   };
 

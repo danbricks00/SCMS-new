@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { DatabaseService } from '../services/database';
 import { formatDateNZ } from '../utils/dateUtils';
+import { canUseServerPdf, generatePdfUrlFromHtml, openPrintDialogWithHtml } from '../utils/pdfFromHtml';
 
 const EventReportPage = () => {
   const [events, setEvents] = useState([]);
@@ -44,9 +45,107 @@ const EventReportPage = () => {
     setFilteredEvents(filtered);
   };
 
-  const exportReport = () => {
-    if (Platform.OS === 'web') {
-      alert(`Exporting events report...\n\nThis will generate a PDF with:\n- All scheduled events\n- Event attendance (if tracked)\n- Event types breakdown\n- Calendar view`);
+  const buildReportHtml = () => {
+    const dateStr = new Date().toLocaleDateString('en-NZ');
+    const today = new Date().toISOString().split('T')[0];
+    const upcomingCount = events.filter(e => e.eventDate >= today).length;
+    const completedCount = events.filter(e => e.eventDate < today).length;
+
+    const filterLabel = filter.charAt(0).toUpperCase() + filter.slice(1);
+
+    const eventRows = filteredEvents.length > 0
+      ? filteredEvents.map((e, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${e.title || '-'}</td>
+            <td><span class="badge" style="background:${getEventTypeColor(e.eventType)}20; color:${getEventTypeColor(e.eventType)};">${getEventTypeLabel(e.eventType)}</span></td>
+            <td>${e.eventDate ? formatDateNZ(e.eventDate) : '-'}</td>
+            <td>${e.startTime || '-'} - ${e.endTime || '-'}</td>
+            <td>${e.location || '-'}</td>
+            <td>${(e.targetClasses && e.targetClasses.length > 0) ? e.targetClasses.join(', ') : '-'}</td>
+          </tr>`).join('')
+      : `<tr><td colspan="7" style="text-align:center; padding:20px; color:#888;">No events found</td></tr>`;
+
+    return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #222; padding: 40px; margin: 0; }
+          .header { text-align: center; border-bottom: 3px solid #4a90e2; padding-bottom: 16px; margin-bottom: 24px; }
+          .header h1 { margin: 0; color: #4a90e2; font-size: 24px; }
+          .header p { margin: 4px 0; color: #555; font-size: 12px; }
+          .meta { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 13px; color: #555; }
+          .stats { display: flex; gap: 12px; margin-bottom: 20px; }
+          .stat { flex: 1; background: #f3f4f6; padding: 14px; border-radius: 8px; text-align: center; }
+          .stat .value { font-size: 22px; font-weight: bold; color: #4a90e2; }
+          .stat .label { font-size: 11px; color: #666; text-transform: uppercase; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th { background: #4a90e2; color: white; text-align: left; padding: 8px; }
+          td { padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+          tr:nth-child(even) td { background: #fafafa; }
+          .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; display: inline-block; }
+          .footer { text-align: center; font-size: 10px; color: #888; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SCMS — Event Report</h1>
+          <p>School Class Management System</p>
+        </div>
+
+        <div class="meta">
+          <div><strong>Generated:</strong> ${dateStr}</div>
+          <div><strong>Filter:</strong> ${filterLabel}</div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="value">${events.length}</div><div class="label">Total Events</div></div>
+          <div class="stat"><div class="value">${upcomingCount}</div><div class="label">Upcoming</div></div>
+          <div class="stat"><div class="value">${completedCount}</div><div class="label">Completed</div></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Title</th>
+              <th>Type</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Location</th>
+              <th>Target Classes</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${eventRows}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Generated by SCMS · ${new Date().toLocaleString('en-NZ')}
+        </div>
+      </body>
+    </html>`;
+  };
+
+  const exportReport = async () => {
+    const html = buildReportHtml();
+
+    try {
+      if (canUseServerPdf()) {
+        const url = await generatePdfUrlFromHtml(html);
+        if (typeof window !== 'undefined') {
+          window.open(url, '_blank');
+        }
+      } else {
+        openPrintDialogWithHtml(html);
+      }
+    } catch (err) {
+      console.warn('Server PDF failed, using print dialog fallback:', err);
+      openPrintDialogWithHtml(html);
     }
   };
 
