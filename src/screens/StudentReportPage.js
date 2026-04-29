@@ -1,0 +1,439 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ProtectedRoute from '../components/ProtectedRoute';
+import { DatabaseService } from '../services/database';
+import { canUseServerPdf, generatePdfUrlFromHtml, openPrintDialogWithHtml } from '../utils/pdfFromHtml';
+
+
+const StudentReportPage = () => {
+  const [students, setStudents] = useState([]);
+  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClass, setSelectedClass] = useState('all');
+  const [classes, setClasses] = useState([]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    filterStudents();
+  }, [searchQuery, selectedClass, students]);
+
+  const loadData = async () => {
+    try {
+      const [studentsData, classesData] = await Promise.all([
+        DatabaseService.getAllStudents(),
+        DatabaseService.getAllClasses()
+      ]);
+      setStudents(studentsData);
+      setFilteredStudents(studentsData);
+      setClasses(classesData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
+
+  const filterStudents = () => {
+    let filtered = students;
+
+    // Filter by class
+    if (selectedClass !== 'all') {
+      filtered = filtered.filter(s => s.class === selectedClass);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(s => 
+        s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.studentId?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredStudents(filtered);
+  };
+
+  const buildReportHtml = () => {
+    const dateStr = new Date().toLocaleDateString('en-NZ');
+    const classFilter = selectedClass === 'all' ? 'All Classes' : selectedClass;
+
+    const studentRows = filteredStudents.length > 0
+      ? filteredStudents.map((s, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${s.studentId || '-'}</td>
+            <td>${s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim() || '-'}</td>
+            <td>${s.class || '-'}</td>
+            <td>${s.email || '-'}</td>
+          </tr>`).join('')
+      : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#888;">No students found</td></tr>`;
+
+    return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #222; padding: 40px; margin: 0; }
+          .header { text-align: center; border-bottom: 3px solid #4a90e2; padding-bottom: 16px; margin-bottom: 24px; }
+          .header h1 { margin: 0; color: #4a90e2; font-size: 24px; }
+          .header p { margin: 4px 0; color: #555; font-size: 12px; }
+          .meta { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 13px; color: #555; }
+          .stats { display: flex; gap: 12px; margin-bottom: 20px; }
+          .stat { flex: 1; background: #f3f4f6; padding: 14px; border-radius: 8px; text-align: center; }
+          .stat .value { font-size: 22px; font-weight: bold; color: #4a90e2; }
+          .stat .label { font-size: 11px; color: #666; text-transform: uppercase; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th { background: #4a90e2; color: white; text-align: left; padding: 8px; }
+          td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
+          tr:nth-child(even) td { background: #fafafa; }
+          .footer { text-align: center; font-size: 10px; color: #888; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SCMS — Student Directory Report</h1>
+          <p>School Class Management System</p>
+        </div>
+
+        <div class="meta">
+          <div><strong>Generated:</strong> ${dateStr}</div>
+          <div><strong>Class Filter:</strong> ${classFilter}</div>
+          ${searchQuery ? `<div><strong>Search:</strong> "${searchQuery}"</div>` : ''}
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="value">${filteredStudents.length}</div><div class="label">Students</div></div>
+          <div class="stat"><div class="value">${classes.length}</div><div class="label">Classes</div></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student ID</th>
+              <th>Name</th>
+              <th>Class</th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${studentRows}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Generated by SCMS · ${new Date().toLocaleString('en-NZ')}
+        </div>
+      </body>
+    </html>`;
+  };
+
+  const exportReport = async () => {
+    const html = buildReportHtml();
+
+    try {
+      if (canUseServerPdf()) {
+        const url = await generatePdfUrlFromHtml(html);
+        if (typeof window !== 'undefined') {
+          window.open(url, '_blank');
+        }
+      } else {
+        openPrintDialogWithHtml(html);
+      }
+    } catch (err) {
+      console.warn('Server PDF failed, using print dialog fallback:', err);
+      openPrintDialogWithHtml(html);
+    }
+  };
+
+  return (
+    <ProtectedRoute requiredRole="admin">
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Student Report</Text>
+          <TouchableOpacity onPress={exportReport} style={styles.exportButton}>
+            <Ionicons name="download-outline" size={20} color="#4a90e2" />
+            <Text style={styles.exportButtonText}>Export</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.content}>
+          {/* Search and Filter */}
+          <View style={styles.section}>
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by name or ID..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
+              <TouchableOpacity
+                style={[styles.filterChip, selectedClass === 'all' && styles.filterChipSelected]}
+                onPress={() => setSelectedClass('all')}
+              >
+                <Text style={[styles.filterChipText, selectedClass === 'all' && styles.filterChipTextSelected]}>
+                  All Classes
+                </Text>
+              </TouchableOpacity>
+              {classes.map((cls, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.filterChip, selectedClass === cls.name && styles.filterChipSelected]}
+                  onPress={() => setSelectedClass(cls.name)}
+                >
+                  <Text style={[styles.filterChipText, selectedClass === cls.name && styles.filterChipTextSelected]}>
+                    {cls.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Statistics */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Statistics</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{filteredStudents.length}</Text>
+                <Text style={styles.statLabel}>Total Students</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{classes.length}</Text>
+                <Text style={styles.statLabel}>Classes</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Student List */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Student Directory</Text>
+            <View style={styles.studentList}>
+              {filteredStudents.length > 0 ? (
+                filteredStudents.map((student, index) => (
+                  <View key={index} style={styles.studentCard}>
+                    <View style={styles.studentAvatar}>
+                      <Ionicons name="person" size={24} color="#4a90e2" />
+                    </View>
+                    <View style={styles.studentInfo}>
+                      <Text style={styles.studentName}>{student.name || `${student.firstName} ${student.lastName}`}</Text>
+                      <Text style={styles.studentId}>ID: {student.studentId}</Text>
+                      <Text style={styles.studentClass}>Class: {student.class}</Text>
+                    </View>
+                    <View style={styles.studentActions}>
+                      <TouchableOpacity style={styles.actionButton}>
+                        <Ionicons name="eye-outline" size={20} color="#4a90e2" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noDataText}>No students found</Text>
+              )}
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </ProtectedRoute>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#fff',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  backButton: {
+    padding: 5,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
+    color: '#333',
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#4a90e2',
+    gap: 4,
+  },
+  exportButtonText: {
+    color: '#4a90e2',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  content: {
+    flex: 1,
+    padding: 15,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+  },
+  filterContainer: {
+    flexDirection: 'row',
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginRight: 8,
+  },
+  filterChipSelected: {
+    backgroundColor: '#4a90e2',
+    borderColor: '#4a90e2',
+  },
+  filterChipText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  filterChipTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  statNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#4a90e2',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+  },
+  studentList: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  studentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  studentAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#e3f2fd',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  studentInfo: {
+    flex: 1,
+  },
+  studentName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  studentId: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  studentClass: {
+    fontSize: 12,
+    color: '#999',
+  },
+  studentActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+  },
+  noDataText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    paddingVertical: 40,
+  },
+});
+
+export default StudentReportPage;
+

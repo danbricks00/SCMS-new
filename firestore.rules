@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // DEV / DEMO MODE — your app uses local session auth, NOT Firebase Auth.
+    // Firestore never sees request.auth, so rules that check request.auth fail.
+    // These rules allow the SCMS app to read/write the collections it uses.
+    // Replace with Firebase Auth + custom claims before production.
+    // -------------------------------------------------------------------------
+
+    match /attendance/{docId} {
+      allow read, write: if true;
+    }
+
+    match /attendanceSummary/{docId} {
+      allow read, write: if true;
+    }
+
+    match /students/{studentId} {
+      allow read, write: if true;
+    }
+
+    match /classes/{classId} {
+      allow read, write: if true;
+    }
+
+    match /announcements/{docId} {
+      allow read, write: if true;
+    }
+
+    match /events/{docId} {
+      allow read, write: if true;
+    }
+
+    match /absenceRequests/{docId} {
+      allow read, write: if true;
+    }
+
+    match /activityLog/{docId} {
+      allow read, write: if true;
+    }
+
+    match /teachers/{docId} {
+      allow read, write: if true;
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

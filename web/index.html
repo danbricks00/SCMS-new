@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="expo-platform" content="web">
-  <meta name="description" content="School Management System - Student Attendance Tracking">
-  <title>School Management System</title>
+  <meta name="description" content="School Class Management System - Student Attendance Tracking">
+  <title>School Class Management System</title>
   <style>
     body, html {
       height: 100%;
@@ -45,6 +45,25 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    /*
+      Dark mode / forced-colors: react-native-svg QR strokes can render as white on white.
+      Class is applied from SimpleQRCode (web). RN StyleSheet colorScheme alone is not always enough on Vercel.
+    */
+    .scms-qr-light {
+      color-scheme: light !important;
+      forced-color-adjust: none !important;
+      isolation: isolate;
+      position: relative;
+    }
+    .scms-qr-light svg {
+      color-scheme: light !important;
+    }
+    .scms-qr-light svg path {
+      stroke: #000000 !important;
+    }
+    .scms-qr-light svg rect[fill] {
+      fill: #ffffff !important;
+    }
   </style>
   <script>
     // Platform detection with iPad Safari fix
@@ -77,7 +96,7 @@
 <body>
   <div id="root">
     <div class="loading">
-      <h2>School Management System</h2>
+      <h2>School Class Management System</h2>
       <p>Loading your dashboard...</p>
       <div class="spinner"></div>
     </div>

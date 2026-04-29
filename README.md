@@ -1,4 +1,4 @@
-# School Management System
+# School Class Management System
 
 A comprehensive school management system built with Expo Router.
 

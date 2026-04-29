@@ -6,26 +6,13 @@ import { QRCodeUtils } from '../utils/qrCodeUtils';
 const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 'login' }) => {
   if (!studentData) return null;
 
-  const getAttendanceButtonColor = () => {
-    switch (attendanceType) {
-      case 'login':
-        return '#4CAF50';
-      case 'logout':
-        return '#FF9800';
-      default:
-        return '#4a90e2';
-    }
+  const handleMarkAttendance = (status) => {
+    // attendanceType: 'login' | 'logout' | 'absent'
+    onMarkAttendance(studentData, attendanceType, status);
   };
 
-  const getAttendanceButtonText = () => {
-    switch (attendanceType) {
-      case 'login':
-        return 'Mark Present';
-      case 'logout':
-        return 'Mark Absent';
-      default:
-        return 'Mark Attendance';
-    }
+  const handleConfirmAbsentOnly = () => {
+    onMarkAttendance(studentData, 'login', 'absent');
   };
 
   return (
@@ -39,15 +26,24 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
       </View>
 
       <View style={styles.content}>
-        {/* Student Photo */}
+        {/* Student Photo - Prominent Display */}
         <View style={styles.photoContainer}>
           {studentData.photo ? (
             <Image source={{ uri: studentData.photo }} style={styles.photo} />
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Ionicons name="person" size={40} color="#666" />
+              <Ionicons name="person" size={48} color="#999" />
+              <Text style={styles.noPhotoText}>No Photo</Text>
             </View>
           )}
+        </View>
+
+        {/* Verification Warning */}
+        <View style={styles.verificationWarning}>
+          <Ionicons name="shield-checkmark" size={20} color="#ff9800" />
+          <Text style={styles.verificationText}>
+            Verify student face matches their photo
+          </Text>
         </View>
 
         {/* Student Details */}
@@ -59,26 +55,75 @@ const StudentCard = ({ studentData, onMarkAttendance, onClose, attendanceType = 
           {/* QR Code Info */}
           <View style={styles.qrInfoContainer}>
             <Ionicons name="qr-code" size={16} color="#4a90e2" />
-            <Text style={styles.qrInfoText}>QR Code Verified</Text>
+            <Text style={styles.qrInfoText}>QR code verified</Text>
           </View>
         </View>
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.attendanceButton, { backgroundColor: getAttendanceButtonColor() }]}
-            onPress={() => onMarkAttendance(studentData, attendanceType)}
-          >
-            <Ionicons 
-              name={attendanceType === 'login' ? 'checkmark-circle' : 'close-circle'} 
-              size={20} 
-              color="#fff" 
-            />
-            <Text style={styles.attendanceButtonText}>
-              {getAttendanceButtonText()}
-            </Text>
-          </TouchableOpacity>
+          {attendanceType === 'absent' ? (
+            <>
+              <Text style={styles.modeHint}>
+                Mark this student as absent for today&apos;s class session.
+              </Text>
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.absentButton]}
+                onPress={handleConfirmAbsentOnly}
+              >
+                <Ionicons name="close-circle" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Confirm Absent</Text>
+              </TouchableOpacity>
+            </>
+          ) : attendanceType === 'login' ? (
+            <>
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.presentButton]}
+                onPress={() => handleMarkAttendance('present')}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Check In</Text>
+              </TouchableOpacity>
 
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.lateButton]}
+                onPress={() => handleMarkAttendance('late')}
+              >
+                <Ionicons name="time" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Late</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.absentButton]}
+                onPress={() => handleMarkAttendance('absent')}
+              >
+                <Ionicons name="close-circle" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Mark Absent</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.modeHint}>
+                Record the student leaving class (check out).
+              </Text>
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.checkoutButton]}
+                onPress={() => handleMarkAttendance('checkout')}
+              >
+                <Ionicons name="log-out" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Check Out</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.attendanceButton, styles.earlyButton]}
+                onPress={() => handleMarkAttendance('left-early')}
+              >
+                <Ionicons name="exit" size={20} color="#fff" />
+                <Text style={styles.attendanceButtonText}>Left Early</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* Cancel Button */}
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={onClose}
@@ -136,24 +181,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   photoContainer: {
-    marginBottom: 20,
+    marginBottom: 15,
+    alignItems: 'center',
   },
   photo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
+    width: 120,
+    height: 140,
+    borderRadius: 10,
+    borderWidth: 4,
     borderColor: '#4a90e2',
   },
   photoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f0f0f0',
+    width: 120,
+    height: 140,
+    borderRadius: 10,
+    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#ddd',
+    borderStyle: 'dashed',
+  },
+  noPhotoText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 8,
+  },
+  verificationWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ff9800',
+  },
+  verificationText: {
+    color: '#e65100',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
   },
   detailsContainer: {
     alignItems: 'center',
@@ -194,6 +264,13 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 20,
   },
+  modeHint: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 14,
+    lineHeight: 20,
+  },
   attendanceButton: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -202,9 +279,24 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
+  presentButton: {
+    backgroundColor: '#4CAF50',
+  },
+  lateButton: {
+    backgroundColor: '#FF9800',
+  },
+  absentButton: {
+    backgroundColor: '#f44336',
+  },
+  checkoutButton: {
+    backgroundColor: '#4CAF50',
+  },
+  earlyButton: {
+    backgroundColor: '#FF9800',
+  },
   attendanceButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
   },

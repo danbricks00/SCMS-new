@@ -1,19 +1,294 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import ProtectedRoute from '../components/ProtectedRoute';
+import ResponsiveScreen from '../components/ResponsiveScreen';
+import SimpleQRCode from '../components/SimpleQRCode';
+import * as Print from 'expo-print';
+import { useAuth } from '../contexts/AuthContext';
+import { DatabaseService } from '../services/database';
+import { QRCodeUtils } from '../utils/qrCodeUtils';
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Same options as SimpleQRCode web raster — print must match on-screen QR. */
+async function qrPayloadToDataUrl(qrPayload, size = 200) {
+  const mod = await import('qrcode');
+  const QRCodeLib = mod.default ?? mod;
+  return QRCodeLib.toDataURL(qrPayload, {
+    width: size,
+    margin: 1,
+    color: { dark: '#000000', light: '#ffffff' },
+    errorCorrectionLevel: 'M',
+  });
+}
 
 const StudentPortal = () => {
+  const { user, logout } = useAuth();
+  const [studentQRCode, setStudentQRCode] = useState(null);
+  const [studentData, setStudentData] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [qrImageDataUrlForPrint, setQrImageDataUrlForPrint] = useState(null);
+
+  // Load student data and QR code from database
+  useEffect(() => {
+    const loadStudentData = async () => {
+      if (!user?.username || studentQRCode) {
+        return;
+      }
+
+      const applyStudent = (student) => {
+        const normalizedStudent = {
+          ...student,
+          studentId: student.studentId || user.username,
+          name: student.name || user.name,
+          class: student.class || user.class || '10A',
+          firestoreDocId: student.id || user.name || user.username
+        };
+        setStudentData(normalizedStudent);
+        if (student.qrCode) {
+          setStudentQRCode(student.qrCode);
+        } else {
+          setStudentQRCode(QRCodeUtils.generateStudentQR(normalizedStudent));
+        }
+        loadEvents(normalizedStudent.class);
+      };
+
+      try {
+        let student = await DatabaseService.getStudentById(user.username);
+        // e.g. Firestore doc id "John Doe" but login username is student1 — no studentId field on doc
+        if (!student && user.name) {
+          student = await DatabaseService.getStudentByDocumentId(user.name);
+        }
+
+        if (student) {
+          applyStudent(student);
+        } else {
+          const fallbackData = {
+            studentId: user.username,
+            name: user.name,
+            firestoreDocId: user.name || user.username,
+            class: user.class || '10A'
+          };
+          setStudentData(fallbackData);
+          setStudentQRCode(QRCodeUtils.generateStudentQR(fallbackData));
+          loadEvents(fallbackData.class);
+        }
+      } catch (error) {
+        console.error('Error loading student data:', error);
+        const fallbackData = {
+          studentId: user.username,
+          name: user.name,
+          firestoreDocId: user.name || user.username,
+          class: user.class || '10A'
+        };
+        setStudentData(fallbackData);
+        setStudentQRCode(QRCodeUtils.generateStudentQR(fallbackData));
+        loadEvents(fallbackData.class);
+      }
+    };
+
+    loadStudentData();
+  }, [user?.username, user?.name, user?.class, studentQRCode]);
+
+  const loadEvents = async (userClass) => {
+    try {
+      const userEvents = await DatabaseService.getEventsForUser('student', [userClass]);
+      setEvents(userEvents);
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
+  };
+
+  const handleGenerateNewQR = async () => {
+    if (!user?.username) {
+      return;
+    }
+    const base = studentData || {
+      studentId: user.username,
+      name: user.name,
+      firestoreDocId: user.name || user.username,
+      class: user.class || '10A'
+    };
+    const normalized = {
+      ...base,
+      studentId: base.studentId || user.username,
+      name: base.name || user.name,
+      class: base.class || user.class || '10A',
+      firestoreDocId: base.firestoreDocId || base.id || user.name || user.username
+    };
+    const newQr = QRCodeUtils.generateStudentQR(normalized);
+    setStudentQRCode(newQr);
+
+    const docId = normalized.firestoreDocId;
+    if (docId) {
+      try {
+        await DatabaseService.setStudentQrCodeByDocId(docId, newQr);
+      } catch {
+        // Still show the new QR locally if Firestore write fails (e.g. rules or missing doc fields).
+      }
+    }
+
+    if (Platform.OS === 'web') {
+      window.alert('A new QR code was generated. Show this code to your teacher for attendance.');
+    } else {
+      Alert.alert(
+        'New QR code',
+        'A new QR code was generated. It works the same for attendance; use this one from now on (or print again if you use a printed card).'
+      );
+    }
+  };
+  
+  const handlePrintQR = async () => {
+    const qrDataForPrint = studentQRCode;
+    console.log('[QR Print] Using QR code:', qrDataForPrint ? qrDataForPrint.substring(0, 30) : 'NULL');
+
+    if (!qrDataForPrint) {
+      alert('QR code is not ready yet. Please wait a moment and try again.');
+      return;
+    }
+
+    let qrImageDataUrl = qrImageDataUrlForPrint;
+    try {
+      if (!qrImageDataUrl) {
+        qrImageDataUrl = await qrPayloadToDataUrl(qrDataForPrint, 200);
+      }
+    } catch (e) {
+      console.error('[QR Print] Failed to build QR image:', e);
+      if (Platform.OS === 'web') {
+        window.alert('Could not prepare the QR image for printing. Please try again.');
+      } else {
+        Alert.alert('Print', 'Could not prepare the QR image for printing. Please try again.');
+      }
+      return;
+    }
+
+    if (!qrImageDataUrl) {
+      if (Platform.OS === 'web') {
+        window.alert('QR image is not ready yet. Please wait a moment and try again.');
+      } else {
+        Alert.alert('Print', 'QR image is not ready yet. Please wait a moment and try again.');
+      }
+      return;
+    }
+
+    const studentName = user?.name || 'Student Name';
+    const studentId = user?.username || 'STU001';
+    const safeName = escapeHtml(studentName);
+    const safeId = escapeHtml(studentId);
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Student QR Code - ${safeName}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; text-align: center; background: white; color: #333; }
+          .print-container { max-width: 400px; margin: 0 auto; border: 2px solid #333; padding: 20px; border-radius: 10px; background: white; }
+          .school-header { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 10px; }
+          .student-info { margin: 20px 0; display: flex; align-items: center; gap: 20px; }
+          .student-photo-container { flex-shrink: 0; }
+          .student-photo { width: 80px; height: 80px; border: 2px solid #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; }
+          .photo-placeholder { text-align: center; }
+          .photo-icon { font-size: 24px; margin-bottom: 4px; }
+          .photo-text { font-size: 10px; color: #666; font-weight: bold; }
+          .student-details { flex: 1; text-align: left; }
+          .student-name { font-size: 20px; font-weight: bold; color: #4a90e2; margin-bottom: 5px; }
+          .student-id { font-size: 16px; color: #666; margin-bottom: 20px; }
+          .qr-code-container { margin: 20px 0; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; background: #ffffff; display: flex; justify-content: center; align-items: center; }
+          .qr-code-container img { width: 200px; height: 200px; display: block; margin: 0 auto; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+          .instructions { font-size: 14px; color: #666; margin-top: 15px; line-height: 1.4; }
+          .footer { margin-top: 20px; font-size: 12px; color: #999; }
+          @media print { body { margin: 0; } .print-container { border: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="print-container">
+          <div class="school-header">School Class Management System</div>
+          <div class="student-info">
+            <div class="student-photo-container">
+              <div class="student-photo">
+                <div class="photo-placeholder">
+                  <div class="photo-icon">📷</div>
+                  <div class="photo-text">Photo</div>
+                </div>
+              </div>
+            </div>
+            <div class="student-details">
+              <div class="student-name">${safeName}</div>
+              <div class="student-id">Student ID: ${safeId}</div>
+            </div>
+          </div>
+          <div class="qr-code-container">
+            <img src="${qrImageDataUrl}" alt="Student QR Code" width="200" height="200" />
+          </div>
+          <div class="instructions">
+            <strong>Instructions:</strong><br>
+            Show this QR code to your teacher for attendance marking.<br>
+            Keep this card safe and do not share with others.
+          </div>
+          <div class="footer">
+            Generated on ${new Date().toLocaleDateString()}
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    if (Platform.OS === 'web') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        const triggerPrint = () => {
+          try {
+            printWindow.print();
+          } catch (e) {
+            console.warn('[QR Print] print() failed:', e);
+          }
+        };
+        printWindow.addEventListener('load', () => setTimeout(triggerPrint, 150));
+        setTimeout(triggerPrint, 500);
+      } else {
+        alert('Please allow pop-ups to print the QR code.');
+      }
+      return;
+    }
+
+    try {
+      await Print.printAsync({ html: printContent });
+    } catch (error) {
+      console.error('[QR Print] Native print failed:', error);
+      Alert.alert('Print error', 'Could not open the print menu. Please try again.');
+    }
+  };
+  
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Student Portal</Text>
-      </View>
+    <ProtectedRoute requiredRole="student">
+      <SafeAreaView style={styles.container}>
+        <ResponsiveScreen>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Student Portal - {user?.name}</Text>
+          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+            <Ionicons name="log-out" size={20} color="#e74c3c" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       
       {/* Announcements Banner */}
       <AnnouncementBanner 
@@ -22,6 +297,46 @@ const StudentPortal = () => {
       />
       
       <ScrollView style={styles.content}>
+        {/* Student QR Code Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My QR Code</Text>
+          <View style={styles.qrCodeContainer}>
+            <Text style={styles.qrCodeDescription}>
+              Show this QR code to your teacher for attendance
+            </Text>
+            <View style={styles.qrCodeWrapper}>
+              <SimpleQRCode
+                studentData={studentData}
+                qrCode={studentQRCode}
+                size={200}
+                onQrImageDataUrl={setQrImageDataUrlForPrint}
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.regenerateQrButton}
+              onPress={handleGenerateNewQR}
+              disabled={!studentQRCode}
+            >
+              <Ionicons name="refresh" size={20} color="#4a90e2" />
+              <Text style={styles.regenerateQrButtonText}>Generate new QR code</Text>
+            </TouchableOpacity>
+            <Text style={styles.studentInfo}>
+              Student ID: {user?.username || "STU001"}
+            </Text>
+            <Text style={styles.studentInfo}>
+              Name: {user?.name || "Student Name"}
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.printButton}
+              onPress={handlePrintQR}
+              disabled={!studentQRCode}
+            >
+              <Ionicons name="print" size={20} color="#fff" />
+              <Text style={styles.printButtonText}>Print QR Code</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Attendance Overview</Text>
           <View style={styles.attendanceStats}>
@@ -57,6 +372,43 @@ const StudentPortal = () => {
           </View>
         </View>
         
+        {/* Upcoming Events */}
+        {events.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Upcoming Events</Text>
+            <View style={styles.eventsList}>
+              {events.map((event, index) => (
+                <View key={index} style={styles.eventCard}>
+                  <View style={styles.eventCardHeader}>
+                    <Ionicons name="calendar-outline" size={20} color="#4a90e2" />
+                    <Text style={styles.eventCardTitle}>{event.title}</Text>
+                  </View>
+                  <Text style={styles.eventCardDescription}>{event.description}</Text>
+                  <View style={styles.eventCardDetails}>
+                    <View style={styles.eventCardDetailRow}>
+                      <Ionicons name="time-outline" size={16} color="#666" />
+                      <Text style={styles.eventCardDetailText}>
+                        {event.eventDate} | {event.startTime} - {event.endTime}
+                      </Text>
+                    </View>
+                    <View style={styles.eventCardDetailRow}>
+                      <Ionicons name="location-outline" size={16} color="#666" />
+                      <Text style={styles.eventCardDetailText}>{event.location}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Updates</Text>
+          <View style={styles.activityLogContainer}>
+            <ActivityLog userRole="student" maxItems={5} />
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Request Absence</Text>
           <TouchableOpacity style={styles.requestButton}>
@@ -64,7 +416,9 @@ const StudentPortal = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+        </ResponsiveScreen>
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 };
 
@@ -90,8 +444,30 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginLeft: 15,
+    flex: 1,
+    textAlign: 'center',
     color: '#333',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e74c3c',
+    gap: 4,
+  },
+  logoutText: {
+    color: '#e74c3c',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  dateTimeContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   content: {
     flex: 1,
@@ -180,6 +556,129 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  qrCodeContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  qrCodeDescription: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  qrCodeWrapper: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    marginBottom: 12,
+  },
+  regenerateQrButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#4a90e2',
+    backgroundColor: '#fff',
+    marginBottom: 15,
+    gap: 8,
+  },
+  regenerateQrButtonText: {
+    color: '#4a90e2',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  studentInfo: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  printButton: {
+    backgroundColor: '#4a90e2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  printButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  eventsList: {
+    gap: 10,
+  },
+  eventCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  eventCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  eventCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  eventCardDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  eventCardDetails: {
+    gap: 5,
+  },
+  eventCardDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  eventCardDetailText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  activityLogContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    minHeight: 200,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
 });
 

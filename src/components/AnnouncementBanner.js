@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { DatabaseService } from '../services/database';
 
@@ -12,17 +12,24 @@ const AnnouncementBanner = ({
   const [announcements, setAnnouncements] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAll, setShowAll] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Memoize userClasses to prevent infinite re-renders
+  const memoizedUserClasses = useMemo(() => userClasses, [JSON.stringify(userClasses)]);
 
   useEffect(() => {
     loadAnnouncements();
-  }, [userRole, userClass, userClasses]);
+  }, [userRole, userClass, memoizedUserClasses]);
 
   const loadAnnouncements = async () => {
+    if (isLoading) return; // Prevent multiple simultaneous calls
+    
+    setIsLoading(true);
     try {
       const filteredAnnouncements = await DatabaseService.getAnnouncementsForUser(
         userRole, 
         userClass, 
-        userClasses
+        memoizedUserClasses
       );
       
       // Sort by priority (urgent first, then high, then normal)
@@ -35,6 +42,8 @@ const AnnouncementBanner = ({
     } catch (error) {
       console.error('Error loading announcements:', error);
       setAnnouncements([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -80,7 +89,6 @@ const AnnouncementBanner = ({
         return 'Unknown';
     }
   };
-
   const nextAnnouncement = () => {
     setCurrentIndex((prev) => (prev + 1) % announcements.length);
   };
@@ -117,15 +125,15 @@ const AnnouncementBanner = ({
                   </Text>
                 </View>
               </View>
-              <Text style={styles.announcementMessage}>{announcement.message}</Text>
-              <View style={styles.announcementFooter}>
-                <Text style={styles.announcementVisibility}>
-                  {getVisibilityLabel(announcement.visibility, announcement.targetClasses)}
-                </Text>
-                <Text style={styles.announcementDate}>
-                  {new Date(announcement.createdAt).toLocaleDateString()}
-                </Text>
-              </View>
+               <Text style={styles.announcementMessage}>{announcement.message}</Text>
+               <View style={styles.announcementFooter}>
+                 <Text style={styles.announcementVisibility}>
+                   {getVisibilityLabel(announcement.visibility, announcement.targetClasses)}
+                 </Text>
+                 <Text style={styles.announcementDate}>
+                   {new Date(announcement.createdAt).toLocaleDateString()}
+                 </Text>
+               </View>
             </View>
           ))}
         </ScrollView>

@@ -1,0 +1,508 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ProtectedRoute from '../components/ProtectedRoute';
+import { useAuth } from '../contexts/AuthContext';
+import { DatabaseService } from '../services/database';
+import { formatDateTimeNZ } from '../utils/dateUtils';
+import { canUseServerPdf, generatePdfUrlFromHtml, openPrintDialogWithHtml } from '../utils/pdfFromHtml';
+
+const AttendanceReportPage = () => {
+  const { user } = useAuth();
+  const [classes, setClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [summary, setSummary] = useState({
+    totalStudents: 0,
+    presentToday: 0,
+    absentToday: 0,
+    lateToday: 0,
+    attendanceRate: 0
+  });
+
+  useEffect(() => {
+    loadClasses();
+  }, []);
+
+  useEffect(() => {
+    if (selectedClass) {
+      loadAttendanceData();
+    }
+  }, [selectedClass]);
+
+  const loadClasses = async () => {
+    try {
+      const classesData = await DatabaseService.getAllClasses();
+      setClasses(classesData);
+      if (classesData.length > 0) {
+        setSelectedClass(classesData[0].name);
+      }
+    } catch (error) {
+      console.error('Error loading classes:', error);
+    }
+  };
+
+  const loadAttendanceData = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const todaySummary = await DatabaseService.getTodayAttendanceSummary(selectedClass);
+      
+      setSummary({
+        totalStudents: todaySummary.totalStudents,
+        presentToday: todaySummary.presentStudents,
+        absentToday: todaySummary.absentStudents,
+        lateToday: todaySummary.lateStudents,
+        attendanceRate: todaySummary.totalStudents > 0 
+          ? Math.round((todaySummary.presentStudents / todaySummary.totalStudents) * 100)
+          : 0
+      });
+
+      setAttendanceData(todaySummary.attendance);
+    } catch (error) {
+      console.error('Error loading attendance data:', error);
+    }
+  };
+
+  const buildReportHtml = () => {
+    const dateStr = new Date().toLocaleDateString('en-NZ');
+
+    const recordRows = attendanceData.length > 0
+      ? attendanceData.map((r, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${r.studentName || '-'}</td>
+            <td>${r.type === 'login' ? 'Checked In' : 'Checked Out'}</td>
+            <td>${r.timestamp ? formatDateTimeNZ(r.timestamp) : '-'}</td>
+            <td><span class="badge badge-${r.status === 'late' ? 'late' : 'present'}">${r.status === 'late' ? 'Late' : 'On Time'}</span></td>
+          </tr>`).join('')
+      : `<tr><td colspan="5" style="text-align:center; padding:20px; color:#888;">No attendance records for today</td></tr>`;
+
+    return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #222; padding: 40px; margin: 0; }
+          .header { text-align: center; border-bottom: 3px solid #4a90e2; padding-bottom: 16px; margin-bottom: 24px; }
+          .header h1 { margin: 0; color: #4a90e2; font-size: 24px; }
+          .header p { margin: 4px 0; color: #555; font-size: 12px; }
+          .meta { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 13px; color: #555; }
+          .stats { display: flex; gap: 12px; margin-bottom: 20px; }
+          .stat { flex: 1; padding: 14px; border-radius: 8px; text-align: center; }
+          .stat .value { font-size: 22px; font-weight: bold; }
+          .stat .label { font-size: 11px; color: #666; text-transform: uppercase; }
+          .stat-present { background: #e8f5e9; }
+          .stat-present .value { color: #4CAF50; }
+          .stat-absent { background: #ffebee; }
+          .stat-absent .value { color: #f44336; }
+          .stat-late { background: #fff3e0; }
+          .stat-late .value { color: #FF9800; }
+          .stat-rate { background: #e3f2fd; }
+          .stat-rate .value { color: #2196F3; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th { background: #4a90e2; color: white; text-align: left; padding: 8px; }
+          td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
+          tr:nth-child(even) td { background: #fafafa; }
+          .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+          .badge-present { background: #e8f5e9; color: #2e7d32; }
+          .badge-late { background: #fff3e0; color: #e65100; }
+          .footer { text-align: center; font-size: 10px; color: #888; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SCMS — Attendance Report</h1>
+          <p>School Class Management System</p>
+        </div>
+
+        <div class="meta">
+          <div><strong>Generated:</strong> ${dateStr}</div>
+          <div><strong>Class:</strong> ${selectedClass || '-'}</div>
+        </div>
+
+        <div class="stats">
+          <div class="stat stat-present"><div class="value">${summary.presentToday}</div><div class="label">Present</div></div>
+          <div class="stat stat-absent"><div class="value">${summary.absentToday}</div><div class="label">Absent</div></div>
+          <div class="stat stat-late"><div class="value">${summary.lateToday}</div><div class="label">Late</div></div>
+          <div class="stat stat-rate"><div class="value">${summary.attendanceRate}%</div><div class="label">Rate</div></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student Name</th>
+              <th>Action</th>
+              <th>Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${recordRows}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Generated by SCMS · ${new Date().toLocaleString('en-NZ')}
+        </div>
+      </body>
+    </html>`;
+  };
+
+  const exportReport = async () => {
+    const html = buildReportHtml();
+
+    try {
+      if (canUseServerPdf()) {
+        const url = await generatePdfUrlFromHtml(html);
+        if (typeof window !== 'undefined') {
+          window.open(url, '_blank');
+        }
+      } else {
+        openPrintDialogWithHtml(html);
+      }
+    } catch (err) {
+      console.warn('Server PDF failed, using print dialog fallback:', err);
+      openPrintDialogWithHtml(html);
+    }
+  };
+
+  return (
+    <ProtectedRoute requiredRole="admin">
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Attendance Report</Text>
+          <TouchableOpacity onPress={exportReport} style={styles.exportButton}>
+            <Ionicons name="download-outline" size={20} color="#4a90e2" />
+            <Text style={styles.exportButtonText}>Export</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.content}>
+          {/* Class Selector */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Class</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.classSelector}>
+              {classes.map((cls, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.classChip,
+                    selectedClass === cls.name && styles.classChipSelected
+                  ]}
+                  onPress={() => setSelectedClass(cls.name)}
+                >
+                  <Text style={[
+                    styles.classChipText,
+                    selectedClass === cls.name && styles.classChipTextSelected
+                  ]}>
+                    {cls.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Summary Cards */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Today's Summary - {selectedClass}</Text>
+            <View style={styles.summaryGrid}>
+              <View style={[styles.summaryCard, { backgroundColor: '#e8f5e9' }]}>
+                <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
+                <Text style={styles.summaryNumber}>{summary.presentToday}</Text>
+                <Text style={styles.summaryLabel}>Present</Text>
+              </View>
+              <View style={[styles.summaryCard, { backgroundColor: '#ffebee' }]}>
+                <Ionicons name="close-circle" size={32} color="#f44336" />
+                <Text style={styles.summaryNumber}>{summary.absentToday}</Text>
+                <Text style={styles.summaryLabel}>Absent</Text>
+              </View>
+              <View style={[styles.summaryCard, { backgroundColor: '#fff3e0' }]}>
+                <Ionicons name="time" size={32} color="#FF9800" />
+                <Text style={styles.summaryNumber}>{summary.lateToday}</Text>
+                <Text style={styles.summaryLabel}>Late</Text>
+              </View>
+              <View style={[styles.summaryCard, { backgroundColor: '#e3f2fd' }]}>
+                <Ionicons name="pie-chart" size={32} color="#2196F3" />
+                <Text style={styles.summaryNumber}>{summary.attendanceRate}%</Text>
+                <Text style={styles.summaryLabel}>Rate</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Attendance Records */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Attendance Records</Text>
+            <View style={styles.recordsList}>
+              {attendanceData.length > 0 ? (
+                attendanceData.slice(0, 20).map((record, index) => (
+                  <View key={index} style={styles.recordItem}>
+                    <View style={styles.recordIcon}>
+                      <Ionicons 
+                        name={record.status === 'late' ? 'time' : 'person'} 
+                        size={20} 
+                        color={record.status === 'late' ? '#FF9800' : '#4CAF50'} 
+                      />
+                    </View>
+                    <View style={styles.recordContent}>
+                      <Text style={styles.recordName}>{record.studentName}</Text>
+                      <Text style={styles.recordDetails}>
+                        {record.type === 'login' ? 'Checked In' : 'Checked Out'} • {formatDateTimeNZ(record.timestamp)}
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.statusBadge,
+                      record.status === 'late' && styles.statusLate,
+                      record.status === 'present' && styles.statusPresent
+                    ]}>
+                      <Text style={styles.statusText}>
+                        {record.status === 'late' ? 'Late' : 'On Time'}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noDataText}>No attendance records for today</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Weekly Overview */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Weekly Overview</Text>
+            <View style={styles.weeklyContainer}>
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((day, index) => (
+                <View key={index} style={styles.dayCard}>
+                  <Text style={styles.dayLabel}>{day}</Text>
+                  <View style={styles.dayBar}>
+                    <View style={[styles.dayBarFill, { height: `${Math.random() * 80 + 20}%` }]} />
+                  </View>
+                  <Text style={styles.dayPercent}>{Math.floor(Math.random() * 20 + 80)}%</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </ProtectedRoute>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#fff',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  backButton: {
+    padding: 5,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
+    color: '#333',
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#4a90e2',
+    gap: 4,
+  },
+  exportButtonText: {
+    color: '#4a90e2',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  content: {
+    flex: 1,
+    padding: 15,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  classSelector: {
+    flexDirection: 'row',
+  },
+  classChip: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+    marginRight: 10,
+  },
+  classChipSelected: {
+    backgroundColor: '#4a90e2',
+    borderColor: '#4a90e2',
+  },
+  classChipText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  classChipTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  summaryCard: {
+    flex: 1,
+    minWidth: '48%',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  summaryNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 8,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  recordsList: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  recordItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  recordIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  recordContent: {
+    flex: 1,
+  },
+  recordName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  recordDetails: {
+    fontSize: 12,
+    color: '#999',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusPresent: {
+    backgroundColor: '#e8f5e9',
+  },
+  statusLate: {
+    backgroundColor: '#fff3e0',
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#333',
+  },
+  noDataText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  weeklyContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  dayCard: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  dayLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  dayBar: {
+    width: 30,
+    height: 100,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 15,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  dayBarFill: {
+    width: '100%',
+    backgroundColor: '#4a90e2',
+    borderRadius: 15,
+  },
+  dayPercent: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
+  },
+});
+
+export default AttendanceReportPage;
+
