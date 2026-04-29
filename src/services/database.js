@@ -8,6 +8,9 @@ function hasFirestore() {
   return db != null;
 }
 
+// Demo/testing IDs that should bypass fraud rules to avoid scan warnings during demos.
+const FRAUD_CHECK_BYPASS_STUDENT_IDS = new Set(['AC0611']);
+
 // Database service for managing students and attendance
 export class DatabaseService {
   
@@ -259,7 +262,11 @@ export class DatabaseService {
         });
       });
       
-      return students.sort((a, b) => a.name.localeCompare(b.name));
+      return students.sort((a, b) => {
+        const nameA = a.name || `${a.firstName || ''} ${a.lastName || ''}`.trim();
+        const nameB = b.name || `${b.firstName || ''} ${b.lastName || ''}`.trim();
+        return nameA.localeCompare(nameB);
+      });
     } catch (error) {
       console.error('Error getting students by class:', error);
       return [];
@@ -422,8 +429,11 @@ export class DatabaseService {
       const { QRCodeUtils } = await import('../utils/qrCodeUtils');
       const nztDetails = QRCodeUtils.getNZTDetails();
       
-      // Run fraud detection checks (unless skipped by admin override)
-      if (!options.skipFraudCheck && attendanceData.type === 'login') {
+      // Run fraud detection checks (unless skipped by admin override or demo bypass).
+      const normalizedStudentId = String(attendanceData.studentId || '').toUpperCase();
+      const shouldSkipFraudCheck =
+        options.skipFraudCheck || FRAUD_CHECK_BYPASS_STUDENT_IDS.has(normalizedStudentId);
+      if (!shouldSkipFraudCheck && attendanceData.type === 'login') {
         console.log('🔒 Running fraud detection checks...');
         
         // Get today's attendance for duplicate check
@@ -569,6 +579,20 @@ export class DatabaseService {
 
       const docRef = await addDoc(collection(db, 'attendance'), attendance);
 
+      // Log attendance activity so Student/Parent "Recent Updates" can reflect new scans.
+      await this.logActivity({
+        type: 'attendance_marked',
+        details: {
+          studentName: attendance.studentName,
+          studentId: attendance.studentId,
+          class: attendance.class,
+          status: attendance.status,
+          action: attendance.type,
+          teacherName: attendance.teacherName,
+          description: `${attendance.studentName} marked ${attendance.status} (${attendance.type}) in ${attendance.class}`
+        }
+      });
+
       // Keep `students.isCheckedIn` in sync with *daily attendance* scans.
       // We intentionally only update for "Class Attendance" style scans (i.e. no custom activity passed)
       // so that activity login/logout tracking doesn't toggle this field unexpectedly.
@@ -680,9 +704,28 @@ export class DatabaseService {
   static async getStudentAttendance(studentId, startDate, endDate) {
     if (!hasFirestore()) return [];
     try {
+      const normalizedStudentId = String(studentId || '').toUpperCase();
+      const lowerStudentId = normalizedStudentId.toLowerCase();
+      const attendance = [];
+      const addFromSnapshot = (snapshot) => {
+        snapshot.forEach((doc) => {
+          attendance.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+      };
+      const safeGetDocs = async (queryRef, label) => {
+        try {
+          return await getDocs(queryRef);
+        } catch (queryError) {
+          console.warn(`getStudentAttendance query failed (${label}); falling back to client-side filter.`, queryError);
+          return null;
+        }
+      };
       let q = query(
         collection(db, 'attendance'),
-        where('studentId', '==', studentId),
+        where('studentId', '==', normalizedStudentId),
         orderBy('timestamp', 'desc')
       );
 
@@ -690,23 +733,52 @@ export class DatabaseService {
       if (startDate && endDate) {
         q = query(
           collection(db, 'attendance'),
-          where('studentId', '==', studentId),
+          where('studentId', '==', normalizedStudentId),
           where('timestamp', '>=', startDate),
           where('timestamp', '<=', endDate),
           orderBy('timestamp', 'desc')
         );
       }
 
-      const querySnapshot = await getDocs(q);
-      const attendance = [];
-      
-      querySnapshot.forEach((doc) => {
-        attendance.push({
-          id: doc.id,
-          ...doc.data()
+      let querySnapshot = await safeGetDocs(q, 'normalized');
+      if (querySnapshot) addFromSnapshot(querySnapshot);
+
+      // Backward-compat: older records may have lowercase student IDs.
+      if (attendance.length === 0 && lowerStudentId && lowerStudentId !== normalizedStudentId) {
+        let lowerQuery = query(
+          collection(db, 'attendance'),
+          where('studentId', '==', lowerStudentId),
+          orderBy('timestamp', 'desc')
+        );
+        if (startDate && endDate) {
+          lowerQuery = query(
+            collection(db, 'attendance'),
+            where('studentId', '==', lowerStudentId),
+            where('timestamp', '>=', startDate),
+            where('timestamp', '<=', endDate),
+            orderBy('timestamp', 'desc')
+          );
+        }
+        querySnapshot = await safeGetDocs(lowerQuery, 'lowercase');
+        if (querySnapshot) addFromSnapshot(querySnapshot);
+      }
+
+      // Last-resort fallback: filter client-side for mixed-case historical records.
+      if (attendance.length === 0) {
+        const allSnapshot = await getDocs(collection(db, 'attendance'));
+        allSnapshot.forEach((doc) => {
+          const data = doc.data();
+          const recordStudentId = String(data.studentId || '').toUpperCase();
+          if (recordStudentId === normalizedStudentId) {
+            attendance.push({
+              id: doc.id,
+              ...data
+            });
+          }
         });
-      });
-      
+        attendance.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      }
+
       return attendance;
     } catch (error) {
       console.error('Error getting student attendance:', error);
@@ -1173,17 +1245,32 @@ export class DatabaseService {
   static async getAbsenceRequestsByStudent(studentName) {
     if (!hasFirestore()) return [];
     try {
-      const q = query(
-        collection(db, 'absenceRequests'),
-        where('studentName', '==', studentName),
-        orderBy('submittedAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
       const requests = [];
-      querySnapshot.forEach((doc) => {
-        requests.push({ id: doc.id, ...doc.data() });
-      });
+      const pushSnapshot = (querySnapshot) => {
+        querySnapshot.forEach((doc) => {
+          requests.push({ id: doc.id, ...doc.data() });
+        });
+      };
+
+      try {
+        const q = query(
+          collection(db, 'absenceRequests'),
+          where('studentName', '==', studentName),
+          orderBy('submittedAt', 'desc')
+        );
+        const querySnapshot = await getDocs(q);
+        pushSnapshot(querySnapshot);
+      } catch (indexError) {
+        console.warn('Indexed absence request query failed; using fallback query.', indexError);
+        const fallbackQuery = query(
+          collection(db, 'absenceRequests'),
+          where('studentName', '==', studentName)
+        );
+        const fallbackSnapshot = await getDocs(fallbackQuery);
+        pushSnapshot(fallbackSnapshot);
+        requests.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+      }
+
       return requests;
     } catch (error) {
       console.error('Error getting absence requests by student:', error);
@@ -1464,11 +1551,36 @@ export class DatabaseService {
       querySnapshot.forEach((doc) => {
         activities.push({ id: doc.id, ...doc.data() });
       });
-      
       return activities;
     } catch (error) {
       console.error('Error getting activity log:', error);
-      return [];
+      // Fallback for missing composite indexes: query broad set, then filter/sort client-side.
+      try {
+        const fallbackSnapshot = await getDocs(
+          query(collection(db, 'activityLog'), orderBy('timestamp', 'desc'), firestoreLimit(200))
+        );
+        let fallbackActivities = [];
+        fallbackSnapshot.forEach((doc) => {
+          fallbackActivities.push({ id: doc.id, ...doc.data() });
+        });
+
+        if (filter !== 'all') {
+          const typeMap = {
+            students: ['student_added', 'student_updated'],
+            teachers: ['teacher_added', 'teacher_updated'],
+            events: ['event_created', 'event_updated'],
+            announcements: ['announcement_created'],
+          };
+          const types = typeMap[filter] || [filter];
+          fallbackActivities = fallbackActivities.filter((activity) => types.includes(activity.type));
+        }
+
+        fallbackActivities.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        return fallbackActivities.slice(0, maxResults);
+      } catch (fallbackError) {
+        console.error('Fallback activity log query failed:', fallbackError);
+        return [];
+      }
     }
   }
 
@@ -1609,16 +1721,16 @@ export class DatabaseService {
    */
   static getSampleStudents() {
     return [
-      { id: '1', studentId: 'STU10A1001', name: 'John Smith', firstName: 'John', lastName: 'Smith', class: '10A', parentContact: 'parent1@email.com' },
-      { id: '2', studentId: 'STU10A1002', name: 'Emma Johnson', firstName: 'Emma', lastName: 'Johnson', class: '10A', parentContact: 'parent2@email.com' },
-      { id: '3', studentId: 'STU10B1003', name: 'Michael Brown', firstName: 'Michael', lastName: 'Brown', class: '10B', parentContact: 'parent3@email.com' },
-      { id: '4', studentId: 'STU10B1004', name: 'Sophia Davis', firstName: 'Sophia', lastName: 'Davis', class: '10B', parentContact: 'parent4@email.com' },
-      { id: '5', studentId: 'STU9A1005', name: 'William Wilson', firstName: 'William', lastName: 'Wilson', class: '9A', parentContact: 'parent5@email.com' },
-      { id: '6', studentId: 'STU9A1006', name: 'Olivia Martinez', firstName: 'Olivia', lastName: 'Martinez', class: '9A', parentContact: 'parent6@email.com' },
-      { id: '7', studentId: 'STU9B1007', name: 'James Anderson', firstName: 'James', lastName: 'Anderson', class: '9B', parentContact: 'parent7@email.com' },
-      { id: '8', studentId: 'STU9B1008', name: 'Ava Taylor', firstName: 'Ava', lastName: 'Taylor', class: '9B', parentContact: 'parent8@email.com' },
-      { id: '9', studentId: 'STU11A1009', name: 'Robert Thomas', firstName: 'Robert', lastName: 'Thomas', class: '11A', parentContact: 'parent9@email.com' },
-      { id: '10', studentId: 'STU11A1010', name: 'Isabella Moore', firstName: 'Isabella', lastName: 'Moore', class: '11A', parentContact: 'parent10@email.com' },
+      { id: '1', studentId: 'AC0611', name: 'Avery Coleman', firstName: 'Avery', lastName: 'Coleman', class: '10A', parentContact: 'keira.coleman@whanau.nz' },
+      { id: '2', studentId: 'NR1904', name: 'Niko Ramsey', firstName: 'Niko', lastName: 'Ramsey', class: '10A', parentContact: 'dominic.ramsey@whanau.nz' },
+      { id: '3', studentId: 'ZE2708', name: 'Zara Ellison', firstName: 'Zara', lastName: 'Ellison', class: '10A', parentContact: 'renee.ellison@whanau.nz' },
+      { id: '4', studentId: 'LB1401', name: 'Leo Bennett', firstName: 'Leo', lastName: 'Bennett', class: '10A', parentContact: 'parent4@email.com' },
+      { id: '5', studentId: 'IC0306', name: 'Iris Caldwell', firstName: 'Iris', lastName: 'Caldwell', class: '10A', parentContact: 'parent5@email.com' },
+      { id: '6', studentId: 'MH2510', name: 'Mason Hartley', firstName: 'Mason', lastName: 'Hartley', class: '10A', parentContact: 'parent6@email.com' },
+      { id: '7', studentId: 'SD1602', name: 'Skye Donovan', firstName: 'Skye', lastName: 'Donovan', class: '10A', parentContact: 'parent7@email.com' },
+      { id: '8', studentId: 'EM0907', name: 'Ethan Mallory', firstName: 'Ethan', lastName: 'Mallory', class: '9B', parentContact: 'parent8@email.com' },
+      { id: '9', studentId: 'AW2112', name: 'Aria Winslow', firstName: 'Aria', lastName: 'Winslow', class: '9B', parentContact: 'parent9@email.com' },
+      { id: '10', studentId: 'FC3005', name: 'Felix Crosby', firstName: 'Felix', lastName: 'Crosby', class: '9B', parentContact: 'parent10@email.com' },
     ];
   }
 
@@ -1628,11 +1740,9 @@ export class DatabaseService {
    */
   static getSampleTeachers() {
     return [
-      { id: '1', teacherId: 'TCH001', name: 'Ms. Sarah Johnson', firstName: 'Sarah', lastName: 'Johnson', subject: 'Mathematics', classes: ['10A', '10B'] },
-      { id: '2', teacherId: 'TCH002', name: 'Mr. David Williams', firstName: 'David', lastName: 'Williams', subject: 'English', classes: ['9A', '9B'] },
-      { id: '3', teacherId: 'TCH003', name: 'Dr. Emily Brown', firstName: 'Emily', lastName: 'Brown', subject: 'Science', classes: ['11A', '10A'] },
-      { id: '4', teacherId: 'TCH004', name: 'Mr. James Miller', firstName: 'James', lastName: 'Miller', subject: 'History', classes: ['10B', '9A'] },
-      { id: '5', teacherId: 'TCH005', name: 'Ms. Linda Davis', firstName: 'Linda', lastName: 'Davis', subject: 'Physical Education', classes: ['9B', '11A'] },
+      { id: '1', teacherId: 'MK1203', name: 'Mila Kensley', firstName: 'Mila', lastName: 'Kensley', subject: 'Mathematics', classes: ['10A'] },
+      { id: '2', teacherId: 'RP2207', name: 'Rowan Prescott', firstName: 'Rowan', lastName: 'Prescott', subject: 'English', classes: ['9B'] },
+      { id: '3', teacherId: 'TM0509', name: 'Talia Mercer', firstName: 'Talia', lastName: 'Mercer', subject: 'Science', classes: ['11A'] },
     ];
   }
 
@@ -1642,11 +1752,9 @@ export class DatabaseService {
    */
   static getSampleClasses() {
     return [
-      { id: '1', classId: 'CLS10A', name: '10A', teacherName: 'Ms. Sarah Johnson', subject: 'Mathematics', studentCount: 25 },
-      { id: '2', classId: 'CLS10B', name: '10B', teacherName: 'Ms. Sarah Johnson', subject: 'Mathematics', studentCount: 23 },
-      { id: '3', classId: 'CLS9A', name: '9A', teacherName: 'Mr. David Williams', subject: 'English', studentCount: 28 },
-      { id: '4', classId: 'CLS9B', name: '9B', teacherName: 'Mr. David Williams', subject: 'English', studentCount: 26 },
-      { id: '5', classId: 'CLS11A', name: '11A', teacherName: 'Dr. Emily Brown', subject: 'Science', studentCount: 22 },
+      { id: '1', classId: 'CLS10A', name: '10A', teacherName: 'Mila Kensley', subject: 'Mathematics', studentCount: 7 },
+      { id: '2', classId: 'CLS9B', name: '9B', teacherName: 'Rowan Prescott', subject: 'English', studentCount: 7 },
+      { id: '3', classId: 'CLS11A', name: '11A', teacherName: 'Talia Mercer', subject: 'Science', studentCount: 6 },
     ];
   }
 
@@ -1807,34 +1915,34 @@ export class DatabaseService {
 // Sample data for testing
 export const SAMPLE_STUDENTS = [
   {
-    studentId: 'STU10AJ1234',
-    name: 'John Doe',
-    firstName: 'John',
-    lastName: 'Doe',
+    studentId: 'AC0611',
+    name: 'Avery Coleman',
+    firstName: 'Avery',
+    lastName: 'Coleman',
     class: '10A',
-    parentContact: 'john.parent@email.com',
+    parentContact: 'keira.coleman@whanau.nz',
     address: '123 School Street, Auckland, NZ',
     emergencyContact: '+64 21 123 4567',
     photo: null
   },
   {
-    studentId: 'STU10BS5678',
-    name: 'Jane Smith',
-    firstName: 'Jane',
-    lastName: 'Smith',
+    studentId: 'NR1904',
+    name: 'Niko Ramsey',
+    firstName: 'Niko',
+    lastName: 'Ramsey',
     class: '10A',
-    parentContact: 'jane.parent@email.com',
+    parentContact: 'dominic.ramsey@whanau.nz',
     address: '456 Learning Lane, Auckland, NZ',
     emergencyContact: '+64 21 987 6543',
     photo: null
   },
   {
-    studentId: 'STU09CW9012',
-    name: 'Bob Wilson',
-    firstName: 'Bob',
-    lastName: 'Wilson',
+    studentId: 'ZE2708',
+    name: 'Zara Ellison',
+    firstName: 'Zara',
+    lastName: 'Ellison',
     class: '9B',
-    parentContact: 'bob.parent@email.com',
+    parentContact: 'renee.ellison@whanau.nz',
     address: '789 Education Ave, Auckland, NZ',
     emergencyContact: '+64 21 555 1234',
     photo: null
@@ -1843,11 +1951,11 @@ export const SAMPLE_STUDENTS = [
 
 export const SAMPLE_ATTENDANCE = [
   {
-    studentId: 'STU10AJ1234',
-    studentName: 'John Doe',
+    studentId: 'AC0611',
+    studentName: 'Avery Coleman',
     class: '10A',
-    teacherId: 'TCH001',
-    teacherName: 'Ms. Johnson',
+    teacherId: 'MK1203',
+    teacherName: 'Mila Kensley',
     type: 'login',
     timestamp: new Date().toISOString(),
     location: 'Classroom A',

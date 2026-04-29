@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import EventManager from '../components/EventManager';
 import ProtectedRoute from '../components/ProtectedRoute';
 import ResponsiveScreen from '../components/ResponsiveScreen';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import QRCodeGenerator from '../components/QRCodeGenerator';
 import { useAuth } from '../contexts/AuthContext';
-import { DatabaseService, SAMPLE_STUDENTS } from '../services/database';
+import { DatabaseService } from '../services/database';
 
 const AdminPortal = () => {
   const { user, logout } = useAuth();
@@ -31,6 +32,7 @@ const AdminPortal = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [events, setEvents] = useState([]);
   const [absenceRequests, setAbsenceRequests] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [dashboardStats, setDashboardStats] = useState({
     totalStudents: 0,
     totalTeachers: 0,
@@ -143,8 +145,7 @@ const AdminPortal = () => {
       setStudents(studentsData);
     } catch (error) {
       console.error('Error loading students:', error);
-      // Use sample data if database is not available
-      setStudents(SAMPLE_STUDENTS);
+      setStudents([]);
     }
   };
 
@@ -409,6 +410,32 @@ const AdminPortal = () => {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadStudents(),
+        loadTeachers(),
+        loadClasses(),
+        loadAnnouncements(),
+        loadEvents(),
+        loadAbsenceRequests(),
+        loadDashboardStats()
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleTabPress = (tabKey) => {
+    setActiveView(tabKey);
+    if (tabKey === 'students') setShowStudentList(true);
+    if (tabKey === 'teachers') setShowAddTeacher(true);
+    if (tabKey === 'classes') setShowAddClass(true);
+    if (tabKey === 'reports') router.push('/reports');
+    if (tabKey === 'settings') setShowAnnouncements(true);
+  };
+
   return (
     <ProtectedRoute requiredRole="admin">
       <SafeAreaView style={styles.container}>
@@ -428,7 +455,10 @@ const AdminPortal = () => {
       <AnnouncementBanner 
         userRole="admin" 
       />
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>School Overview</Text>
           <View style={styles.statsGrid}>
@@ -455,46 +485,76 @@ const AdminPortal = () => {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionGrid}>
             <TouchableOpacity 
-              style={[styles.actionCard, { width: actionCardWidthPct }]}
+              style={[styles.actionCard, styles.actionBlue, { width: actionCardWidthPct }]}
               onPress={() => setShowStudentList(true)}
             >
-              <Ionicons name="people" size={32} color="#4a90e2" />
+              <View style={[styles.actionIconBubble, styles.actionBlueBubble]}>
+                <Ionicons name="people" size={24} color="#4a90e2" />
+              </View>
               <Text style={styles.actionText}>Manage Students</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.actionCard, { width: actionCardWidthPct }]}
+              style={[styles.actionCard, styles.actionGreen, { width: actionCardWidthPct }]}
               onPress={() => setShowAddTeacher(true)}
             >
-              <Ionicons name="person-add" size={32} color="#4CAF50" />
+              <View style={[styles.actionIconBubble, styles.actionGreenBubble]}>
+                <Ionicons name="person-add" size={24} color="#4CAF50" />
+              </View>
               <Text style={styles.actionText}>Add Teacher</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.actionCard, { width: actionCardWidthPct }]}
+              style={[styles.actionCard, styles.actionAmber, { width: actionCardWidthPct }]}
               onPress={() => setShowAddClass(true)}
             >
-              <Ionicons name="school" size={32} color="#FF9800" />
+              <View style={[styles.actionIconBubble, styles.actionAmberBubble]}>
+                <Ionicons name="school" size={24} color="#FF9800" />
+              </View>
               <Text style={styles.actionText}>Create Class</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.actionCard, { width: actionCardWidthPct }]}
+              style={[styles.actionCard, styles.actionPurple, { width: actionCardWidthPct }]}
               onPress={() => setShowAddStudent(true)}
             >
-              <Ionicons name="person-add-outline" size={32} color="#9C27B0" />
+              <View style={[styles.actionIconBubble, styles.actionPurpleBubble]}>
+                <Ionicons name="person-add-outline" size={24} color="#9C27B0" />
+              </View>
               <Text style={styles.actionText}>Add Student</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.actionCard, { width: actionCardWidthPct }]}
+              style={[styles.actionCard, styles.actionCyan, { width: actionCardWidthPct }]}
               onPress={() => setShowAnnouncements(true)}
             >
-              <Ionicons name="megaphone" size={32} color="#00BCD4" />
+              <View style={[styles.actionIconBubble, styles.actionCyanBubble]}>
+                <Ionicons name="megaphone" size={24} color="#00BCD4" />
+              </View>
               <Text style={styles.actionText}>Announcements</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.actionCard, { width: actionCardWidthPct }]}
+              style={[styles.actionCard, styles.actionSlate, { width: actionCardWidthPct }]}
               onPress={() => router.push('/reports')}
             >
-              <Ionicons name="bar-chart" size={32} color="#607D8B" />
+              <View style={[styles.actionIconBubble, styles.actionSlateBubble]}>
+                <Ionicons name="bar-chart" size={24} color="#607D8B" />
+              </View>
               <Text style={styles.actionText}>Reports</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.actionCard, styles.actionPink, { width: actionCardWidthPct }]}
+              onPress={() => setShowEventManager(true)}
+            >
+              <View style={[styles.actionIconBubble, styles.actionPinkBubble]}>
+                <Ionicons name="calendar" size={24} color="#E91E63" />
+              </View>
+              <Text style={styles.actionText}>Manage Events</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.actionCard, styles.actionBrown, { width: actionCardWidthPct }]}
+              onPress={() => setShowAbsenceRequests(true)}
+            >
+              <View style={[styles.actionIconBubble, styles.actionBrownBubble]}>
+                <Ionicons name="document-text" size={24} color="#795548" />
+              </View>
+              <Text style={styles.actionText}>Absence Requests</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -506,6 +566,32 @@ const AdminPortal = () => {
           </View>
         </View>
       </ScrollView>
+
+      <View style={styles.bottomTabBar}>
+        {[
+          { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
+          { key: 'students', label: 'Students', icon: 'people' },
+          { key: 'teachers', label: 'Teachers', icon: 'person' },
+          { key: 'classes', label: 'Classes', icon: 'school' },
+          { key: 'reports', label: 'Reports', icon: 'bar-chart' },
+          { key: 'settings', label: 'Settings', icon: 'settings' }
+        ].map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.bottomTabItem, activeView === tab.key && styles.bottomTabItemActive]}
+            onPress={() => handleTabPress(tab.key)}
+          >
+            <Ionicons
+              name={tab.icon}
+              size={18}
+              color={activeView === tab.key ? '#4a90e2' : '#777'}
+            />
+            <Text style={[styles.bottomTabText, activeView === tab.key && styles.bottomTabTextActive]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
         </ResponsiveScreen>
 
       {/* Student List Modal */}
@@ -1010,6 +1096,55 @@ const AdminPortal = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      <EventManager
+        visible={showEventManager}
+        onClose={() => setShowEventManager(false)}
+        onSubmit={handleCreateEvent}
+        userRole="admin"
+        allClasses={classes}
+      />
+
+      <Modal
+        visible={showAbsenceRequests}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAbsenceRequests(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Absence Requests</Text>
+            <View style={styles.placeholder} />
+          </View>
+          <ScrollView style={styles.formContainer}>
+            {absenceRequests.length === 0 ? (
+              <Text style={styles.emptyStateText}>No absence requests found.</Text>
+            ) : absenceRequests.map((request) => (
+              <View key={request.id} style={styles.absenceRequestCard}>
+                <Text style={styles.absenceRequestStudent}>{request.studentName}</Text>
+                <Text style={styles.absenceRequestReason}>{request.reason}</Text>
+                <Text style={styles.absenceRequestDates}>{request.startDate} to {request.endDate}</Text>
+                <View style={styles.absenceRequestActions}>
+                  <TouchableOpacity
+                    style={[styles.absenceReviewButton, styles.approveButton]}
+                    onPress={() => handleReviewAbsenceRequest(request.id, 'approved')}
+                  >
+                    <Text style={styles.absenceReviewButtonText}>Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.absenceReviewButton, styles.rejectButton]}
+                    onPress={() => handleReviewAbsenceRequest(request.id, 'rejected')}
+                  >
+                    <Text style={styles.absenceReviewButtonText}>Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -1089,6 +1224,33 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  bottomTabBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingVertical: 8,
+  },
+  bottomTabItem: {
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  bottomTabItemActive: {
+    backgroundColor: '#e8f2ff',
+  },
+  bottomTabText: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#777',
+  },
+  bottomTabTextActive: {
+    color: '#4a90e2',
+    fontWeight: '600',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1170,15 +1332,44 @@ const styles = StyleSheet.create({
   actionCard: {
     width: '48%',
     borderRadius: 12,
-    padding: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     marginBottom: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+    borderWidth: 1,
+    borderColor: '#e9edf3',
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  actionIconBubble: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  actionBlue: { backgroundColor: '#f4f9ff' },
+  actionGreen: { backgroundColor: '#f3fbf4' },
+  actionAmber: { backgroundColor: '#fff8f0' },
+  actionPurple: { backgroundColor: '#fbf5ff' },
+  actionCyan: { backgroundColor: '#f2fcff' },
+  actionSlate: { backgroundColor: '#f6f8fb' },
+  actionPink: { backgroundColor: '#fff4f8' },
+  actionBrown: { backgroundColor: '#faf6f4' },
+  actionBlueBubble: { backgroundColor: '#e9f3ff' },
+  actionGreenBubble: { backgroundColor: '#e8f8eb' },
+  actionAmberBubble: { backgroundColor: '#fff1de' },
+  actionPurpleBubble: { backgroundColor: '#f3e8ff' },
+  actionCyanBubble: { backgroundColor: '#dff8ff' },
+  actionSlateBubble: { backgroundColor: '#e8edf2' },
+  actionPinkBubble: { backgroundColor: '#ffe4ef' },
+  actionBrownBubble: { backgroundColor: '#efe4dd' },
   primaryAction: {
     backgroundColor: '#4CAF50',
   },
@@ -1206,9 +1397,9 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 14,
-    color: '#333',
-    marginTop: 8,
+    color: '#2d3748',
     textAlign: 'center',
+    fontWeight: '600',
   },
   activityList: {
     gap: 12,
@@ -1786,6 +1977,48 @@ const styles = StyleSheet.create({
   visibilityOptionTextActive: {
     color: '#fff',
     fontWeight: '600',
+  },
+  absenceRequestCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+  },
+  absenceRequestStudent: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 6,
+  },
+  absenceRequestReason: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 6,
+  },
+  absenceRequestDates: {
+    fontSize: 12,
+    color: '#777',
+  },
+  absenceRequestActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  absenceReviewButton: {
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  approveButton: {
+    backgroundColor: '#4CAF50',
+  },
+  rejectButton: {
+    backgroundColor: '#F44336',
+  },
+  absenceReviewButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
   },
   emptyState: {
     alignItems: 'center',

@@ -190,11 +190,11 @@ export class QRCodeUtils {
 
 // Sample student data structure
 export const SAMPLE_STUDENT_DATA = {
-  studentId: 'STU10AJ1234',
-  name: 'John Doe',
+  studentId: 'AC0611',
+  name: 'Avery Coleman',
   class: '10A',
   photo: null,
-  parentContact: 'parent@email.com',
+  parentContact: 'keira.coleman@whanau.nz',
   address: '123 School Street, Auckland, NZ',
   emergencyContact: '+64 21 123 4567'
 };

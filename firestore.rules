@@ -45,6 +45,22 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /parents/{docId} {
+      allow read, write: if true;
+    }
+
+    match /admins/{docId} {
+      allow read, write: if true;
+    }
+
+    match /enrolments/{docId} {
+      allow read, write: if true;
+    }
+
+    match /users/{docId} {
+      allow read, write: if true;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;

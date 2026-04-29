@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
@@ -39,7 +39,28 @@ const StudentPortal = () => {
   const [studentQRCode, setStudentQRCode] = useState(null);
   const [studentData, setStudentData] = useState(null);
   const [events, setEvents] = useState([]);
+  const [recentAttendance, setRecentAttendance] = useState([]);
+  const [attendanceMetrics, setAttendanceMetrics] = useState({ presentRate: 0, absences: 0, lateCount: 0 });
   const [qrImageDataUrlForPrint, setQrImageDataUrlForPrint] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const toDate = (value) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value === 'string' || typeof value === 'number') {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (typeof value?.toDate === 'function') {
+      const parsed = value.toDate();
+      return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed : null;
+    }
+    if (typeof value?.seconds === 'number') {
+      const parsed = new Date(value.seconds * 1000);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+  };
 
   // Load student data and QR code from database
   useEffect(() => {
@@ -49,9 +70,10 @@ const StudentPortal = () => {
       }
 
       const applyStudent = (student) => {
+        const normalizedStudentId = String(student.studentId || user.username || '').toUpperCase();
         const normalizedStudent = {
           ...student,
-          studentId: student.studentId || user.username,
+          studentId: normalizedStudentId,
           name: student.name || user.name,
           class: student.class || user.class || '10A',
           firestoreDocId: student.id || user.name || user.username
@@ -74,9 +96,10 @@ const StudentPortal = () => {
 
         if (student) {
           applyStudent(student);
+          loadAttendance(String(student.studentId || user.username || '').toUpperCase());
         } else {
           const fallbackData = {
-            studentId: user.username,
+            studentId: String(user.username || '').toUpperCase(),
             name: user.name,
             firestoreDocId: user.name || user.username,
             class: user.class || '10A'
@@ -84,11 +107,12 @@ const StudentPortal = () => {
           setStudentData(fallbackData);
           setStudentQRCode(QRCodeUtils.generateStudentQR(fallbackData));
           loadEvents(fallbackData.class);
+          loadAttendance(fallbackData.studentId);
         }
       } catch (error) {
         console.error('Error loading student data:', error);
         const fallbackData = {
-          studentId: user.username,
+          studentId: String(user.username || '').toUpperCase(),
           name: user.name,
           firestoreDocId: user.name || user.username,
           class: user.class || '10A'
@@ -96,11 +120,23 @@ const StudentPortal = () => {
         setStudentData(fallbackData);
         setStudentQRCode(QRCodeUtils.generateStudentQR(fallbackData));
         loadEvents(fallbackData.class);
+        loadAttendance(fallbackData.studentId);
       }
     };
 
     loadStudentData();
   }, [user?.username, user?.name, user?.class, studentQRCode]);
+
+  useEffect(() => {
+    const studentId = String(studentData?.studentId || user?.username || '').toUpperCase();
+    if (!studentId) return;
+
+    const interval = setInterval(() => {
+      loadAttendance(studentId);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [studentData?.studentId, user?.username]);
 
   const loadEvents = async (userClass) => {
     try {
@@ -108,6 +144,70 @@ const StudentPortal = () => {
       setEvents(userEvents);
     } catch (error) {
       console.error('Error loading events:', error);
+    }
+  };
+
+  const loadAttendance = async (studentId) => {
+    const normalizedStudentId = String(studentId || '').toUpperCase();
+    if (!normalizedStudentId) return;
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const records = await DatabaseService.getStudentAttendance(normalizedStudentId);
+      const recordsWithDates = records
+        .map((record) => {
+          const recordDate = toDate(record?.timestamp) || toDate(record?.createdAt) || toDate(record?.nztTimestamp);
+          return {
+            ...record,
+            _recordDate: recordDate
+          };
+        })
+        .filter((record) => !!record._recordDate && record._recordDate >= thirtyDaysAgo)
+        .sort((a, b) => b._recordDate - a._recordDate);
+
+      // Keep only the latest mark per class/day/action so status changes override older marks.
+      const latestBySession = new Map();
+      recordsWithDates.forEach((record) => {
+        const dayKey = record._recordDate.toISOString().slice(0, 10);
+        const classKey = String(record.class || studentData?.class || user?.class || 'unknown');
+        const actionKey = String(record.type || 'login');
+        const sessionKey = `${classKey}|${dayKey}|${actionKey}`;
+        if (!latestBySession.has(sessionKey)) {
+          latestBySession.set(sessionKey, record);
+        }
+      });
+
+      const dedupedRecentRecords = Array.from(latestBySession.values()).sort((a, b) => b._recordDate - a._recordDate);
+      setRecentAttendance(dedupedRecentRecords.slice(0, 5));
+
+      const loginRecords = dedupedRecentRecords.filter((record) => !record.type || record.type === 'login');
+      const absentCount = loginRecords.filter((record) => record.status === 'absent').length;
+      const lateCount = loginRecords.filter((record) => record.status === 'late').length;
+      const presentCount = loginRecords.filter((record) => record.status !== 'absent').length;
+      const presentRate = loginRecords.length > 0 ? Math.round((presentCount / loginRecords.length) * 100) : 0;
+      setAttendanceMetrics({
+        presentRate,
+        absences: absentCount,
+        lateCount
+      });
+    } catch (error) {
+      console.error('Error loading attendance:', error);
+      setRecentAttendance([]);
+      setAttendanceMetrics({ presentRate: 0, absences: 0, lateCount: 0 });
+    }
+  };
+
+  const handleRefresh = async () => {
+    const studentId = String(studentData?.studentId || user?.username || '').toUpperCase();
+    const userClass = studentData?.class || user?.class || '10A';
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadEvents(userClass),
+        loadAttendance(studentId)
+      ]);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -293,10 +393,13 @@ const StudentPortal = () => {
       {/* Announcements Banner */}
       <AnnouncementBanner 
         userRole="student" 
-        userClass="10A" // This should come from student data
+        userClass={studentData?.class || user?.class || '10A'}
       />
       
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
         {/* Student QR Code Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My QR Code</Text>
@@ -321,10 +424,10 @@ const StudentPortal = () => {
               <Text style={styles.regenerateQrButtonText}>Generate new QR code</Text>
             </TouchableOpacity>
             <Text style={styles.studentInfo}>
-              Student ID: {user?.username || "STU001"}
+              Student ID: {studentData?.studentId || user?.username || "STU001"}
             </Text>
             <Text style={styles.studentInfo}>
-              Name: {user?.name || "Student Name"}
+              Name: {studentData?.name || user?.name || "Student Name"}
             </Text>
             
             <TouchableOpacity 
@@ -341,15 +444,15 @@ const StudentPortal = () => {
           <Text style={styles.sectionTitle}>Attendance Overview</Text>
           <View style={styles.attendanceStats}>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>95%</Text>
+              <Text style={styles.statNumber}>{attendanceMetrics.presentRate}%</Text>
               <Text style={styles.statLabel}>Present</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>3</Text>
+              <Text style={styles.statNumber}>{attendanceMetrics.absences}</Text>
               <Text style={styles.statLabel}>Absences</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>2</Text>
+              <Text style={styles.statNumber}>{attendanceMetrics.lateCount}</Text>
               <Text style={styles.statLabel}>Late</Text>
             </View>
           </View>
@@ -358,17 +461,22 @@ const StudentPortal = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Attendance</Text>
           <View style={styles.attendanceList}>
-            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day, index) => (
-              <View key={index} style={styles.attendanceItem}>
-                <Text style={styles.dayText}>{day}</Text>
-                <View style={[styles.statusIndicator, 
-                  day === 'Wednesday' ? styles.absentIndicator : styles.presentIndicator]}>
-                  <Text style={styles.statusText}>
-                    {day === 'Wednesday' ? 'Absent' : 'Present'}
-                  </Text>
+            {recentAttendance.length === 0 ? (
+              <Text style={styles.dayText}>No attendance records yet.</Text>
+            ) : recentAttendance.map((record) => {
+              const displayDate =
+                toDate(record.timestamp) || toDate(record.createdAt) || toDate(record.nztTimestamp);
+              const dateLabel = displayDate ? displayDate.toLocaleDateString() : 'Unknown date';
+              const isAbsent = record.status === 'absent';
+              return (
+                <View key={record.id} style={styles.attendanceItem}>
+                  <Text style={styles.dayText}>{dateLabel}</Text>
+                  <View style={[styles.statusIndicator, isAbsent ? styles.absentIndicator : styles.presentIndicator]}>
+                    <Text style={styles.statusText}>{record.status || 'present'}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
         
@@ -403,9 +511,14 @@ const StudentPortal = () => {
         )}
         
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Updates</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleNoMargin]}>Recent Updates</Text>
+            <TouchableOpacity style={styles.viewAllButton} onPress={() => router.push('/updates')}>
+              <Text style={styles.viewAllButtonText}>View all</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.activityLogContainer}>
-            <ActivityLog userRole="student" maxItems={5} />
+            <ActivityLog userRole="student" maxItems={3} />
           </View>
         </View>
 
@@ -481,6 +594,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
     color: '#333',
+  },
+  sectionTitleNoMargin: {
+    marginBottom: 0,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  viewAllButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  viewAllButtonText: {
+    color: '#4a90e2',
+    fontSize: 14,
+    fontWeight: '600',
   },
   attendanceStats: {
     flexDirection: 'row',

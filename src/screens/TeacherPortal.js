@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityScanner from '../components/ActivityScanner';
 import AnnouncementBanner from '../components/AnnouncementBanner';
@@ -25,22 +25,32 @@ const TeacherPortal = () => {
   const [scannedStudent, setScannedStudent] = useState(null);
   const [attendanceType, setAttendanceType] = useState('login');
   const [events, setEvents] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [classesData, setClassesData] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState({
     totalStudents: 0,
     presentStudents: 0,
     absentStudents: 0,
     lateStudents: 0
   });
-  const [currentClass, setCurrentClass] = useState('10A');
-  const [teacherClasses, setTeacherClasses] = useState(['10A', '8B', '9C']); // Teacher's classes
+  const [currentClass, setCurrentClass] = useState('');
+  const [teacherClasses, setTeacherClasses] = useState([]);
   const [showStudentList, setShowStudentList] = useState(false);
   const [classStudents, setClassStudents] = useState([]);
   const [studentAttendanceStatus, setStudentAttendanceStatus] = useState({});
+  const [studentListFilter, setStudentListFilter] = useState('all');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    loadTeacherClasses();
+  }, [user?.name, user?.profileId]);
+
+  useEffect(() => {
+    if (!currentClass) return;
     loadAttendanceSummary();
     loadClassStudents();
     loadEvents();
+    loadAnnouncements();
   }, [currentClass]);
 
   useEffect(() => {
@@ -53,14 +63,20 @@ const TeacherPortal = () => {
 
   const loadAttendanceSummary = async () => {
     try {
-      const summary = await DatabaseService.getTodayAttendanceSummary(currentClass);
-      setAttendanceSummary(summary);
-      
-      // Build status map for each student
+      const today = new Date().toISOString().split('T')[0];
+      const [students, attendanceRecords] = await Promise.all([
+        DatabaseService.getStudentsByClass(currentClass),
+        DatabaseService.getClassAttendance(currentClass, today)
+      ]);
+
+      const totalStudents = students.length;
       const statusMap = {};
-      summary.attendance.forEach(record => {
+      [...attendanceRecords]
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        .forEach(record => {
+        const normalizedStudentId = String(record.studentId || '').toUpperCase();
         if (record.type === 'login') {
-          statusMap[record.studentId] = {
+          statusMap[normalizedStudentId] = {
             status: record.status || 'present',
             time: record.nztFormatted || record.timestamp,
             activity: record.activity,
@@ -68,9 +84,57 @@ const TeacherPortal = () => {
           };
         }
       });
+
+      let presentStudents = 0;
+      let lateStudents = 0;
+      students.forEach((student) => {
+        const normalizedStudentId = String(student.studentId || student.id || '').toUpperCase();
+        const status = statusMap[normalizedStudentId]?.status;
+        if (status && status !== 'absent') presentStudents += 1;
+        if (status === 'late') lateStudents += 1;
+      });
+
+      const absentStudents = Math.max(totalStudents - presentStudents, 0);
+      setAttendanceSummary({
+        totalStudents,
+        presentStudents,
+        absentStudents,
+        lateStudents,
+      });
+
       setStudentAttendanceStatus(statusMap);
     } catch (error) {
       console.error('Error loading attendance summary:', error);
+      setAttendanceSummary({
+        totalStudents: 0,
+        presentStudents: 0,
+        absentStudents: 0,
+        lateStudents: 0
+      });
+      setStudentAttendanceStatus({});
+    }
+  };
+
+  const loadTeacherClasses = async () => {
+    try {
+      const allClasses = await DatabaseService.getAllClasses();
+      const mine = allClasses.filter((cls) => {
+        return (
+          (user?.profileId && cls.teacherId === user.profileId) ||
+          (user?.name && cls.teacherName === user.name)
+        );
+      });
+      const classNames = mine.map((cls) => cls.name);
+      setClassesData(mine);
+      setTeacherClasses(classNames);
+      if (classNames.length > 0 && !classNames.includes(currentClass)) {
+        setCurrentClass(classNames[0]);
+      }
+    } catch (error) {
+      console.error('Error loading teacher classes:', error);
+      setClassesData([]);
+      setTeacherClasses([]);
+      setCurrentClass('');
     }
   };
 
@@ -80,12 +144,7 @@ const TeacherPortal = () => {
       setClassStudents(students);
     } catch (error) {
       console.error('Error loading class students:', error);
-      // Fallback to sample data
-      setClassStudents([
-        { studentId: 'STU10AJ1234', name: 'John Doe', class: currentClass, photo: null },
-        { studentId: 'STU10BS5678', name: 'Jane Smith', class: currentClass, photo: null },
-        { studentId: 'STU10CW9012', name: 'Bob Wilson', class: currentClass, photo: null },
-      ]);
+      setClassStudents([]);
     }
   };
 
@@ -95,6 +154,16 @@ const TeacherPortal = () => {
       setEvents(userEvents);
     } catch (error) {
       console.error('Error loading events:', error);
+    }
+  };
+
+  const loadAnnouncements = async () => {
+    try {
+      const data = await DatabaseService.getAnnouncementsForUser('teacher', currentClass, teacherClasses);
+      setAnnouncements(data);
+    } catch (error) {
+      console.error('Error loading announcements:', error);
+      setAnnouncements([]);
     }
   };
 
@@ -151,17 +220,27 @@ const TeacherPortal = () => {
       };
       
       const attendanceData = {
-        studentId: studentData.studentId,
-        studentName: studentData.name,
+        studentId: String(
+          studentData.studentId ||
+          studentData.profileId ||
+          studentData.username ||
+          ''
+        ).toUpperCase(),
+        studentName: studentData.name || `${studentData.firstName || ''} ${studentData.lastName || ''}`.trim(),
         studentDocId: studentData.firestoreDocId || null,
-        class: studentData.class,
-        teacherId: 'TCH001', // This should come from teacher authentication
-        teacherName: 'Ms. Johnson', // This should come from teacher authentication
+        class: studentData.class || currentClass,
+        teacherId: user?.profileId || user?.username || 'TEACHER',
+        teacherName: user?.name || 'Teacher',
         type: type,
         status: status, // 'present', 'late', 'absent', 'checkout'
         location: 'Classroom A',
         notes: statusNotes[status] || 'Attendance marked'
       };
+
+      if (!attendanceData.studentId) {
+        Alert.alert('Missing student ID', 'Could not mark attendance because this student has no valid ID.');
+        return;
+      }
 
       const result = await DatabaseService.recordAttendance(attendanceData);
       
@@ -215,6 +294,23 @@ const TeacherPortal = () => {
     setScannedStudent(null);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadTeacherClasses();
+      if (currentClass) {
+        await Promise.all([
+          loadAttendanceSummary(),
+          loadClassStudents(),
+          loadEvents(),
+          loadAnnouncements()
+        ]);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <ProtectedRoute requiredRole="teacher">
       <SafeAreaView style={styles.container}>
@@ -253,11 +349,14 @@ const TeacherPortal = () => {
         userClasses={teacherClasses} 
       />
       
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Classes</Text>
           <View style={styles.classList}>
-            <View style={styles.classCard}>
+            {currentClass ? <View style={styles.classCard}>
               <View style={styles.classHeader}>
                 <Text style={styles.className}>Class {currentClass}</Text>
                 <Text style={styles.classInfo}>{classStudents.length || attendanceSummary.totalStudents} Students</Text>
@@ -309,69 +408,31 @@ const TeacherPortal = () => {
                   <Text style={styles.scanButtonText}>Check Out</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-            
-            <View style={styles.classCard}>
-              <View style={styles.classHeader}>
-                <Text style={styles.className}>Class 8B</Text>
-                <Text style={styles.classInfo}>28 Students</Text>
-              </View>
-              
-              <View style={styles.attendanceIndicator}>
-                <Text style={styles.attendanceText}>Today&apos;s Attendance: 26/28</Text>
-                <View style={styles.statusBreakdown}>
-                  <Text style={styles.presentText}>Present: 26</Text>
-                  <Text style={styles.lateText}>Late: 0</Text>
-                  <Text style={styles.absentText}>Absent: 2</Text>
-                </View>
-              </View>
+            </View> : (
+              <Text style={styles.classInfo}>No classes found for this teacher yet.</Text>
+            )}
 
-              <TouchableOpacity 
-                style={styles.viewStudentListButton}
-                onPress={() => {
-                  setCurrentClass('8B');
-                  setShowStudentList(true);
-                }}
-              >
-                <Ionicons name="list" size={18} color="#4a90e2" />
-                <Text style={styles.viewStudentListText}>View All Students</Text>
-              </TouchableOpacity>
-
-              <View style={styles.qrScanButtons}>
-                <TouchableOpacity 
-                  style={[styles.scanButton, styles.checkInButton]}
-                  onPress={() => {
-                    setCurrentClass('8B');
-                    openQRScanner('login');
-                  }}
-                >
-                  <Ionicons name="log-in" size={18} color="#fff" />
-                  <Text style={styles.scanButtonText}>Check In</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.scanButton, styles.absentButton]}
-                  onPress={() => {
-                    setCurrentClass('8B');
-                    openQRScanner('absent');
-                  }}
-                >
-                  <Ionicons name="close-circle" size={18} color="#fff" />
-                  <Text style={styles.scanButtonText}>Mark Absent</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={[styles.scanButton, styles.checkOutButton]}
-                  onPress={() => {
-                    setCurrentClass('8B');
-                    openQRScanner('logout');
-                  }}
-                >
-                  <Ionicons name="log-out" size={18} color="#fff" />
-                  <Text style={styles.scanButtonText}>Check Out</Text>
-                </TouchableOpacity>
+            {teacherClasses.length > 1 && (
+              <View style={styles.classSwitchRow}>
+                {teacherClasses.map((className) => (
+                  <TouchableOpacity
+                    key={className}
+                    style={[
+                      styles.classSwitchChip,
+                      currentClass === className && styles.classSwitchChipActive
+                    ]}
+                    onPress={() => setCurrentClass(className)}
+                  >
+                    <Text style={[
+                      styles.classSwitchChipText,
+                      currentClass === className && styles.classSwitchChipTextActive
+                    ]}>
+                      {className}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </View>
+            )}
           </View>
         </View>
         
@@ -403,8 +464,7 @@ const TeacherPortal = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Today&apos;s Schedule</Text>
           <View style={styles.scheduleList}>
-            {['8:00 AM - 9:30 AM: Class 10A', '10:00 AM - 11:30 AM: Class 8B', 
-              '12:30 PM - 2:00 PM: Class 9C', '2:30 PM - 4:00 PM: Staff Meeting'].map((session, index) => (
+            {(classesData.length ? classesData.map((cls) => `${cls.schedule || 'Time TBA'}: Class ${cls.name}`) : ['No schedule data available']).map((session, index) => (
               <View key={index} style={styles.scheduleItem}>
                 <Ionicons name="time" size={24} color="#4a90e2" />
                 <Text style={styles.scheduleText}>{session}</Text>
@@ -454,17 +514,17 @@ const TeacherPortal = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Announcements</Text>
           <View style={styles.announcementList}>
-            <View style={styles.announcementItem}>
-              <Text style={styles.announcementTitle}>Staff Meeting</Text>
-              <Text style={styles.announcementText}>Reminder: Staff meeting today at 2:30 PM in the conference room.</Text>
-              <Text style={styles.announcementDate}>Today</Text>
-            </View>
-            
-            <View style={styles.announcementItem}>
-              <Text style={styles.announcementTitle}>Exam Schedule</Text>
-              <Text style={styles.announcementText}>Mid-term exams will begin next Monday. Please submit your question papers by Friday.</Text>
-              <Text style={styles.announcementDate}>Yesterday</Text>
-            </View>
+            {announcements.length === 0 ? (
+              <Text style={styles.announcementText}>No announcements available.</Text>
+            ) : announcements.slice(0, 3).map((announcement) => (
+              <View key={announcement.id} style={styles.announcementItem}>
+                <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                <Text style={styles.announcementText}>{announcement.message}</Text>
+                <Text style={styles.announcementDate}>
+                  {announcement.createdAt ? new Date(announcement.createdAt).toLocaleDateString() : 'Now'}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
       </ScrollView>
@@ -555,32 +615,59 @@ const TeacherPortal = () => {
 
           {/* Filter Tabs */}
           <View style={styles.filterTabs}>
-            <TouchableOpacity style={[styles.filterTab, styles.activeFilterTab]}>
-              <Text style={styles.activeFilterText}>All ({classStudents.length})</Text>
+            <TouchableOpacity
+              style={[styles.filterTab, studentListFilter === 'all' && styles.activeFilterTab]}
+              onPress={() => setStudentListFilter('all')}
+            >
+              <Text style={studentListFilter === 'all' ? styles.activeFilterText : styles.filterText}>
+                All ({classStudents.length})
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.filterTab}>
-              <Text style={styles.filterText}>Present ({attendanceSummary.presentStudents})</Text>
+            <TouchableOpacity
+              style={[styles.filterTab, studentListFilter === 'present' && styles.activeFilterTab]}
+              onPress={() => setStudentListFilter('present')}
+            >
+              <Text style={studentListFilter === 'present' ? styles.activeFilterText : styles.filterText}>
+                Present ({attendanceSummary.presentStudents})
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.filterTab}>
-              <Text style={styles.filterText}>Absent ({attendanceSummary.absentStudents})</Text>
+            <TouchableOpacity
+              style={[styles.filterTab, studentListFilter === 'absent' && styles.activeFilterTab]}
+              onPress={() => setStudentListFilter('absent')}
+            >
+              <Text style={studentListFilter === 'absent' ? styles.activeFilterText : styles.filterText}>
+                Absent ({attendanceSummary.absentStudents})
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Student List */}
           <ScrollView style={styles.studentListContainer}>
-            {classStudents.map((student) => {
-              const attendanceInfo = studentAttendanceStatus[student.studentId];
+            {classStudents.filter((student) => {
+              if (studentListFilter === 'all') return true;
+              const normalizedStudentId = String(student.studentId || student.id || '').toUpperCase();
+              const attendanceInfo = studentAttendanceStatus[normalizedStudentId] || studentAttendanceStatus[student.id];
               const status = attendanceInfo?.status || 'absent';
+              if (studentListFilter === 'present') return status !== 'absent';
+              if (studentListFilter === 'absent') return status === 'absent';
+              return true;
+            }).map((student, index) => {
+              const studentKey = student.studentId || student.id || `${student.firstName || 'student'}-${student.lastName || index}`;
+              const normalizedStudentId = String(student.studentId || student.id || '').toUpperCase();
+              const attendanceInfo = studentAttendanceStatus[normalizedStudentId] || studentAttendanceStatus[student.id];
+              const status = attendanceInfo?.status || 'absent';
+              const displayName = student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Unnamed student';
+              const displayStudentId = student.studentId || student.id || 'N/A';
               
               return (
-                <View key={student.studentId} style={styles.studentListItem}>
+                <View key={studentKey} style={styles.studentListItem}>
                   <View style={styles.studentAvatar}>
                     <Ionicons name="person-circle" size={48} color="#4a90e2" />
                   </View>
                   
                   <View style={styles.studentInfo}>
-                    <Text style={styles.studentListName}>{student.name}</Text>
-                    <Text style={styles.studentListId}>{student.studentId}</Text>
+                    <Text style={styles.studentListName}>{displayName}</Text>
+                    <Text style={styles.studentListId}>{displayStudentId}</Text>
                     {attendanceInfo && (
                       <Text style={styles.studentListActivity}>
                         {attendanceInfo.activity} • {attendanceInfo.time}
@@ -621,12 +708,12 @@ const TeacherPortal = () => {
       <TeacherAnnouncement
         visible={showTeacherAnnouncement}
         onClose={() => setShowTeacherAnnouncement(false)}
-        teacherId={user?.username || "TCH001"}
+        teacherId={user?.profileId || user?.username || "TEACHER"}
         teacherName={user?.name || "Teacher"}
         teacherClasses={teacherClasses.map((className, index) => ({
           id: `class_${index}`,
           name: className,
-          subject: 'Mathematics' // This should come from actual class data
+          subject: classesData.find((cls) => cls.name === className)?.subject || 'General'
         }))}
       />
 
@@ -719,6 +806,29 @@ const styles = StyleSheet.create({
   },
   classList: {
     gap: 12,
+  },
+  classSwitchRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  classSwitchChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f1f1f1',
+  },
+  classSwitchChipActive: {
+    backgroundColor: '#4a90e2',
+  },
+  classSwitchChipText: {
+    color: '#555',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  classSwitchChipTextActive: {
+    color: '#fff',
   },
   classCard: {
     backgroundColor: '#f9f9f9',

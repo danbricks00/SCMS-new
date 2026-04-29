@@ -25,8 +25,8 @@ const ActivityLog = ({ userRole, maxItems = 10 }) => {
     }
   };
 
-  const getActivityIcon = (type) => {
-    switch (type) {
+  const getActivityIcon = (activity) => {
+    switch (activity?.type) {
       case 'student_added':
         return { name: 'person-add', color: '#4CAF50' };
       case 'teacher_added':
@@ -39,6 +39,14 @@ const ActivityLog = ({ userRole, maxItems = 10 }) => {
         return { name: 'megaphone', color: '#F44336' };
       case 'absence_request':
         return { name: 'document-text', color: '#00BCD4' };
+      case 'attendance_marked':
+        if (activity?.details?.status === 'absent') {
+          return { name: 'close-circle', color: '#F44336' };
+        }
+        if (activity?.details?.status === 'late') {
+          return { name: 'time', color: '#FF9800' };
+        }
+        return { name: 'checkmark-done-circle', color: '#4CAF50' };
       default:
         return { name: 'information-circle', color: '#666' };
     }
@@ -58,6 +66,8 @@ const ActivityLog = ({ userRole, maxItems = 10 }) => {
         return `Announcement: ${activity.details.announcementTitle}`;
       case 'absence_request':
         return `Absence Request: ${activity.details.studentName}`;
+      case 'attendance_marked':
+        return `Attendance: ${activity.details.studentName}`;
       default:
         return 'Activity';
     }
@@ -121,7 +131,7 @@ const ActivityLog = ({ userRole, maxItems = 10 }) => {
 
       <ScrollView style={styles.activityList}>
         {filteredActivities.map((activity, index) => {
-          const icon = getActivityIcon(activity.type);
+          const icon = getActivityIcon(activity);
           return (
             <View key={index} style={styles.activityItem}>
               <View style={[styles.iconContainer, { backgroundColor: icon.color + '20' }]}>

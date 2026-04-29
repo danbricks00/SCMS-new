@@ -15,12 +15,12 @@ const LoginPage = () => {
 
   // Sample user database - in production, this would come from Firebase
   const users = {
-    'admin': { password: 'admin123', role: 'admin', name: 'Admin User' },
-    'teacher1': { password: 'teacher123', role: 'teacher', name: 'Ms. Johnson' },
-    'teacher2': { password: 'teacher123', role: 'teacher', name: 'Mr. Smith' },
-    'student1': { password: 'student123', role: 'student', name: 'John Doe', class: '10A' },
-    'student2': { password: 'student123', role: 'student', name: 'Jane Smith', class: '9B' },
-    'parent1': { password: 'parent123', role: 'parent', name: 'Parent User', studentId: 'student1' },
+    'hq1001': { username: 'HQ1001', password: 'Admin-HQ1001', role: 'admin', name: 'Harper Quill', profileId: 'HQ1001' },
+    'mk1203': { username: 'MK1203', password: 'Teach-MK1203', role: 'teacher', name: 'Mila Kensley', profileId: 'MK1203' },
+    'rp2207': { username: 'RP2207', password: 'Teach-RP2207', role: 'teacher', name: 'Rowan Prescott', profileId: 'RP2207' },
+    'ac0611': { username: 'AC0611', password: 'Stud-AC0611', role: 'student', name: 'Avery Coleman', class: '10A', studentId: 'AC0611' },
+    'nr1904': { username: 'NR1904', password: 'Stud-NR1904', role: 'student', name: 'Niko Ramsey', class: '10A', studentId: 'NR1904' },
+    'kc1001': { username: 'KC1001', password: 'Par-KC1001', role: 'parent', name: 'Keira Coleman', studentId: 'AC0611', profileId: 'KC1001' },
   };
 
   const handleLogin = async () => {
@@ -33,14 +33,15 @@ const LoginPage = () => {
 
     // Simulate API call delay
     setTimeout(() => {
-      const user = users[username.toLowerCase()];
+      const user = users[username.trim().toLowerCase()];
       
       if (user && user.password === password) {
         // Login user through context
         login({
-          username: username.toLowerCase(),
+          username: user.username || username.trim().toUpperCase(),
           role: user.role,
           name: user.name,
+          profileId: user.profileId,
           class: user.class,
           studentId: user.studentId
         });
@@ -88,10 +89,10 @@ const LoginPage = () => {
 
   const handleDemoLogin = (role) => {
     const demoUsers = {
-      'admin': { username: 'admin', password: 'admin123' },
-      'teacher': { username: 'teacher1', password: 'teacher123' },
-      'student': { username: 'student1', password: 'student123' },
-      'parent': { username: 'parent1', password: 'parent123' }
+      'admin': { username: 'HQ1001', password: 'Admin-HQ1001' },
+      'teacher': { username: 'MK1203', password: 'Teach-MK1203' },
+      'student': { username: 'AC0611', password: 'Stud-AC0611' },
+      'parent': { username: 'KC1001', password: 'Par-KC1001' }
     };
 
     const demoUser = demoUsers[role];
@@ -188,10 +189,10 @@ const LoginPage = () => {
 
         <View style={styles.credentials}>
           <Text style={styles.credentialsTitle}>Demo Credentials:</Text>
-          <Text style={styles.credentialsText}>Admin: admin / admin123</Text>
-          <Text style={styles.credentialsText}>Teacher: teacher1 / teacher123</Text>
-          <Text style={styles.credentialsText}>Student: student1 / student123</Text>
-          <Text style={styles.credentialsText}>Parent: parent1 / parent123</Text>
+          <Text style={styles.credentialsText}>Admin: HQ1001 / Admin-HQ1001</Text>
+          <Text style={styles.credentialsText}>Teacher: MK1203 / Teach-MK1203</Text>
+          <Text style={styles.credentialsText}>Student: AC0611 / Stud-AC0611</Text>
+          <Text style={styles.credentialsText}>Parent: KC1001 / Par-KC1001</Text>
         </View>
       </View>
       </ResponsiveScreen>

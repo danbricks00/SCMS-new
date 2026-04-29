@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AbsenceRequestForm from '../components/AbsenceRequestForm';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
@@ -15,20 +15,57 @@ const ParentPortal = () => {
   const [showAbsenceForm, setShowAbsenceForm] = useState(false);
   const [absenceRequests, setAbsenceRequests] = useState([]);
   const [events, setEvents] = useState([]);
-  
-  // Sample children data - in production, this would come from the database
-  const children = [
-    { name: 'John Doe', class: '10A' },
-    { name: 'Jane Doe', class: '8B' }
-  ];
+  const [notifications, setNotifications] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [children, setChildren] = useState([]);
 
   useEffect(() => {
+    loadChildren();
+  }, [user?.studentId, user?.linkedStudentId, user?.username]);
+
+  useEffect(() => {
+    if (children.length === 0) return;
     loadAbsenceRequests();
     loadEvents();
-  }, []);
+    loadNotifications();
+  }, [children]);
+
+  const loadChildren = async () => {
+    try {
+      const linkedStudentId = String(user?.studentId || user?.linkedStudentId || '').toUpperCase();
+      if (!linkedStudentId) {
+        setChildren([]);
+        return;
+      }
+
+      const student = await DatabaseService.getStudentById(linkedStudentId);
+      if (student) {
+        setChildren([{
+          id: student.id,
+          studentId: String(student.studentId || linkedStudentId).toUpperCase(),
+          name: student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || linkedStudentId,
+          class: student.class || 'N/A'
+        }]);
+      } else {
+        setChildren([{
+          id: linkedStudentId,
+          studentId: linkedStudentId,
+          name: linkedStudentId,
+          class: 'N/A'
+        }]);
+      }
+    } catch (error) {
+      console.error('Error loading parent children:', error);
+      setChildren([]);
+    }
+  };
 
   const loadAbsenceRequests = async () => {
     try {
+      if (children.length === 0) {
+        setAbsenceRequests([]);
+        return;
+      }
       // Load absence requests for parent's children
       const allRequests = [];
       for (const child of children) {
@@ -43,12 +80,53 @@ const ParentPortal = () => {
 
   const loadEvents = async () => {
     try {
+      if (children.length === 0) {
+        setEvents([]);
+        return;
+      }
       // Get child's classes
       const userClasses = children.map(child => child.class);
       const userEvents = await DatabaseService.getEventsForUser('parent', userClasses);
       setEvents(userEvents);
     } catch (error) {
       console.error('Error loading events:', error);
+    }
+  };
+
+  const loadNotifications = async () => {
+    try {
+      if (children.length === 0) {
+        setNotifications([]);
+        return;
+      }
+
+      const items = [];
+      for (const child of children) {
+        const studentId = String(child.studentId || '').toUpperCase();
+        if (!studentId) continue;
+        const attendance = await DatabaseService.getStudentAttendance(studentId);
+        const latest = attendance
+          .filter((record) => (record.type || 'login') === 'login')
+          .sort((a, b) => new Date(b.timestamp || b.createdAt || 0) - new Date(a.timestamp || a.createdAt || 0))[0];
+
+        if (latest) {
+          const status = String(latest.status || 'present');
+          const statusTitle = status.charAt(0).toUpperCase() + status.slice(1);
+          items.push({
+            id: `${studentId}-${latest.id || latest.timestamp || Date.now()}`,
+            icon: status === 'absent' ? 'close-circle' : status === 'late' ? 'time' : 'checkmark-circle',
+            color: status === 'absent' ? '#f44336' : status === 'late' ? '#ff9800' : '#4caf50',
+            title: `Attendance Update: ${child.name}`,
+            text: `${child.name} was marked ${statusTitle}`,
+            date: latest.timestamp ? new Date(latest.timestamp).toLocaleString() : 'Just now'
+          });
+        }
+      }
+
+      setNotifications(items);
+    } catch (error) {
+      console.error('Error loading parent notifications:', error);
+      setNotifications([]);
     }
   };
 
@@ -71,6 +149,15 @@ const ParentPortal = () => {
       }
     }
   };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([loadAbsenceRequests(), loadEvents(), loadNotifications()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   
   return (
     <ProtectedRoute requiredRole="parent">
@@ -90,16 +177,20 @@ const ParentPortal = () => {
       {/* Announcements Banner */}
       <AnnouncementBanner 
         userRole="parent" 
-        userClass="10A" // This should come from child's data
+        userClass={children[0]?.class || '10A'}
       />
       
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Children</Text>
           <View style={styles.childList}>
             {children.map((child, index) => (
-              <View key={index} style={styles.childCard}>
+              <View key={child.id || child.studentId || index} style={styles.childCard}>
                 <Text style={styles.childName}>{child.name}</Text>
+                <Text style={styles.childClass}>ID: {child.studentId}</Text>
                 <Text style={styles.childClass}>Class: {child.class}</Text>
                 <View style={styles.attendanceIndicator}>
                   <Text style={styles.attendanceText}>Attendance: 95%</Text>
@@ -113,23 +204,24 @@ const ParentPortal = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Notifications</Text>
           <View style={styles.notificationList}>
-            <View style={styles.notificationItem}>
-              <Ionicons name="alert-circle" size={24} color="#ff9800" />
-              <View style={styles.notificationContent}>
-                <Text style={styles.notificationTitle}>Absence Alert</Text>
-                <Text style={styles.notificationText}>John was absent on Wednesday</Text>
-                <Text style={styles.notificationDate}>2 days ago</Text>
+            {notifications.length === 0 ? (
+              <View style={styles.notificationItem}>
+                <Ionicons name="notifications-off-outline" size={24} color="#999" />
+                <View style={styles.notificationContent}>
+                  <Text style={styles.notificationTitle}>No recent notifications</Text>
+                  <Text style={styles.notificationText}>Updates will appear here for your linked child.</Text>
+                </View>
               </View>
-            </View>
-            
-            <View style={styles.notificationItem}>
-              <Ionicons name="calendar" size={24} color="#4caf50" />
-              <View style={styles.notificationContent}>
-                <Text style={styles.notificationTitle}>Upcoming Event</Text>
-                <Text style={styles.notificationText}>Parent-Teacher Meeting</Text>
-                <Text style={styles.notificationDate}>Next Monday</Text>
+            ) : notifications.map((item) => (
+              <View key={item.id} style={styles.notificationItem}>
+                <Ionicons name={item.icon} size={24} color={item.color} />
+                <View style={styles.notificationContent}>
+                  <Text style={styles.notificationTitle}>{item.title}</Text>
+                  <Text style={styles.notificationText}>{item.text}</Text>
+                  <Text style={styles.notificationDate}>{item.date}</Text>
+                </View>
               </View>
-            </View>
+            ))}
           </View>
         </View>
 
@@ -204,9 +296,14 @@ const ParentPortal = () => {
 
         {/* Recent Updates */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Updates</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleNoMargin]}>Recent Updates</Text>
+            <TouchableOpacity style={styles.viewAllButton} onPress={() => router.push('/updates')}>
+              <Text style={styles.viewAllButtonText}>View all</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.activityLogContainer}>
-            <ActivityLog userRole="parent" maxItems={5} />
+            <ActivityLog userRole="parent" maxItems={3} />
           </View>
         </View>
       </ScrollView>
@@ -284,6 +381,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
     color: '#333',
+  },
+  sectionTitleNoMargin: {
+    marginBottom: 0,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  viewAllButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  viewAllButtonText: {
+    color: '#4a90e2',
+    fontSize: 14,
+    fontWeight: '600',
   },
   childList: {
     marginBottom: 10,
