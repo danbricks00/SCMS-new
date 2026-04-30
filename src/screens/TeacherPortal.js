@@ -41,6 +41,22 @@ const TeacherPortal = () => {
   const [studentListFilter, setStudentListFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
 
+  const showPopup = (title, message, onOk) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(`${title}\n\n${message}`);
+      if (onOk) onOk();
+      return;
+    }
+
+    Alert.alert(
+      title,
+      message,
+      onOk
+        ? [{ text: 'OK', onPress: onOk }]
+        : [{ text: 'OK' }]
+    );
+  };
+
   useEffect(() => {
     loadTeacherClasses();
   }, [user?.name, user?.profileId]);
@@ -238,7 +254,7 @@ const TeacherPortal = () => {
       };
 
       if (!attendanceData.studentId) {
-        Alert.alert('Missing student ID', 'Could not mark attendance because this student has no valid ID.');
+        showPopup('Missing student ID', 'Could not mark attendance because this student has no valid ID.');
         return;
       }
 
@@ -246,13 +262,13 @@ const TeacherPortal = () => {
       
       // Check if attendance was blocked due to fraud detection
       if (result.blocked) {
-        Alert.alert(
+        showPopup(
           'Attendance blocked',
           result.message,
-          [{ text: 'OK', onPress: () => {
+          () => {
             setShowStudentCard(false);
             setScannedStudent(null);
-          }}]
+          }
         );
         return;
       }
@@ -260,23 +276,18 @@ const TeacherPortal = () => {
       const timeText = QRCodeUtils.formatNZTTime(new Date().toISOString());
       const timezone = QRCodeUtils.getNZTimezoneAbbreviation();
       
-      Alert.alert(
+      showPopup(
         'Attendance recorded',
         `${studentData.name} marked as ${statusLabels[status]} at ${timeText} (${timezone})`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowStudentCard(false);
-              setScannedStudent(null);
-              loadAttendanceSummary(); // Refresh the summary
-            }
-          }
-        ]
+        () => {
+          setShowStudentCard(false);
+          setScannedStudent(null);
+          loadAttendanceSummary(); // Refresh the summary
+        }
       );
     } catch (error) {
       console.error('Error recording attendance:', error);
-      Alert.alert('Error', 'Failed to record attendance. Please try again.');
+      showPopup('Error', 'Failed to record attendance. Please try again.');
     }
   };
 

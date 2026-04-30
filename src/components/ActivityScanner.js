@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity, Modal, ScrollView, TextInput, Switch } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity, Modal, ScrollView, TextInput, Switch, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QRScanner from './QRScanner';
@@ -42,6 +42,22 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
     recurring: false
   });
 
+  const showPopup = (title, message, onOk) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(`${title}\n\n${message}`);
+      if (onOk) onOk();
+      return;
+    }
+
+    Alert.alert(
+      title,
+      message,
+      onOk
+        ? [{ text: 'OK', onPress: onOk }]
+        : [{ text: 'OK' }]
+    );
+  };
+
   useEffect(() => {
     if (isVisible && selectedActivity) {
       loadActivitySummary();
@@ -65,9 +81,9 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
       setScannedStudent(scanResult.studentData);
       setShowStudentCard(true);
     } else if (scanResult.result === QR_SCAN_RESULTS.INVALID) {
-      Alert.alert('Invalid QR Code', 'The scanned QR code is not valid for this system.');
+      showPopup('Invalid QR Code', 'The scanned QR code is not valid for this system.');
     } else {
-      Alert.alert('Scan Error', scanResult.error || 'Failed to scan QR code');
+      showPopup('Scan Error', scanResult.error || 'Failed to scan QR code');
     }
   };
 
@@ -94,13 +110,13 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
       
       // Check if blocked by fraud detection
       if (result.blocked) {
-        Alert.alert(
+        showPopup(
           'Activity blocked',
           result.message,
-          [{ text: 'OK', onPress: () => {
+          () => {
             setShowStudentCard(false);
             setScannedStudent(null);
-          }}]
+          }
         );
         return;
       }
@@ -111,32 +127,27 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
         ? (status === 'late' ? 'started (late)' : 'started') 
         : (status === 'left-early' ? 'left early from' : 'completed');
       
-      Alert.alert(
+      showPopup(
         'Activity recorded',
         `${studentData.name} ${action} ${selectedActivity || customActivity} at ${timeText}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowStudentCard(false);
-              setScannedStudent(null);
-              loadActivitySummary(); // Refresh the summary
-              if (onActivityComplete) {
-                onActivityComplete();
-              }
-            }
+        () => {
+          setShowStudentCard(false);
+          setScannedStudent(null);
+          loadActivitySummary(); // Refresh the summary
+          if (onActivityComplete) {
+            onActivityComplete();
           }
-        ]
+        }
       );
     } catch (error) {
       console.error('Error recording activity:', error);
-      Alert.alert('Error', 'Failed to record activity. Please try again.');
+      showPopup('Error', 'Failed to record activity. Please try again.');
     }
   };
 
   const openQRScanner = (type) => {
     if (!selectedActivity && !customActivity) {
-      Alert.alert('Select Activity', 'Please select an activity before scanning.');
+      showPopup('Select Activity', 'Please select an activity before scanning.');
       return;
     }
     setScanType(type);
@@ -413,10 +424,10 @@ const ActivityScanner = ({ isVisible, onClose, onActivityComplete }) => {
               <TouchableOpacity
                 style={styles.saveScheduleButton}
                 onPress={() => {
-                  Alert.alert(
+                  showPopup(
                     'Schedule Saved',
                     `Activity scheduled from ${scheduleData.startTime} to ${scheduleData.endTime}${scheduleData.autoCheckout ? '. Students will auto-checkout at end time.' : ''}`,
-                    [{ text: 'OK', onPress: () => setShowScheduleModal(false) }]
+                    () => setShowScheduleModal(false)
                   );
                 }}
               >
