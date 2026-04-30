@@ -518,7 +518,18 @@ const StudentPortal = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.activityLogContainer}>
-            <ActivityLog userRole="student" maxItems={3} />
+            <ActivityLog
+              userRole="student"
+              maxItems={3}
+              linkedStudentIds={[
+                String(studentData?.studentId || user?.studentId || user?.username || '')
+                  .trim()
+                  .toUpperCase()
+              ].filter(Boolean)}
+              linkedStudentNames={[
+                String(studentData?.name || user?.name || '').trim()
+              ].filter(Boolean)}
+            />
           </View>
         </View>
 

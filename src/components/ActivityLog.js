@@ -15,7 +15,7 @@ function normalizeStudentName(name) {
 /**
  * Parents only see attendance / absence lines for their linked children (not whole-school feeds).
  */
-function activityMatchesLinkedChildren(activity, idSet, nameSet) {
+function activityMatchesLinkedChildren(activity, idSet, nameSet, includeNonStudentSpecific = false) {
   if (!idSet?.size && !nameSet?.size) return false;
   const d = activity.details || {};
 
@@ -32,7 +32,7 @@ function activityMatchesLinkedChildren(activity, idSet, nameSet) {
     return Boolean(nm && nameSet?.has(nm));
   }
 
-  return false;
+  return includeNonStudentSpecific;
 }
 
 const ActivityLog = ({
@@ -86,8 +86,8 @@ const ActivityLog = ({
     }
   };
 
-  const parentFilterKey = useMemo(() => {
-    if (userRole !== 'parent' || linkedStudentIds == null) return '';
+  const scopedStudentFilterKey = useMemo(() => {
+    if (!['parent', 'student'].includes(userRole) || linkedStudentIds == null) return '';
     return [linkedStudentIds.join('|'), (linkedStudentNames || []).join('|')].join('~');
   }, [userRole, linkedStudentIds, linkedStudentNames]);
 
@@ -97,15 +97,15 @@ const ActivityLog = ({
     // Refresh every 30 seconds
     const interval = setInterval(loadActivities, 30000);
     return () => clearInterval(interval);
-  }, [userRole, maxItems, parentFilterKey]);
+  }, [userRole, maxItems, scopedStudentFilterKey]);
 
   const loadActivities = async () => {
     try {
-      const parentChildFilter = userRole === 'parent' && linkedStudentIds != null;
-      const fetchCap = parentChildFilter ? 200 : Math.max(maxItems * 4, 50);
+      const scopedStudentFilter = ['parent', 'student'].includes(userRole) && linkedStudentIds != null;
+      const fetchCap = scopedStudentFilter ? 200 : Math.max(maxItems * 4, 50);
       let activityData = await DatabaseService.getActivityLog(userRole, 'all', fetchCap);
 
-      if (parentChildFilter) {
+      if (scopedStudentFilter) {
         if (!linkedStudentIds.length) {
           activityData = [];
         } else {
@@ -117,7 +117,9 @@ const ActivityLog = ({
               .map((n) => normalizeStudentName(n))
               .filter(Boolean)
           );
-          activityData = activityData.filter((a) => activityMatchesLinkedChildren(a, idSet, nameSet));
+          activityData = activityData.filter((a) =>
+            activityMatchesLinkedChildren(a, idSet, nameSet, userRole === 'student')
+          );
         }
       }
 
@@ -189,7 +191,7 @@ const ActivityLog = ({
       return false;
     }
 
-    if (userRole === 'parent' && linkedStudentIds != null) {
+    if ((userRole === 'parent' || userRole === 'student') && linkedStudentIds != null) {
       return ['attendance_marked', 'absence_request'].includes(activity.type);
     }
 
