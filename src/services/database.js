@@ -488,14 +488,20 @@ export class DatabaseService {
       // Calculate timing data for reports
       const timingData = {};
       
-      // If checking out, calculate duration from check-in
+      // If checking out, calculate duration from check-in (fetch attendance here — `todayAttendance` from the
+      // login-only fraud block is not in scope for logout).
       if (attendanceData.type === 'logout') {
-        const checkInRecord = todayAttendance?.find(r => 
-          r.studentId === attendanceData.studentId && 
-          r.activity === attendanceData.activity && 
-          r.type === 'login'
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayRows = await this.getClassAttendance(attendanceData.class, todayStr);
+        const sid = String(attendanceData.studentId || '').toUpperCase();
+        const activityLabel = attendanceData.activity || 'Class Attendance';
+        const checkInRecord = (todayRows || []).find(
+          (r) =>
+            String(r.studentId || '').toUpperCase() === sid &&
+            (r.activity || 'Class Attendance') === activityLabel &&
+            r.type === 'login'
         );
-        
+
         if (checkInRecord) {
           const checkInTime = new Date(checkInRecord.timestamp);
           const checkOutTime = new Date();

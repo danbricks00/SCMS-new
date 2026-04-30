@@ -1,15 +1,58 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ActivityLog from '../components/ActivityLog';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { useAuth } from '../contexts/AuthContext';
+import { DatabaseService } from '../services/database';
 
 const UpdatesPage = () => {
   const { user } = useAuth();
   const userRole = user?.role || 'student';
+  const [parentActivityIds, setParentActivityIds] = useState(null);
+  const [parentActivityNames, setParentActivityNames] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (user?.role !== 'parent') {
+        setParentActivityIds(null);
+        setParentActivityNames(null);
+        return;
+      }
+      const sid = String(user?.linkedStudentId || user?.studentId || '')
+        .trim()
+        .toUpperCase();
+      if (!sid) {
+        if (!cancelled) {
+          setParentActivityIds([]);
+          setParentActivityNames([]);
+        }
+        return;
+      }
+      try {
+        const student = await DatabaseService.getStudentById(sid);
+        const name =
+          student?.name ||
+          `${student?.firstName || ''} ${student?.lastName || ''}`.trim() ||
+          '';
+        if (!cancelled) {
+          setParentActivityIds([sid]);
+          setParentActivityNames(name ? [name] : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setParentActivityIds([sid]);
+          setParentActivityNames([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.role, user?.linkedStudentId, user?.studentId]);
 
   return (
     <ProtectedRoute requiredRole={userRole}>
@@ -25,7 +68,12 @@ const UpdatesPage = () => {
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.activityLogContainer}>
-            <ActivityLog userRole={userRole} maxItems={100} />
+            <ActivityLog
+              userRole={userRole}
+              maxItems={100}
+              linkedStudentIds={userRole === 'parent' ? parentActivityIds ?? [] : null}
+              linkedStudentNames={userRole === 'parent' ? parentActivityNames ?? [] : null}
+            />
           </View>
         </ScrollView>
       </SafeAreaView>

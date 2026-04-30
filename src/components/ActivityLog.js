@@ -1,24 +1,85 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DatabaseService } from '../services/database';
 import { formatTimestampNZ } from '../utils/dateUtils';
 
-const ActivityLog = ({ userRole, maxItems = 10 }) => {
+/** Normalize for comparing student names from activity log vs roster. */
+function normalizeStudentName(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Parents only see attendance / absence lines for their linked children (not whole-school feeds).
+ */
+function activityMatchesLinkedChildren(activity, idSet, nameSet) {
+  if (!idSet?.size && !nameSet?.size) return false;
+  const d = activity.details || {};
+
+  if (activity.type === 'attendance_marked') {
+    const sid = String(d.studentId || '').trim().toUpperCase();
+    if (sid && idSet?.has(sid)) return true;
+    const nm = normalizeStudentName(d.studentName);
+    if (nm && nameSet?.has(nm)) return true;
+    return false;
+  }
+
+  if (activity.type === 'absence_request') {
+    const nm = normalizeStudentName(d.studentName);
+    return Boolean(nm && nameSet?.has(nm));
+  }
+
+  return false;
+}
+
+const ActivityLog = ({
+  userRole,
+  maxItems = 10,
+  /** When set (e.g. parent portal), only activities for these student ids / names are shown. */
+  linkedStudentIds = null,
+  linkedStudentNames = null
+}) => {
   const [activities, setActivities] = useState([]);
   const [filter, setFilter] = useState('all'); // all, students, teachers, events, announcements
 
+  const parentFilterKey = useMemo(() => {
+    if (userRole !== 'parent' || linkedStudentIds == null) return '';
+    return [linkedStudentIds.join('|'), (linkedStudentNames || []).join('|')].join('~');
+  }, [userRole, linkedStudentIds, linkedStudentNames]);
+
   useEffect(() => {
     loadActivities();
-    
+
     // Refresh every 30 seconds
     const interval = setInterval(loadActivities, 30000);
     return () => clearInterval(interval);
-  }, [filter, userRole]);
+  }, [filter, userRole, maxItems, parentFilterKey]);
 
   const loadActivities = async () => {
     try {
-      const activityData = await DatabaseService.getActivityLog(userRole, filter);
+      const parentChildFilter = userRole === 'parent' && linkedStudentIds != null;
+      const fetchCap = parentChildFilter ? 200 : Math.max(maxItems * 4, 50);
+      let activityData = await DatabaseService.getActivityLog(userRole, filter, fetchCap);
+
+      if (parentChildFilter) {
+        if (!linkedStudentIds.length) {
+          activityData = [];
+        } else {
+          const idSet = new Set(
+            linkedStudentIds.map((id) => String(id || '').trim().toUpperCase()).filter(Boolean)
+          );
+          const nameSet = new Set(
+            (linkedStudentNames || [])
+              .map((n) => normalizeStudentName(n))
+              .filter(Boolean)
+          );
+          activityData = activityData.filter((a) => activityMatchesLinkedChildren(a, idSet, nameSet));
+        }
+      }
+
       setActivities(activityData.slice(0, maxItems));
     } catch (error) {
       console.error('Error loading activities:', error);
@@ -79,14 +140,16 @@ const ActivityLog = ({ userRole, maxItems = 10 }) => {
 
   // Filter activities based on user role
   const shouldShowActivity = (activity) => {
-    // Admin and teachers see everything
     if (userRole === 'admin' || userRole === 'teacher') {
       return true;
     }
 
-    // Students and parents don't see student/teacher/class additions
-    if (userRole === 'student' || userRole === 'parent') {
-      return !['student_added', 'teacher_added', 'class_added'].includes(activity.type);
+    if (['student_added', 'teacher_added', 'class_added'].includes(activity.type)) {
+      return false;
+    }
+
+    if (userRole === 'parent' && linkedStudentIds != null) {
+      return ['attendance_marked', 'absence_request'].includes(activity.type);
     }
 
     return true;

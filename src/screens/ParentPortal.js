@@ -32,7 +32,9 @@ const ParentPortal = () => {
 
   const loadChildren = async () => {
     try {
-      const linkedStudentId = String(user?.studentId || user?.linkedStudentId || '').toUpperCase();
+      const linkedStudentId = String(
+        user?.linkedStudentId || user?.studentId || ''
+      ).toUpperCase();
       if (!linkedStudentId) {
         setChildren([]);
         return;
@@ -303,7 +305,14 @@ const ParentPortal = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.activityLogContainer}>
-            <ActivityLog userRole="parent" maxItems={3} />
+            <ActivityLog
+              userRole="parent"
+              maxItems={3}
+              linkedStudentIds={children
+                .map((c) => String(c.studentId || '').trim().toUpperCase())
+                .filter(Boolean)}
+              linkedStudentNames={children.map((c) => String(c.name || '').trim()).filter(Boolean)}
+            />
           </View>
         </View>
       </ScrollView>

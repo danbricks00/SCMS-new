@@ -1,101 +1,113 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimeDisplay from '../components/DateTimeDisplay';
 import ResponsiveScreen from '../components/ResponsiveScreen';
+import { isFirebaseConfigured } from '../config/firebase';
+import { fetchDemoUsersByRole, loginWithAppUser } from '../services/appUsersAuth';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [demoLogins, setDemoLogins] = useState({});
   const { login } = useAuth();
 
-  // Sample user database - in production, this would come from Firebase
-  const users = {
-    'hq1001': { username: 'HQ1001', password: 'Admin-HQ1001', role: 'admin', name: 'Harper Quill', profileId: 'HQ1001' },
-    'mk1203': { username: 'MK1203', password: 'Teach-MK1203', role: 'teacher', name: 'Mila Kensley', profileId: 'MK1203' },
-    'rp2207': { username: 'RP2207', password: 'Teach-RP2207', role: 'teacher', name: 'Rowan Prescott', profileId: 'RP2207' },
-    'ac0611': { username: 'AC0611', password: 'Stud-AC0611', role: 'student', name: 'Avery Coleman', class: '10A', studentId: 'AC0611' },
-    'nr1904': { username: 'NR1904', password: 'Stud-NR1904', role: 'student', name: 'Niko Ramsey', class: '10A', studentId: 'NR1904' },
-    'kc1001': { username: 'KC1001', password: 'Par-KC1001', role: 'parent', name: 'Keira Coleman', studentId: 'AC0611', profileId: 'KC1001' },
-  };
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const demos = await fetchDemoUsersByRole();
+        if (!cancelled) {
+          setDemoLogins(demos);
+        }
+      } catch (e) {
+        console.warn('[Login] Could not load demo accounts from Firestore:', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleLogin = async () => {
+    setFormError('');
+
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both username and password');
+      setFormError('Enter your school email or account id and your password.');
       return;
     }
 
     setLoading(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const user = users[username.trim().toLowerCase()];
-      
-      if (user && user.password === password) {
-        // Login user through context
-        login({
-          username: user.username || username.trim().toUpperCase(),
-          role: user.role,
-          name: user.name,
-          profileId: user.profileId,
-          class: user.class,
-          studentId: user.studentId
-        });
+    try {
+      const user = await loginWithAppUser(username, password);
 
-        // Check for intended destination first
-        let redirectRoute = null;
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-          const intendedDestination = sessionStorage.getItem('intendedDestination');
-          if (intendedDestination) {
-            // Map the intended destination to the correct route
-            const destinationMap = {
-              'StudentPortal': '/student',
-              'ParentPortal': '/parent',
-              'TeacherPortal': '/teacher',
-              'AdminPortal': '/admin'
-            };
-            redirectRoute = destinationMap[intendedDestination];
-            // Clear the intended destination
-            sessionStorage.removeItem('intendedDestination');
-          }
-        }
+      login({
+        username: user.username,
+        role: user.role,
+        name: user.name,
+        profileId: user.profileId,
+        class: user.class,
+        studentId: user.studentId,
+        linkedStudentId: user.linkedStudentId
+      });
 
-        // If no intended destination, use role-based routing
-        if (!redirectRoute) {
-          const roleRoutes = {
-            'admin': '/admin',
-            'teacher': '/teacher',
-            'student': '/student',
-            'parent': '/parent'
+      let redirectRoute = null;
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        const intendedDestination = sessionStorage.getItem('intendedDestination');
+        if (intendedDestination) {
+          const destinationMap = {
+            StudentPortal: '/student',
+            ParentPortal: '/parent',
+            TeacherPortal: '/teacher',
+            AdminPortal: '/admin'
           };
-          redirectRoute = roleRoutes[user.role];
+          redirectRoute = destinationMap[intendedDestination];
+          sessionStorage.removeItem('intendedDestination');
         }
-
-        if (redirectRoute) {
-          router.replace(redirectRoute);
-        } else {
-          Alert.alert('Error', 'Invalid user role or destination');
-        }
-      } else {
-        Alert.alert('Error', 'Invalid username or password');
       }
+
+      if (!redirectRoute) {
+        const roleRoutes = {
+          admin: '/admin',
+          teacher: '/teacher',
+          student: '/student',
+          parent: '/parent'
+        };
+        redirectRoute = roleRoutes[user.role];
+      }
+
+      if (redirectRoute) {
+        setFormError('');
+        router.replace(redirectRoute);
+      } else {
+        setFormError('Your account is missing a valid role. Please contact support.');
+      }
+    } catch (error) {
+      console.error('[Login] Error:', error);
+      setFormError(
+        error?.message || 'Could not sign in. Check your connection and try again.'
+      );
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleDemoLogin = (role) => {
-    const demoUsers = {
-      'admin': { username: 'HQ1001', password: 'Admin-HQ1001' },
-      'teacher': { username: 'MK1203', password: 'Teach-MK1203' },
-      'student': { username: 'AC0611', password: 'Stud-AC0611' },
-      'parent': { username: 'KC1001', password: 'Par-KC1001' }
-    };
-
-    const demoUser = demoUsers[role];
+    setFormError('');
+    const demoUser = demoLogins[role];
+    if (!demoUser) {
+      setFormError(
+        `No demo user with role "${role}" is set up yet. Add a user in Firestore with that role (and matching Authentication).`
+      );
+      return;
+    }
     setUsername(demoUser.username);
     setPassword(demoUser.password);
   };
@@ -108,16 +120,25 @@ const LoginPage = () => {
         <View style={styles.header}>
           <Text style={styles.title}>School Class Management System</Text>
           <Text style={styles.subtitle}>Please login to continue</Text>
+          {!isFirebaseConfigured && (
+            <Text style={styles.configWarning}>
+              Firebase is not configured. Set EXPO_PUBLIC_FIREBASE_* in your environment before signing in.
+            </Text>
+          )}
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Username</Text>
+            <Text style={styles.label}>Email or account id</Text>
             <TextInput
               style={styles.input}
               value={username}
-              onChangeText={setUsername}
-              placeholder="Enter your username"
+              onChangeText={(t) => {
+                setFormError('');
+                setUsername(t);
+              }}
+              placeholder="School email or profile code"
+              placeholderTextColor="#9ca3af"
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -125,21 +146,45 @@ const LoginPage = () => {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter your password"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View style={styles.passwordFieldRow}>
+              <TextInput
+                style={styles.passwordInputFlex}
+                value={password}
+                onChangeText={(t) => {
+                  setFormError('');
+                  setPassword(t);
+                }}
+                placeholder="Password"
+                placeholderTextColor="#9ca3af"
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword((v) => !v)}
+                style={styles.passwordEyeButton}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#666" />
+              </TouchableOpacity>
+            </View>
           </View>
 
+          {!!formError && (
+            <View accessibilityLiveRegion="polite">
+              <Text style={styles.formError}>{formError}</Text>
+            </View>
+          )}
+
           <TouchableOpacity
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+            style={[
+              styles.loginButton,
+              (loading || !isFirebaseConfigured) && styles.loginButtonDisabled
+            ]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading || !isFirebaseConfigured}
           >
             <Ionicons name="log-in" size={20} color="#fff" />
             <Text style={styles.loginButtonText}>
@@ -153,33 +198,53 @@ const LoginPage = () => {
           <Text style={styles.demoSubtitle}>Click to auto-fill credentials</Text>
           
           <View style={styles.demoButtons}>
-            <TouchableOpacity
-              style={[styles.demoButton, styles.adminButton]}
-              onPress={() => handleDemoLogin('admin')}
-            >
+          <TouchableOpacity
+            style={[
+              styles.demoButton,
+              styles.adminButton,
+              (!demoLogins.admin || loading) && styles.demoButtonDisabled
+            ]}
+            onPress={() => handleDemoLogin('admin')}
+            disabled={!demoLogins.admin || loading}
+          >
               <Ionicons name="shield" size={16} color="#fff" />
               <Text style={styles.demoButtonText}>Admin</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.demoButton, styles.teacherButton]}
+              style={[
+                styles.demoButton,
+                styles.teacherButton,
+                (!demoLogins.teacher || loading) && styles.demoButtonDisabled
+              ]}
               onPress={() => handleDemoLogin('teacher')}
+              disabled={!demoLogins.teacher || loading}
             >
               <Ionicons name="person" size={16} color="#fff" />
               <Text style={styles.demoButtonText}>Teacher</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.demoButton, styles.studentButton]}
+              style={[
+                styles.demoButton,
+                styles.studentButton,
+                (!demoLogins.student || loading) && styles.demoButtonDisabled
+              ]}
               onPress={() => handleDemoLogin('student')}
+              disabled={!demoLogins.student || loading}
             >
               <Ionicons name="school" size={16} color="#fff" />
               <Text style={styles.demoButtonText}>Student</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.demoButton, styles.parentButton]}
+              style={[
+                styles.demoButton,
+                styles.parentButton,
+                (!demoLogins.parent || loading) && styles.demoButtonDisabled
+              ]}
               onPress={() => handleDemoLogin('parent')}
+              disabled={!demoLogins.parent || loading}
             >
               <Ionicons name="people" size={16} color="#fff" />
               <Text style={styles.demoButtonText}>Parent</Text>
@@ -188,11 +253,11 @@ const LoginPage = () => {
         </View>
 
         <View style={styles.credentials}>
-          <Text style={styles.credentialsTitle}>Demo Credentials:</Text>
-          <Text style={styles.credentialsText}>Admin: HQ1001 / Admin-HQ1001</Text>
-          <Text style={styles.credentialsText}>Teacher: MK1203 / Teach-MK1203</Text>
-          <Text style={styles.credentialsText}>Student: AC0611 / Stud-AC0611</Text>
-          <Text style={styles.credentialsText}>Parent: KC1001 / Par-KC1001</Text>
+          <Text style={styles.credentialsTitle}>How sign-in works</Text>
+          <Text style={styles.credentialsText}>
+            Use your school email or the same profile code you use at school (we match your Firestore user and sign you
+            in with Firebase). Demo buttons fill a sample account per role when available.
+          </Text>
         </View>
       </View>
       </ResponsiveScreen>
@@ -227,6 +292,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  configWarning: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#c0392b',
+    textAlign: 'center',
+    paddingHorizontal: 12,
+  },
   form: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -254,6 +326,34 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  passwordFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    paddingRight: 4,
+  },
+  passwordInputFlex: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingLeft: 12,
+    paddingRight: 8,
+    fontSize: 16,
+  },
+  passwordEyeButton: {
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formError: {
+    color: '#c0392b',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+    marginTop: -4,
   },
   loginButton: {
     flexDirection: 'row',
@@ -308,6 +408,9 @@ const styles = StyleSheet.create({
     minWidth: '45%',
     justifyContent: 'center',
     gap: 6,
+  },
+  demoButtonDisabled: {
+    opacity: 0.45,
   },
   adminButton: {
     backgroundColor: '#e74c3c',
