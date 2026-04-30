@@ -32,30 +32,58 @@ const ParentPortal = () => {
 
   const loadChildren = async () => {
     try {
-      const linkedStudentId = String(
-        user?.linkedStudentId || user?.studentId || ''
-      ).toUpperCase();
-      if (!linkedStudentId) {
+      const linkedStudentIds = [
+        ...(Array.isArray(user?.linkedStudentIds) ? user.linkedStudentIds : []),
+        user?.linkedStudentId,
+        user?.studentId
+      ]
+        .map((id) => String(id || '').trim().toUpperCase())
+        .filter(Boolean);
+      const uniqueIds = Array.from(new Set(linkedStudentIds));
+
+      if (uniqueIds.length === 0) {
         setChildren([]);
         return;
       }
 
-      const student = await DatabaseService.getStudentById(linkedStudentId);
-      if (student) {
-        setChildren([{
-          id: student.id,
-          studentId: String(student.studentId || linkedStudentId).toUpperCase(),
-          name: student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || linkedStudentId,
-          class: student.class || 'N/A'
-        }]);
-      } else {
-        setChildren([{
-          id: linkedStudentId,
-          studentId: linkedStudentId,
-          name: linkedStudentId,
-          class: 'N/A'
-        }]);
+      const loadedChildren = [];
+      for (const linkedStudentId of uniqueIds) {
+        const student = await DatabaseService.getStudentById(linkedStudentId);
+        let attendanceRateLabel = 'No data yet';
+        try {
+          const attendance = await DatabaseService.getStudentAttendance(linkedStudentId);
+          const loginEntries = attendance.filter((record) => (record.type || 'login') === 'login');
+          if (loginEntries.length > 0) {
+            const presentCount = loginEntries.filter((record) => {
+              const status = String(record.status || '').toLowerCase();
+              return status === 'present' || status === 'late';
+            }).length;
+            const percentage = Math.round((presentCount / loginEntries.length) * 100);
+            attendanceRateLabel = `${percentage}%`;
+          }
+        } catch (attendanceError) {
+          console.warn('Could not calculate attendance rate for child:', linkedStudentId, attendanceError);
+        }
+
+        if (student) {
+          loadedChildren.push({
+            id: student.id,
+            studentId: String(student.studentId || linkedStudentId).toUpperCase(),
+            name: student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || linkedStudentId,
+            class: student.class || 'N/A',
+            attendanceRateLabel
+          });
+        } else {
+          loadedChildren.push({
+            id: linkedStudentId,
+            studentId: linkedStudentId,
+            name: linkedStudentId,
+            class: 'N/A',
+            attendanceRateLabel
+          });
+        }
       }
+      setChildren(loadedChildren);
     } catch (error) {
       console.error('Error loading parent children:', error);
       setChildren([]);
@@ -195,7 +223,7 @@ const ParentPortal = () => {
                 <Text style={styles.childClass}>ID: {child.studentId}</Text>
                 <Text style={styles.childClass}>Class: {child.class}</Text>
                 <View style={styles.attendanceIndicator}>
-                  <Text style={styles.attendanceText}>Attendance: 95%</Text>
+                  <Text style={styles.attendanceText}>Attendance: {child.attendanceRateLabel || 'No data yet'}</Text>
                 </View>
               </View>
             ))}

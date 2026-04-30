@@ -53,8 +53,10 @@ const LoginPage = () => {
         role: user.role,
         name: user.name,
         profileId: user.profileId,
+        email: user.email,
         class: user.class,
         studentId: user.studentId,
+        linkedStudentIds: user.linkedStudentIds,
         linkedStudentId: user.linkedStudentId
       });
 
@@ -118,6 +120,7 @@ const LoginPage = () => {
       <ResponsiveScreen>
       <View style={styles.content}>
         <View style={styles.header}>
+          <Ionicons name="school" size={72} color="#4a90e2" style={styles.headerIcon} />
           <Text style={styles.title}>School Class Management System</Text>
           <Text style={styles.subtitle}>Please login to continue</Text>
           {!isFirebaseConfigured && (
@@ -281,6 +284,9 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 40,
+  },
+  headerIcon: {
+    marginBottom: 14,
   },
   title: {
     fontSize: 28,

@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDoc, limit as firestoreLimit, getDocs, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, deleteField, doc, getDoc, limit as firestoreLimit, getDocs, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { comprehensiveFraudCheck, formatFraudCheckMessage, logFraudAttempt } from '../utils/fraudDetection';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
@@ -13,6 +13,187 @@ const FRAUD_CHECK_BYPASS_STUDENT_IDS = new Set(['AC0611']);
 
 // Database service for managing students and attendance
 export class DatabaseService {
+  // ===== PARENT MANAGEMENT =====
+
+  static splitFullName(fullName) {
+    const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return { firstName: '', lastName: '' };
+    if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+    return {
+      firstName: parts[0],
+      lastName: parts.slice(1).join(' ')
+    };
+  }
+
+  static async getParentByEmail(email) {
+    if (!hasFirestore()) return null;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) return null;
+
+    try {
+      const q = query(
+        collection(db, 'parents'),
+        where('email', '==', normalizedEmail),
+        firestoreLimit(1)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return null;
+      const d = snap.docs[0];
+      return { docId: d.id, ...d.data() };
+    } catch (error) {
+      console.warn('Error getting parent by email:', error);
+      return null;
+    }
+  }
+
+  static async upsertParentProfile({
+    parentId,
+    email,
+    name,
+    phone,
+    linkedStudentId,
+    linkedStudentIds = []
+  }) {
+    if (!hasFirestore()) return null;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const sid = String(linkedStudentId || '').trim().toUpperCase();
+    if (!normalizedEmail) return null;
+
+    const existing = await this.getParentByEmail(normalizedEmail);
+    const { firstName, lastName } = this.splitFullName(name || existing?.name || '');
+    const existingIdsFromArray = Array.isArray(existing?.linkedStudentId)
+      ? existing.linkedStudentId.map((id) => String(id || '').trim().toUpperCase()).filter(Boolean)
+      : [];
+    const existingIdsFromLegacyArray = Array.isArray(existing?.linkedStudentIds)
+      ? existing.linkedStudentIds.map((id) => String(id || '').trim().toUpperCase()).filter(Boolean)
+      : [];
+    const existingPrimaryId = !Array.isArray(existing?.linkedStudentId)
+      ? String(existing?.linkedStudentId || '').trim().toUpperCase()
+      : '';
+    const requestedIds = Array.isArray(linkedStudentIds)
+      ? linkedStudentIds.map((id) => String(id || '').trim().toUpperCase()).filter(Boolean)
+      : [];
+    const mergedIds = Array.from(
+      new Set([sid, existingPrimaryId, ...requestedIds, ...existingIdsFromArray, ...existingIdsFromLegacyArray].filter(Boolean))
+    );
+    const validStudentIds = [];
+    for (const candidateId of mergedIds) {
+      try {
+        const studentSnap = await getDoc(doc(db, 'students', candidateId));
+        if (studentSnap.exists) {
+          const student = studentSnap.data() || {};
+          const canonicalId = QRCodeUtils.generateStudentId(
+            student.firstName || '',
+            student.lastName || '',
+            student.class || '',
+            student.dob || ''
+          );
+          const normalizedCanonical = String(canonicalId || '').trim().toUpperCase();
+          const normalizedStored = String(student.studentId || student.id || '').trim().toUpperCase();
+          // Keep only IDs that match the student's canonical ID.
+          if (normalizedCanonical && normalizedCanonical === candidateId) {
+            validStudentIds.push(candidateId);
+          } else if (!normalizedCanonical && normalizedStored === candidateId) {
+            validStudentIds.push(candidateId);
+          }
+        }
+      } catch {
+        // Ignore individual lookup failure and keep moving.
+      }
+    }
+    const finalLinkedIds = Array.from(new Set([sid, ...validStudentIds].filter(Boolean)));
+    const profileId = existing?.id || parentId || `PAR${Date.now().toString().slice(-6)}`;
+    const docId = existing?.docId || profileId;
+    const now = new Date().toISOString();
+
+    await setDoc(doc(db, 'parents', docId), {
+      id: profileId,
+      email: normalizedEmail,
+      role: 'parent',
+      firstName,
+      lastName,
+      name: String(name || `${firstName} ${lastName}`.trim()).trim(),
+      phone: String(phone || existing?.phone || '').trim(),
+      linkedStudentId: finalLinkedIds,
+      isActive: true,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    }, { merge: true });
+
+    return {
+      docId,
+      id: profileId,
+      linkedStudentIds: finalLinkedIds
+    };
+  }
+
+  static async normalizeAllParentLinkedStudents() {
+    if (!hasFirestore()) return 0;
+    try {
+      const snap = await getDocs(collection(db, 'parents'));
+      let updatedCount = 0;
+
+      for (const parentDoc of snap.docs) {
+        const data = parentDoc.data() || {};
+        const linkedFromPrimary = Array.isArray(data.linkedStudentId)
+          ? data.linkedStudentId
+          : [data.linkedStudentId];
+        const linkedFromLegacy = Array.isArray(data.linkedStudentIds)
+          ? data.linkedStudentIds
+          : [data.linkedStudentIds];
+
+        const mergedIds = Array.from(
+          new Set(
+            [...linkedFromPrimary, ...linkedFromLegacy]
+              .map((id) => String(id || '').trim().toUpperCase())
+              .filter(Boolean)
+          )
+        );
+        const validCanonicalIds = [];
+        for (const candidateId of mergedIds) {
+          try {
+            const studentSnap = await getDoc(doc(db, 'students', candidateId));
+            if (!studentSnap.exists) continue;
+            const student = studentSnap.data() || {};
+            const canonicalId = QRCodeUtils.generateStudentId(
+              student.firstName || '',
+              student.lastName || '',
+              student.class || '',
+              student.dob || ''
+            );
+            const normalizedCanonical = String(canonicalId || '').trim().toUpperCase();
+            const normalizedStored = String(student.studentId || student.id || '').trim().toUpperCase();
+            if ((normalizedCanonical && normalizedCanonical === candidateId) || (!normalizedCanonical && normalizedStored === candidateId)) {
+              validCanonicalIds.push(candidateId);
+            }
+          } catch {
+            // best effort, continue
+          }
+        }
+
+        const currentlyPrimaryArray = Array.isArray(data.linkedStudentId);
+        const hasLegacyField = Object.prototype.hasOwnProperty.call(data, 'linkedStudentIds');
+        const needsWrite =
+          !currentlyPrimaryArray ||
+          hasLegacyField ||
+          JSON.stringify((data.linkedStudentId || []).map((id) => String(id || '').trim().toUpperCase())) !== JSON.stringify(validCanonicalIds);
+
+        if (needsWrite) {
+          await updateDoc(doc(db, 'parents', parentDoc.id), {
+            linkedStudentId: validCanonicalIds,
+            linkedStudentIds: deleteField(),
+            updatedAt: new Date().toISOString()
+          });
+          updatedCount += 1;
+        }
+      }
+
+      return updatedCount;
+    } catch (error) {
+      console.warn('Error normalizing parent linked student fields:', error);
+      return 0;
+    }
+  }
   
   // ===== TEACHER MANAGEMENT =====
   
@@ -177,8 +358,31 @@ export class DatabaseService {
         studentData.studentId = QRCodeUtils.generateStudentId(
           studentData.firstName, 
           studentData.lastName, 
-          studentData.class
+          studentData.class,
+          studentData.dob
         );
+      }
+
+      const normalizedStudentId = String(studentData.studentId || '').trim().toUpperCase();
+      const normalizedClass = String(studentData.class || '').trim();
+      const classDigitsMatch = normalizedClass.match(/\d+/);
+      const parsedYearLevel = classDigitsMatch ? Number(classDigitsMatch[0]) : null;
+      const classId = normalizedClass ? `CLS${normalizedClass.replace(/\s+/g, '').toUpperCase()}` : '';
+
+      studentData.studentId = normalizedStudentId;
+      studentData.id = normalizedStudentId;
+      studentData.class = normalizedClass;
+      studentData.classId = classId;
+      studentData.yearLevel = Number.isFinite(parsedYearLevel) ? parsedYearLevel : '';
+      studentData.isActive = true;
+      if (typeof studentData.isCheckedIn !== 'boolean') {
+        studentData.isCheckedIn = false;
+      }
+      if (studentData.lastCheckedInAt == null) {
+        studentData.lastCheckedInAt = '';
+      }
+      if (studentData.lastCheckedOutAt == null) {
+        studentData.lastCheckedOutAt = '';
       }
 
       // Generate QR code data (without timestamp for display)
@@ -188,7 +392,8 @@ export class DatabaseService {
       studentData.createdAt = new Date().toISOString();
       studentData.updatedAt = new Date().toISOString();
 
-      const docRef = await addDoc(collection(db, 'students'), studentData);
+      const studentDocId = normalizedStudentId;
+      await setDoc(doc(db, 'students', studentDocId), studentData, { merge: true });
       
       // Log activity
       await this.logActivity({
@@ -201,8 +406,8 @@ export class DatabaseService {
         }
       });
       
-      console.log('Student added with ID:', docRef.id);
-      return docRef.id;
+      console.log('Student added with ID:', studentDocId);
+      return studentDocId;
     } catch (error) {
       console.error('Error adding student:', error);
       throw error;

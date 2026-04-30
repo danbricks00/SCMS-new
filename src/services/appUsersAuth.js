@@ -1,6 +1,9 @@
 import {
+  deleteUser,
+  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut as firebaseSignOut
+  signOut as firebaseSignOut,
+  getAuth
 } from 'firebase/auth';
 import {
   collection,
@@ -9,8 +12,11 @@ import {
   getDocs,
   limit,
   query,
+  setDoc,
+  updateDoc,
   where
 } from 'firebase/firestore';
+import { deleteApp, initializeApp } from 'firebase/app';
 import { auth, db, isFirebaseConfigured } from '../config/firebase';
 
 const ALLOWED_ROLES = ['admin', 'teacher', 'student', 'parent'];
@@ -35,13 +41,16 @@ export function mapFirestoreUserToSession(snap) {
   const docId = snap.id;
 
   const linkedChildId = asLoginToken(data.linkedStudentId);
+  const linkedChildIds = Array.isArray(data.linkedStudentIds)
+    ? data.linkedStudentIds.map((id) => asLoginToken(id)).filter(Boolean)
+    : [];
   const dataStudentId = asLoginToken(data.studentId);
   const profileIdToken = asLoginToken(data.profileId);
 
   /** For parents, `studentId` must be the child's id (portal), not the parent's profileId. */
   let sessionStudentId;
   if (role === 'parent') {
-    sessionStudentId = linkedChildId || dataStudentId || '';
+    sessionStudentId = linkedChildId || linkedChildIds[0] || dataStudentId || '';
   } else {
     sessionStudentId = dataStudentId || profileIdToken;
   }
@@ -51,17 +60,107 @@ export function mapFirestoreUserToSession(snap) {
     role,
     name: data.name || '',
     profileId: data.profileId,
+    email: data.email || '',
     class: data.class || data.classId || '',
     studentId: sessionStudentId,
+    linkedStudentIds: linkedChildIds.length ? linkedChildIds : undefined,
     linkedStudentId: linkedChildId || undefined,
     firebaseUid: docId
+  };
+}
+
+function normalizeLinkedStudentIds(...sources) {
+  const ids = [];
+  for (const source of sources) {
+    if (Array.isArray(source)) {
+      ids.push(...source);
+    } else if (source != null && source !== '') {
+      ids.push(source);
+    }
+  }
+  return Array.from(
+    new Set(
+      ids
+        .map((id) => String(id || '').trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+}
+
+async function hydrateParentLinkedStudents(session) {
+  if (!session || session.role !== 'parent' || !db) return session;
+
+  const existingIds = normalizeLinkedStudentIds(
+    session.linkedStudentIds,
+    session.linkedStudentId,
+    session.studentId
+  );
+
+  let parentDocIds = [];
+  const profileId = String(session.profileId || '').trim();
+  if (profileId) {
+    try {
+      const parentById = await getDoc(doc(db, 'parents', profileId));
+      if (parentById.exists()) {
+        const data = parentById.data() || {};
+        parentDocIds = normalizeLinkedStudentIds(
+          data.linkedStudentId,
+          data.linkedStudentIds
+        );
+      }
+    } catch (error) {
+      console.warn('[appUsersAuth] parent hydrate by profileId failed:', error);
+    }
+  }
+
+  if (!parentDocIds.length && session.email) {
+    try {
+      const parentByEmail = query(
+        collection(db, 'parents'),
+        where('email', '==', String(session.email).trim().toLowerCase()),
+        limit(1)
+      );
+      const parentSnap = await getDocs(parentByEmail);
+      if (!parentSnap.empty) {
+        const data = parentSnap.docs[0].data() || {};
+        parentDocIds = normalizeLinkedStudentIds(
+          data.linkedStudentId,
+          data.linkedStudentIds
+        );
+      }
+    } catch (error) {
+      console.warn('[appUsersAuth] parent hydrate by email failed:', error);
+    }
+  }
+
+  const mergedIds = normalizeLinkedStudentIds(existingIds, parentDocIds);
+  if (!mergedIds.length) return session;
+
+  return {
+    ...session,
+    studentId: mergedIds[0],
+    linkedStudentId: mergedIds[0],
+    linkedStudentIds: mergedIds
   };
 }
 
 export async function fetchUserSessionForUid(uid) {
   if (!isFirebaseConfigured || !db || !uid) return null;
   const snap = await getDoc(doc(db, 'users', uid));
-  return mapFirestoreUserToSession(snap);
+  const direct = mapFirestoreUserToSession(snap);
+  if (direct) return await hydrateParentLinkedStudents(direct);
+
+  try {
+    const q = query(collection(db, 'users'), where('firebaseUid', '==', uid), limit(1));
+    const byFirebaseUid = await getDocs(q);
+    if (!byFirebaseUid.empty) {
+      const session = mapFirestoreUserToSession(byFirebaseUid.docs[0]);
+      return await hydrateParentLinkedStudents(session);
+    }
+  } catch (error) {
+    console.warn('[appUsersAuth] fetchUserSessionForUid fallback failed:', error);
+  }
+  return null;
 }
 
 /**
@@ -172,6 +271,43 @@ async function findUserDocForNonEmail(identifier) {
   return null;
 }
 
+async function findUserDocsForNonEmail(identifier) {
+  const docs = [];
+  const seen = new Set();
+  const pushDoc = (snap) => {
+    if (!snap?.id || seen.has(snap.id)) return;
+    seen.add(snap.id);
+    docs.push(snap);
+  };
+
+  const byDocId = await getUserSnapshotByDocIdCandidates(identifier);
+  if (byDocId) pushDoc(byDocId);
+
+  const fieldNames = [
+    'username',
+    'profileId',
+    'studentId',
+    'schoolUsername',
+    'loginName',
+    'userCode'
+  ];
+
+  for (const field of fieldNames) {
+    try {
+      const values = stringMatchVariants(identifier);
+      for (const v of values) {
+        const q = query(collection(db, 'users'), where(field, '==', v), limit(10));
+        const snap = await getDocs(q);
+        snap.docs.forEach((d) => pushDoc(d));
+      }
+    } catch (error) {
+      console.warn(`[appUsersAuth] user docs lookup by ${field} failed:`, error?.message || error);
+    }
+  }
+
+  return docs;
+}
+
 /**
  * @param {string} code Firebase Auth error code
  * @param {boolean} typedAsEmail true if the user entered something with @ (email-style sign-in)
@@ -230,41 +366,64 @@ export async function loginWithAppUser(identifierInput, passwordInput) {
   const typedAsEmail = identifier.includes('@');
 
   let emailToSignIn = null;
+  let signInCandidateEmails = [];
 
   if (typedAsEmail) {
     emailToSignIn = identifier;
+    signInCandidateEmails = [emailToSignIn];
   } else {
-    const profileSnap = await findUserDocForNonEmail(identifier);
-    if (!profileSnap) {
+    const profileDocs = await findUserDocsForNonEmail(identifier);
+    if (!profileDocs.length) {
       throw new Error(
         'No account matched that user id or profile code. Check spelling, or sign in with your school email instead.'
       );
     }
-    const data = profileSnap.data() || {};
-    const email = typeof data.email === 'string' ? data.email.trim() : '';
-    if (!email || !email.includes('@')) {
+    const emails = Array.from(
+      new Set(
+        profileDocs
+          .map((d) => {
+            const data = d.data() || {};
+            return typeof data.email === 'string' ? data.email.trim() : '';
+          })
+          .filter((email) => email && email.includes('@'))
+      )
+    );
+
+    if (!emails.length) {
       throw new Error(
         'This account id has no school email on file. Sign in with your school email, or ask an admin to add an email to your profile.'
       );
     }
-    emailToSignIn = email;
+    emailToSignIn = emails[0];
+    signInCandidateEmails = emails;
   }
 
   let credential;
-  try {
-    credential = await signInWithEmailAndPassword(auth, emailToSignIn, password);
-  } catch (e) {
-    const code = typeof e?.code === 'string' ? e.code : '';
-    if (code) {
+  let lastSignInError = null;
+  for (const candidateEmail of signInCandidateEmails) {
+    try {
+      credential = await signInWithEmailAndPassword(auth, candidateEmail, password);
+      break;
+    } catch (e) {
+      lastSignInError = e;
+      const code = typeof e?.code === 'string' ? e.code : '';
+      // For ID-based login, keep trying other mapped emails on invalid credentials.
+      if (!typedAsEmail && (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password')) {
+        continue;
+      }
       const msg = authErrorMessage(code, typedAsEmail);
       throw new Error(msg || e.message || 'Sign-in failed.');
     }
-    throw e;
+  }
+
+  if (!credential) {
+    const code = typeof lastSignInError?.code === 'string' ? lastSignInError.code : '';
+    const msg = authErrorMessage(code, typedAsEmail);
+    throw new Error(msg || lastSignInError?.message || 'Sign-in failed.');
   }
 
   const uid = credential.user.uid;
-  const profileSnap = await getDoc(doc(db, 'users', uid));
-  const session = mapFirestoreUserToSession(profileSnap);
+  const session = await fetchUserSessionForUid(uid);
   if (!session) {
     await firebaseSignOut(auth);
     throw new Error(
@@ -376,4 +535,307 @@ export async function fetchDemoUsersByRole() {
   }
 
   return byRole;
+}
+
+/**
+ * Create a Firebase Auth account + matching `users/{uid}` profile without
+ * changing the currently signed-in admin session.
+ */
+export async function createManagedAppUserAccount({
+  email,
+  password,
+  role,
+  name,
+  username,
+  profileId,
+  studentId = '',
+  className = '',
+  linkedStudentId = '',
+  linkedStudentIds = [],
+  extraProfileData = {}
+}) {
+  if (!isFirebaseConfigured || !db || !auth?.app) {
+    throw new Error('Firebase is not configured. Cannot create login account.');
+  }
+
+  if (!email || !password || !role || !profileId) {
+    throw new Error('Missing required account fields (email, password, role, profileId).');
+  }
+
+  if (!ALLOWED_ROLES.includes(role)) {
+    throw new Error(`Invalid role "${role}" for login account.`);
+  }
+
+  const tempAppName = `managed-user-create-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const secondaryApp = initializeApp(auth.app.options, tempAppName);
+  const secondaryAuth = getAuth(secondaryApp);
+  const cleanupSecondaryApp = async () => {
+    try {
+      await firebaseSignOut(secondaryAuth);
+    } catch {
+      // best-effort cleanup
+    }
+    try {
+      await deleteApp(secondaryApp);
+    } catch {
+      // best-effort cleanup
+    }
+  };
+
+  try {
+    const credential = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+    const uid = credential.user.uid;
+    const normalizedProfileId = String(profileId || '').trim().toUpperCase();
+    const userAliasDocId = `U_${normalizedProfileId}`;
+    const normalizedClass = String(className || '').trim();
+    const classId = normalizedClass ? `CLS${normalizedClass.replace(/\s+/g, '').toUpperCase()}` : '';
+
+    const normalizedLinkedIds = Array.isArray(linkedStudentIds)
+      ? linkedStudentIds.map((id) => String(id || '').trim().toUpperCase()).filter(Boolean)
+      : [];
+    const primaryLinkedStudentId = String(linkedStudentId || normalizedLinkedIds[0] || '')
+      .trim()
+      .toUpperCase();
+
+    const basePayload = {
+      id: userAliasDocId,
+      username: username || normalizedProfileId,
+      role,
+      name: name || '',
+      profileId: normalizedProfileId,
+      email: email.trim().toLowerCase(),
+      studentId: studentId || '',
+      class: normalizedClass,
+      classId,
+      linkedStudentId: primaryLinkedStudentId || '',
+      linkedStudentIds: primaryLinkedStudentId
+        ? Array.from(new Set([primaryLinkedStudentId, ...normalizedLinkedIds]))
+        : normalizedLinkedIds,
+      firebaseUid: uid,
+      ...extraProfileData,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Keep canonical user doc path as U_<profileId>.
+    await setDoc(doc(db, 'users', userAliasDocId), basePayload, { merge: true });
+
+    await cleanupSecondaryApp();
+
+    return { uid, userAliasDocId };
+  } catch (error) {
+    await cleanupSecondaryApp();
+    throw error;
+  }
+}
+
+export async function deleteManagedAppUserAccount(uid) {
+  if (!isFirebaseConfigured || !auth?.app || !uid) return;
+
+  const tempAppName = `managed-user-delete-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const secondaryApp = initializeApp(auth.app.options, tempAppName);
+  const secondaryAuth = getAuth(secondaryApp);
+  const cleanupSecondaryApp = async () => {
+    try {
+      await firebaseSignOut(secondaryAuth);
+    } catch {
+      // best-effort cleanup
+    }
+    try {
+      await deleteApp(secondaryApp);
+    } catch {
+      // best-effort cleanup
+    }
+  };
+
+  try {
+    // We can only delete the currently signed-in user on this auth instance.
+    // Since this helper is for rollback, we expect caller to provide a uid that
+    // was just created in this flow and currently signed in on secondary auth.
+    if (secondaryAuth.currentUser && secondaryAuth.currentUser.uid === uid) {
+      await deleteUser(secondaryAuth.currentUser);
+    }
+  } catch (error) {
+    console.warn('[appUsersAuth] account rollback failed:', error);
+  } finally {
+    await cleanupSecondaryApp();
+  }
+}
+
+export async function linkStudentToExistingParentByEmail(parentEmail, studentId) {
+  if (!isFirebaseConfigured || !db) return false;
+
+  const email = String(parentEmail || '').trim().toLowerCase();
+  const sid = String(studentId || '').trim().toUpperCase();
+  if (!email || !sid) return false;
+
+  try {
+    const q = query(
+      collection(db, 'users'),
+      where('role', '==', 'parent'),
+      where('email', '==', email),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return false;
+
+    const parentDoc = snap.docs[0];
+    const parentData = parentDoc.data() || {};
+    const parentIdsFromUsers = Array.isArray(parentData.linkedStudentIds)
+      ? parentData.linkedStudentIds.map((id) => String(id || '').trim().toUpperCase()).filter(Boolean)
+      : [];
+    const parentPrimaryFromUsers = String(parentData.linkedStudentId || '').trim().toUpperCase();
+
+    // Prefer canonical list from parents/<id> collection when available.
+    let parentIdsFromParentsCollection = [];
+    try {
+      const parentsQuery = query(
+        collection(db, 'parents'),
+        where('email', '==', email),
+        limit(1)
+      );
+      const parentSnap = await getDocs(parentsQuery);
+      if (!parentSnap.empty) {
+        const parentProfile = parentSnap.docs[0].data() || {};
+        const fromPrimary = Array.isArray(parentProfile.linkedStudentId)
+          ? parentProfile.linkedStudentId
+          : [parentProfile.linkedStudentId];
+        const fromLegacy = Array.isArray(parentProfile.linkedStudentIds)
+          ? parentProfile.linkedStudentIds
+          : [parentProfile.linkedStudentIds];
+        parentIdsFromParentsCollection = [...fromPrimary, ...fromLegacy]
+          .map((id) => String(id || '').trim().toUpperCase())
+          .filter(Boolean);
+      }
+    } catch (parentLookupError) {
+      console.warn('[appUsersAuth] parent collection lookup failed during link:', parentLookupError);
+    }
+
+    const baseIds = parentIdsFromParentsCollection.length > 0
+      ? parentIdsFromParentsCollection
+      : [parentPrimaryFromUsers, ...parentIdsFromUsers].filter(Boolean);
+    const mergedIds = Array.from(new Set([sid, ...baseIds].filter(Boolean)));
+
+    const parentProfileId = String(parentData.profileId || '').trim().toUpperCase();
+    const canonicalDocId = parentProfileId ? `U_${parentProfileId}` : '';
+    const docIdsToSync = Array.from(
+      new Set([parentDoc.id, canonicalDocId, parentData.firebaseUid].filter(Boolean))
+    );
+    for (const docId of docIdsToSync) {
+      await setDoc(doc(db, 'users', docId), {
+        id: canonicalDocId || docId,
+        linkedStudentId: mergedIds[0], // backward compatibility
+        linkedStudentIds: mergedIds,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+
+    // Keep dedicated parents collection in sync when present.
+    try {
+      const parentProfileIdLegacy = String(parentData.profileId || '').trim();
+      const parentsQuery = query(
+        collection(db, 'parents'),
+        where('email', '==', email),
+        limit(1)
+      );
+      const parentSnap = await getDocs(parentsQuery);
+      if (!parentSnap.empty) {
+        const parentDocSnap = parentSnap.docs[0];
+        await updateDoc(doc(db, 'parents', parentDocSnap.id), {
+          linkedStudentId: mergedIds,
+          updatedAt: new Date().toISOString()
+        });
+      } else if (parentProfileIdLegacy) {
+        await setDoc(doc(db, 'parents', parentProfileIdLegacy), {
+          id: parentProfileIdLegacy,
+          email,
+          role: 'parent',
+          firstName: '',
+          lastName: '',
+          name: String(parentData.name || '').trim(),
+          phone: String(parentData.parentPhone || parentData.phone || '').trim(),
+          linkedStudentId: mergedIds,
+          isActive: true,
+          createdAt: parentData.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    } catch (syncError) {
+      console.warn('[appUsersAuth] failed to sync parents collection link:', syncError);
+    }
+    return true;
+  } catch (error) {
+    console.warn('[appUsersAuth] failed to link student to parent account:', error);
+    return false;
+  }
+}
+
+export async function findParentAccountByEmail(parentEmail) {
+  if (!isFirebaseConfigured || !db) return null;
+
+  const email = String(parentEmail || '').trim().toLowerCase();
+  if (!email) return null;
+
+  try {
+    const q = query(
+      collection(db, 'users'),
+      where('role', '==', 'parent'),
+      where('email', '==', email)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const docs = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+      const mergedIds = Array.from(
+        new Set(
+          docs.flatMap((entry) => {
+            const fromPrimary = Array.isArray(entry.linkedStudentId)
+              ? entry.linkedStudentId
+              : [entry.linkedStudentId];
+            const fromLegacy = Array.isArray(entry.linkedStudentIds)
+              ? entry.linkedStudentIds
+              : [entry.linkedStudentIds];
+            return [...fromPrimary, ...fromLegacy]
+              .map((id) => String(id || '').trim().toUpperCase())
+              .filter(Boolean);
+          })
+        )
+      );
+      const preferred = docs.find((entry) => String(entry.id || '').startsWith('U_')) || docs[0];
+      return {
+        ...preferred,
+        linkedStudentIds: mergedIds,
+        linkedStudentId: mergedIds
+      };
+    }
+  } catch (error) {
+    console.warn('[appUsersAuth] failed to find parent account by email:', error);
+  }
+
+  // Fallback for legacy data where parent exists in `parents` collection only.
+  try {
+    const parentQuery = query(
+      collection(db, 'parents'),
+      where('email', '==', email),
+      limit(1)
+    );
+    const parentSnap = await getDocs(parentQuery);
+    if (parentSnap.empty) return null;
+    const d = parentSnap.docs[0];
+    const data = d.data() || {};
+    return {
+      uid: null,
+      source: 'parents',
+      profileId: data.id || d.id,
+      name: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+      email: data.email || email,
+      linkedStudentId: data.linkedStudentId || '',
+      linkedStudentIds: Array.isArray(data.linkedStudentId)
+        ? data.linkedStudentId
+        : (Array.isArray(data.linkedStudentIds) ? data.linkedStudentIds : (data.linkedStudentId ? [data.linkedStudentId] : []))
+    };
+  } catch (fallbackError) {
+    console.warn('[appUsersAuth] fallback parent lookup failed:', fallbackError);
+    return null;
+  }
 }

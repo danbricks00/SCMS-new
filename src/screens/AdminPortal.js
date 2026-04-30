@@ -11,7 +11,9 @@ import ResponsiveScreen from '../components/ResponsiveScreen';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import QRCodeGenerator from '../components/QRCodeGenerator';
 import { useAuth } from '../contexts/AuthContext';
+import { createManagedAppUserAccount, findParentAccountByEmail, linkStudentToExistingParentByEmail } from '../services/appUsersAuth';
 import { DatabaseService } from '../services/database';
+import { QRCodeUtils } from '../utils/qrCodeUtils';
 
 const AdminPortal = () => {
   const { user, logout } = useAuth();
@@ -42,11 +44,15 @@ const AdminPortal = () => {
   const [newStudent, setNewStudent] = useState({
     firstName: '',
     lastName: '',
+    dob: '',
     class: '',
     parentContact: '',
-    address: '',
-    emergencyContact: '',
-    photo: ''
+    parentName: '',
+    parentPhone: '',
+    photo: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
   });
   const [newTeacher, setNewTeacher] = useState({
     firstName: '',
@@ -56,7 +62,9 @@ const AdminPortal = () => {
     subject: '',
     department: '',
     photo: '',
-    classes: []
+    classes: [],
+    password: '',
+    confirmPassword: ''
   });
   const [newClass, setNewClass] = useState({
     name: '',
@@ -74,6 +82,92 @@ const AdminPortal = () => {
     visibility: 'all',
     targetClasses: []
   });
+  const [parentMatchStatus, setParentMatchStatus] = useState('idle'); // idle | checking | found | not_found | invalid
+  const [matchedParentName, setMatchedParentName] = useState('');
+  const [matchedParentProfile, setMatchedParentProfile] = useState(null);
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
+
+  const showPopup = (title, message) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(`${title}\n\n${message}`);
+      return;
+    }
+    Alert.alert(title, message);
+  };
+
+  const generateParentProfileId = (name) => {
+    const cleaned = String(name || '').trim();
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    const firstInitial = (parts[0] || 'P').charAt(0).toUpperCase();
+    const lastInitial = (parts[1] || parts[0] || 'R').charAt(0).toUpperCase();
+    const suffix = Date.now().toString().slice(-4);
+    return `${firstInitial}${lastInitial}${suffix}`;
+  };
+
+  const generateStudentEmail = (firstName, lastName) => {
+    const first = String(firstName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const last = String(lastName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!first || !last) return '';
+    return `${first}.${last}@student.scms.school.nz`;
+  };
+
+  const generateFallbackStudentEmail = (firstName, lastName, studentId) => {
+    const first = String(firstName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const last = String(lastName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sid = String(studentId || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!first || !last || !sid) return '';
+    return `${first}.${last}.${sid}@student.scms.school.nz`;
+  };
+
+  useEffect(() => {
+    let active = true;
+    const parentEmail = String(newStudent.parentContact || '').trim().toLowerCase();
+
+    if (!parentEmail) {
+      setParentMatchStatus('idle');
+      setMatchedParentName('');
+      setMatchedParentProfile(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(parentEmail)) {
+      setParentMatchStatus('invalid');
+      setMatchedParentName('');
+      setMatchedParentProfile(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    setParentMatchStatus('checking');
+    const timer = setTimeout(async () => {
+      const existingParent = await findParentAccountByEmail(parentEmail);
+      if (!active) return;
+      if (existingParent) {
+        setParentMatchStatus(existingParent.uid ? 'found' : 'profile_only');
+        setMatchedParentName(existingParent.name || 'Existing parent');
+        setMatchedParentProfile(existingParent);
+        if (!existingParent.uid && existingParent.name) {
+          setNewStudent((prev) => ({
+            ...prev,
+            parentName: prev.parentName || existingParent.name
+          }));
+        }
+      } else {
+        setParentMatchStatus('not_found');
+        setMatchedParentName('');
+        setMatchedParentProfile(null);
+      }
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [newStudent.parentContact]);
 
   useEffect(() => {
     loadStudents();
@@ -83,6 +177,9 @@ const AdminPortal = () => {
     loadEvents();
     loadAbsenceRequests();
     loadDashboardStats();
+    DatabaseService.normalizeAllParentLinkedStudents().catch((error) => {
+      console.warn('Parent linked-student normalization failed:', error);
+    });
   }, []);
 
   const loadDashboardStats = async () => {
@@ -231,51 +328,226 @@ const AdminPortal = () => {
   };
 
   const handleAddStudent = async () => {
-    if (!newStudent.firstName || !newStudent.lastName || !newStudent.class) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (isAddingStudent) return;
+
+    if (!newStudent.firstName || !newStudent.lastName || !newStudent.class || !newStudent.dob || !newStudent.parentContact) {
+      showPopup('Error', 'Please fill in all required fields including date of birth and parent email');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(newStudent.dob || '').trim())) {
+      showPopup('Error', 'Date of birth must be in YYYY-MM-DD format');
       return;
     }
 
     try {
+      setIsAddingStudent(true);
+      const parentEmail = String(newStudent.parentContact || '').trim().toLowerCase();
+      const existingParent = parentMatchStatus === 'found' || parentMatchStatus === 'profile_only'
+        ? (matchedParentProfile || await findParentAccountByEmail(parentEmail))
+        : await findParentAccountByEmail(parentEmail);
+      const parentHasLogin = Boolean(existingParent?.uid);
+      const needsParentLoginSetup = !parentHasLogin;
+      const resolvedParentPhone = String(
+        newStudent.parentPhone || existingParent?.phone || ''
+      ).trim();
+
+      if (needsParentLoginSetup) {
+        if (!newStudent.parentName || !resolvedParentPhone) {
+          showPopup('Missing parent details', 'This parent needs account setup. Please enter parent name and contact info.');
+          return;
+        }
+      }
+
+      const generatedStudentId = newStudent.studentId || QRCodeUtils.generateStudentId(
+        newStudent.firstName,
+        newStudent.lastName,
+        newStudent.class,
+        newStudent.dob
+      );
+      const fullName = `${newStudent.firstName} ${newStudent.lastName}`;
+      const generatedStudentPassword = QRCodeUtils.generateStudentPasswordFromDob(generatedStudentId);
+      const primaryStudentEmail = generateStudentEmail(newStudent.firstName, newStudent.lastName);
+      const fallbackStudentEmail = generateFallbackStudentEmail(
+        newStudent.firstName,
+        newStudent.lastName,
+        generatedStudentId
+      );
+      if (!primaryStudentEmail) {
+        showPopup('Error', 'Could not generate student email from name. Please check the student name.');
+        return;
+      }
+
+      let generatedStudentEmail = primaryStudentEmail;
+      try {
+        await createManagedAppUserAccount({
+          email: generatedStudentEmail,
+          password: generatedStudentPassword,
+          role: 'student',
+          name: fullName,
+          username: generatedStudentId,
+          profileId: generatedStudentId,
+          studentId: generatedStudentId,
+          className: newStudent.class,
+          extraProfileData: {
+            password: generatedStudentPassword
+          }
+        });
+      } catch (studentAuthError) {
+        const code = String(studentAuthError?.code || studentAuthError?.message || '');
+        const isEmailInUse = code.includes('auth/email-already-in-use');
+        if (!isEmailInUse || !fallbackStudentEmail) {
+          throw studentAuthError;
+        }
+
+        generatedStudentEmail = fallbackStudentEmail;
+        await createManagedAppUserAccount({
+          email: generatedStudentEmail,
+          password: generatedStudentPassword,
+          role: 'student',
+          name: fullName,
+          username: generatedStudentId,
+          profileId: generatedStudentId,
+          studentId: generatedStudentId,
+          className: newStudent.class,
+          extraProfileData: {
+            password: generatedStudentPassword
+          }
+        });
+      }
+
       const studentData = {
         ...newStudent,
-        name: `${newStudent.firstName} ${newStudent.lastName}`
+        studentId: generatedStudentId,
+        name: fullName,
+        email: generatedStudentEmail
       };
+      // Do not store phone numbers under students.
+      delete studentData.parentPhone;
+      // Do not store non-persisted fields under students.
+      delete studentData.address;
 
       await DatabaseService.addStudent(studentData);
-      Alert.alert('Success', 'Student added successfully');
+      const linkedToExistingParent = parentHasLogin
+        ? await linkStudentToExistingParentByEmail(parentEmail, generatedStudentId)
+        : false;
+
+      let parentProfileId = existingParent?.profileId || existingParent?.id || generateParentProfileId(newStudent.parentName);
+      const generatedParentPassword = `Par-${String(parentProfileId).toUpperCase()}`;
+      if (needsParentLoginSetup) {
+        const parentUsername = String(newStudent.parentName || '')
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '.')
+          .replace(/^\.+|\.+$/g, '') || parentProfileId.toLowerCase();
+
+        await createManagedAppUserAccount({
+          email: parentEmail,
+          password: generatedParentPassword,
+          role: 'parent',
+          name: newStudent.parentName,
+          username: parentUsername,
+          profileId: parentProfileId,
+          linkedStudentId: generatedStudentId,
+          linkedStudentIds: [generatedStudentId],
+          extraProfileData: {
+            parentPhone: resolvedParentPhone,
+            password: generatedParentPassword
+          }
+        });
+      }
+
+      await DatabaseService.upsertParentProfile({
+        parentId: parentProfileId,
+        email: parentEmail,
+        name: newStudent.parentName || existingParent?.name || '',
+        phone: resolvedParentPhone,
+        linkedStudentId: generatedStudentId,
+        linkedStudentIds: Array.isArray(existingParent?.linkedStudentIds) ? existingParent.linkedStudentIds : []
+      });
+
+      showPopup('Success', 'Student added successfully');
+      showPopup(
+        'Student login created',
+        `Student ID: ${generatedStudentId}\nEmail: ${generatedStudentEmail}\nDefault password: ${generatedStudentPassword}`
+      );
+      if (parentHasLogin && linkedToExistingParent) {
+        showPopup(
+          'Parent linked',
+          `Linked ${fullName} to existing parent account: ${parentEmail}`
+        );
+      } else if (needsParentLoginSetup) {
+        showPopup(
+          'Parent setup complete',
+          `Created/updated parent account for ${newStudent.parentName} and linked ${fullName}.\n\nParent ID: ${parentProfileId}\nParent password: ${generatedParentPassword}`
+        );
+      }
       
       // Reset form
       setNewStudent({
         firstName: '',
         lastName: '',
+        dob: '',
         class: '',
         parentContact: '',
-        address: '',
-        emergencyContact: '',
-        photo: ''
+        parentName: '',
+        parentPhone: '',
+        photo: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
       });
       
       setShowAddStudent(false);
       loadStudents();
       loadDashboardStats(); // Refresh dashboard stats
+      setParentMatchStatus('idle');
+      setMatchedParentName('');
+      setMatchedParentProfile(null);
     } catch (error) {
       console.error('Error adding student:', error);
-      Alert.alert('Error', 'Failed to add student');
+      const errorMessage = String(error?.message || error || 'Failed to add student');
+      showPopup('Error adding student', errorMessage);
+    } finally {
+      setIsAddingStudent(false);
     }
   };
 
   const handleAddTeacher = async () => {
-    if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.email || !newTeacher.subject) {
-      Alert.alert('Error', 'Please fill in all required fields (First Name, Last Name, Email, Subject)');
+    if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.email || !newTeacher.subject || !newTeacher.password || !newTeacher.confirmPassword) {
+      Alert.alert('Error', 'Please fill in all required fields (First Name, Last Name, Email, Subject, Password)');
+      return;
+    }
+
+    if (newTeacher.password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    if (newTeacher.password !== newTeacher.confirmPassword) {
+      Alert.alert('Error', 'Teacher passwords do not match');
       return;
     }
 
     try {
+      const generatedTeacherId = newTeacher.teacherId || `TCH${Date.now().toString().slice(-6)}`;
+      const fullName = `${newTeacher.firstName} ${newTeacher.lastName}`;
+
+      await createManagedAppUserAccount({
+        email: newTeacher.email,
+        password: newTeacher.password,
+        role: 'teacher',
+        name: fullName,
+        username: generatedTeacherId,
+        profileId: generatedTeacherId
+      });
+
       const teacherData = {
         ...newTeacher,
-        name: `${newTeacher.firstName} ${newTeacher.lastName}`
+        teacherId: generatedTeacherId,
+        name: fullName
       };
+      delete teacherData.password;
+      delete teacherData.confirmPassword;
 
       await DatabaseService.addTeacher(teacherData);
       Alert.alert('Success', 'Teacher added successfully');
@@ -289,7 +561,9 @@ const AdminPortal = () => {
         subject: '',
         department: '',
         photo: '',
-        classes: []
+        classes: [],
+        password: '',
+        confirmPassword: ''
       });
       
       setShowAddTeacher(false);
@@ -703,47 +977,117 @@ const AdminPortal = () => {
                 placeholder="e.g., 10A, 9B"
               />
             </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Date of Birth *</Text>
+              <TextInput
+                style={styles.input}
+                value={newStudent.dob}
+                onChangeText={(text) => setNewStudent({...newStudent, dob: text})}
+                placeholder="YYYY-MM-DD (e.g. 2008-11-06)"
+                autoCapitalize="none"
+              />
+              <Text style={styles.helperText}>
+                Student ID is auto-generated from initials + day/month (e.g. AC0611).
+              </Text>
+            </View>
             
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Parent Contact</Text>
+              <Text style={styles.inputLabel}>Student Login (Auto-generated)</Text>
+              <View style={styles.readonlyBox}>
+                <Text style={styles.readonlyText}>
+                  ID: {newStudent.firstName && newStudent.lastName && newStudent.dob
+                    ? QRCodeUtils.generateStudentId(newStudent.firstName, newStudent.lastName, newStudent.class, newStudent.dob)
+                    : 'Will be generated after entering name + DOB'}
+                </Text>
+                <Text style={styles.readonlyText}>
+                  Email: {newStudent.firstName && newStudent.lastName && newStudent.dob
+                    ? generateStudentEmail(newStudent.firstName, newStudent.lastName)
+                    : 'Will be auto-generated from student name'}
+                </Text>
+                <Text style={styles.readonlyText}>
+                  Password: {newStudent.firstName && newStudent.lastName && newStudent.dob
+                    ? QRCodeUtils.generateStudentPasswordFromDob(
+                        QRCodeUtils.generateStudentId(newStudent.firstName, newStudent.lastName, newStudent.class, newStudent.dob)
+                      )
+                    : 'Will be generated from DOB'}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.formDivider}>
+              <View style={styles.formDividerLine} />
+              <Text style={styles.formDividerText}>Parent Information</Text>
+              <View style={styles.formDividerLine} />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Parent Email *</Text>
               <TextInput
                 style={styles.input}
                 value={newStudent.parentContact}
                 onChangeText={(text) => setNewStudent({...newStudent, parentContact: text})}
                 placeholder="parent@email.com"
                 keyboardType="email-address"
+                autoCapitalize="none"
               />
+              {parentMatchStatus === 'checking' && (
+                <Text style={styles.helperText}>Checking for existing parent account...</Text>
+              )}
+              {parentMatchStatus === 'found' && (
+                <Text style={[styles.helperText, styles.matchFoundText]}>
+                  Match found: {matchedParentName}. Student will be linked to this parent account.
+                </Text>
+              )}
+              {parentMatchStatus === 'profile_only' && (
+                <Text style={[styles.helperText, styles.matchNotFoundText]}>
+                  Parent profile found, but login is missing. Enter name/contact to complete account setup.
+                </Text>
+              )}
+              {parentMatchStatus === 'not_found' && (
+                <Text style={[styles.helperText, styles.matchNotFoundText]}>
+                  Match not found. Set up a new parent account below.
+                </Text>
+              )}
+              {parentMatchStatus === 'invalid' && (
+                <Text style={[styles.helperText, styles.matchNotFoundText]}>
+                  Enter a valid parent email to continue.
+                </Text>
+              )}
             </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Address</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={newStudent.address}
-                onChangeText={(text) => setNewStudent({...newStudent, address: text})}
-                placeholder="Student address"
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Emergency Contact</Text>
-              <TextInput
-                style={styles.input}
-                value={newStudent.emergencyContact}
-                onChangeText={(text) => setNewStudent({...newStudent, emergencyContact: text})}
-                placeholder="+64 21 123 4567"
-                keyboardType="phone-pad"
-              />
-            </View>
+
+            {(parentMatchStatus === 'not_found' || parentMatchStatus === 'profile_only') && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Parent Name *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newStudent.parentName}
+                    onChangeText={(text) => setNewStudent({...newStudent, parentName: text})}
+                    placeholder="Parent full name"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Parent Phone / Contact Info *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newStudent.parentPhone}
+                    onChangeText={(text) => setNewStudent({...newStudent, parentPhone: text})}
+                    placeholder="+64 21 123 4567"
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              </>
+            )}
             
             <TouchableOpacity
-              style={styles.addButton}
+              style={[styles.addButton, isAddingStudent && styles.addButtonDisabled]}
               onPress={handleAddStudent}
+              disabled={isAddingStudent}
             >
               <Ionicons name="add-circle" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Add Student</Text>
+              <Text style={styles.addButtonText}>{isAddingStudent ? 'Adding Student...' : 'Add Student'}</Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -803,6 +1147,28 @@ const AdminPortal = () => {
                 onChangeText={(text) => setNewTeacher({...newTeacher, email: text})}
                 placeholder="teacher@school.edu"
                 keyboardType="email-address"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Teacher Login Password *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.password}
+                onChangeText={(text) => setNewTeacher({...newTeacher, password: text})}
+                placeholder="Minimum 6 characters"
+                secureTextEntry
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Confirm Password *</Text>
+              <TextInput
+                style={styles.input}
+                value={newTeacher.confirmPassword}
+                onChangeText={(text) => setNewTeacher({...newTeacher, confirmPassword: text})}
+                placeholder="Re-enter password"
+                secureTextEntry
               />
             </View>
             
@@ -1825,11 +2191,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
   },
+  readonlyBox: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    backgroundColor: '#f7f9fc',
+    gap: 6,
+  },
+  readonlyText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
   helperText: {
     fontSize: 12,
     color: '#666',
     marginTop: 6,
     fontStyle: 'italic',
+  },
+  matchFoundText: {
+    color: '#2e7d32',
+    fontStyle: 'normal',
+    fontWeight: '600',
+  },
+  matchNotFoundText: {
+    color: '#c62828',
+    fontStyle: 'normal',
+    fontWeight: '600',
+  },
+  formDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  formDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#d9d9d9',
+  },
+  formDividerText: {
+    marginHorizontal: 10,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   textArea: {
     height: 80,
@@ -1847,6 +2255,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 20,
     gap: 8,
+  },
+  addButtonDisabled: {
+    opacity: 0.7,
   },
   addButtonText: {
     color: '#fff',

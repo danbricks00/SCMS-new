@@ -139,14 +139,30 @@ export class QRCodeUtils {
    * @param {string} firstName - Student's first name
    * @param {string} lastName - Student's last name
    * @param {string} studentClass - Student's class
+   * @param {string} dob - Student date of birth (YYYY-MM-DD)
    * @returns {string} Unique student ID
    */
-  static generateStudentId(firstName, lastName, studentClass) {
+  static generateStudentId(firstName, lastName, studentClass, dob = '') {
+    const safeFirst = String(firstName || '').trim();
+    const safeLast = String(lastName || '').trim();
+    const initials = `${safeFirst.charAt(0)}${safeLast.charAt(0)}`.toUpperCase();
+
+    const dobMatch = String(dob || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dobMatch) {
+      const month = dobMatch[2];
+      const day = dobMatch[3];
+      return `${initials}${day}${month}`;
+    }
+
     const timestamp = Date.now().toString().slice(-4);
-    const initials = firstName.charAt(0).toUpperCase() + lastName.charAt(0).toUpperCase();
-    const classCode = studentClass.replace(/[^a-zA-Z0-9]/g, '');
-    
+    const classCode = String(studentClass || '').replace(/[^a-zA-Z0-9]/g, '');
     return `STU${classCode}${initials}${timestamp}`;
+  }
+
+  static generateStudentPasswordFromDob(studentId = '') {
+    const normalizedId = String(studentId || '').trim().toUpperCase();
+    if (!normalizedId) return '';
+    return `Stud-${normalizedId}`;
   }
 
   /**

@@ -43,7 +43,48 @@ const ActivityLog = ({
   linkedStudentNames = null
 }) => {
   const [activities, setActivities] = useState([]);
-  const [filter, setFilter] = useState('all'); // all, students, teachers, events, announcements
+  const [allActivities, setAllActivities] = useState([]);
+  const [filter, setFilter] = useState('all'); // all, student, teacher, event, announcement
+
+  const normalizeFilter = (value) => {
+    const key = String(value || 'all').toLowerCase();
+    if (key === 'students' || key === 'student') return 'student';
+    if (key === 'teachers' || key === 'teacher') return 'teacher';
+    if (key === 'events' || key === 'event') return 'event';
+    if (key === 'announcements' || key === 'announcement') return 'announcement';
+    return 'all';
+  };
+
+  const activityMatchesFilter = (activity, activeFilter) => {
+    if (activeFilter === 'all') return true;
+
+    const type = activity?.type;
+    switch (activeFilter) {
+      case 'student':
+        return [
+          'student_added',
+          'student_updated',
+          'attendance_marked',
+          'absence_request'
+        ].includes(type);
+      case 'teacher':
+        return [
+          'teacher_added',
+          'teacher_updated'
+        ].includes(type);
+      case 'event':
+        return [
+          'event_created',
+          'event_updated'
+        ].includes(type);
+      case 'announcement':
+        return [
+          'announcement_created'
+        ].includes(type);
+      default:
+        return true;
+    }
+  };
 
   const parentFilterKey = useMemo(() => {
     if (userRole !== 'parent' || linkedStudentIds == null) return '';
@@ -56,13 +97,13 @@ const ActivityLog = ({
     // Refresh every 30 seconds
     const interval = setInterval(loadActivities, 30000);
     return () => clearInterval(interval);
-  }, [filter, userRole, maxItems, parentFilterKey]);
+  }, [userRole, maxItems, parentFilterKey]);
 
   const loadActivities = async () => {
     try {
       const parentChildFilter = userRole === 'parent' && linkedStudentIds != null;
       const fetchCap = parentChildFilter ? 200 : Math.max(maxItems * 4, 50);
-      let activityData = await DatabaseService.getActivityLog(userRole, filter, fetchCap);
+      let activityData = await DatabaseService.getActivityLog(userRole, 'all', fetchCap);
 
       if (parentChildFilter) {
         if (!linkedStudentIds.length) {
@@ -80,7 +121,7 @@ const ActivityLog = ({
         }
       }
 
-      setActivities(activityData.slice(0, maxItems));
+      setAllActivities(activityData);
     } catch (error) {
       console.error('Error loading activities:', error);
     }
@@ -155,36 +196,43 @@ const ActivityLog = ({
     return true;
   };
 
-  const filteredActivities = activities.filter(shouldShowActivity);
+  useEffect(() => {
+    const normalizedFilter = normalizeFilter(filter);
+    const scopedActivities = allActivities
+      .filter((activity) => activityMatchesFilter(activity, normalizedFilter))
+      .filter(shouldShowActivity)
+      .slice(0, maxItems);
 
-  if (filteredActivities.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="notifications-off-outline" size={48} color="#ccc" />
-        <Text style={styles.emptyText}>No recent activities</Text>
-      </View>
-    );
-  }
+    setActivities(scopedActivities);
+  }, [allActivities, filter, maxItems, userRole, linkedStudentIds, linkedStudentNames]);
+
+  const filteredActivities = activities;
 
   return (
     <View style={styles.container}>
       {userRole === 'admin' && (
         <View style={styles.filterContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {['all', 'students', 'teachers', 'events', 'announcements'].map((filterType) => (
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'student', label: 'Student' },
+              { key: 'teacher', label: 'Teachers' },
+              { key: 'event', label: 'Events' },
+              { key: 'announcement', label: 'Announcements' }
+            ].map((filterType) => (
               <TouchableOpacity
-                key={filterType}
+                key={filterType.key}
                 style={[
                   styles.filterButton,
-                  filter === filterType && styles.filterButtonActive
+                  normalizeFilter(filter) === filterType.key && styles.filterButtonActive
                 ]}
-                onPress={() => setFilter(filterType)}
+                onPress={() => setFilter(filterType.key)}
               >
                 <Text style={[
                   styles.filterButtonText,
-                  filter === filterType && styles.filterButtonTextActive
+                  normalizeFilter(filter) === filterType.key && styles.filterButtonTextActive
                 ]}>
-                  {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+                  {filterType.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -193,7 +241,12 @@ const ActivityLog = ({
       )}
 
       <ScrollView style={styles.activityList}>
-        {filteredActivities.map((activity, index) => {
+        {filteredActivities.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="notifications-off-outline" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>No recent activities</Text>
+          </View>
+        ) : filteredActivities.map((activity, index) => {
           const icon = getActivityIcon(activity);
           return (
             <View key={index} style={styles.activityItem}>

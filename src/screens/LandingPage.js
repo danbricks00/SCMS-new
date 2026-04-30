@@ -20,20 +20,10 @@ const LandingPage = ({ navigation }) => {
     setMenuOpen(!menuOpen);
   };
 
-  const navigateTo = (route) => {
+  const navigateToLogin = () => {
     setMenuOpen(false);
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      sessionStorage.setItem('intendedDestination', route);
-    }
     router.push('/login');
   };
-
-  const navItems = [
-    { key: 'StudentPortal', label: 'Student', icon: 'school' },
-    { key: 'ParentPortal', label: 'Parent', icon: 'people' },
-    { key: 'TeacherPortal', label: 'Teacher', icon: 'book' },
-    { key: 'AdminPortal', label: 'Admin', icon: 'settings' },
-  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -54,22 +44,7 @@ const LandingPage = ({ navigation }) => {
           >
             School Class Management System
           </Text>
-          {showInlineNav ? (
-            <View style={styles.inlineNav}>
-              {navItems.map((item) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={styles.inlineNavButton}
-                  onPress={() => navigateTo(item.key)}
-                >
-                  <Ionicons name={item.icon} size={18} color="#4a90e2" />
-                  <Text style={styles.inlineNavText}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.headerSpacer} />
-          )}
+          <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.dateTimeContainer}>
@@ -82,16 +57,13 @@ const LandingPage = ({ navigation }) => {
               <Ionicons name="close" size={32} color="#fff" />
             </TouchableOpacity>
             <View style={styles.menuItems}>
-              {navItems.map((item) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={styles.menuItem}
-                  onPress={() => navigateTo(item.key)}
-                >
-                  <Ionicons name={item.icon} size={24} color="#fff" />
-                  <Text style={styles.menuText}>{item.label} Portal</Text>
-                </TouchableOpacity>
-              ))}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={navigateToLogin}
+              >
+                <Ionicons name="log-in-outline" size={24} color="#fff" />
+                <Text style={styles.menuText}>Login</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -102,6 +74,10 @@ const LandingPage = ({ navigation }) => {
             <Text style={[styles.heroSubtitle, isTablet && styles.heroSubtitleLarge]}>
               Attendance Management System
             </Text>
+            <TouchableOpacity style={styles.heroLoginButton} onPress={navigateToLogin}>
+              <Ionicons name="log-in-outline" size={20} color="#fff" />
+              <Text style={styles.heroLoginButtonText}>Login</Text>
+            </TouchableOpacity>
 
             <View
               style={[
@@ -181,28 +157,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginLeft: 8,
   },
-  inlineNav: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 6,
-    flexShrink: 1,
-  },
-  inlineNavButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e8f4fd',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    gap: 4,
-  },
-  inlineNavText: {
-    color: '#2c5282',
-    fontSize: 13,
-    fontWeight: '600',
-  },
   dateTimeContainer: {
     padding: 16,
     backgroundColor: '#fff',
@@ -247,33 +201,54 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingVertical: 20,
+    justifyContent: 'center',
   },
   heroSection: {
+    flex: 1,
     alignItems: 'center',
-    paddingTop: 24,
+    justifyContent: 'center',
+    paddingTop: 48,
+    paddingBottom: 24,
   },
   heroTitle: {
-    fontSize: 28,
+    fontSize: 34,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   heroTitleLarge: {
-    fontSize: 36,
+    fontSize: 44,
   },
   heroSubtitle: {
-    fontSize: 18,
+    fontSize: 24,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 40,
   },
   heroSubtitleLarge: {
-    fontSize: 20,
-    marginBottom: 40,
+    fontSize: 28,
+    marginBottom: 48,
+  },
+  heroLoginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#4a90e2',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    marginBottom: 28,
+  },
+  heroLoginButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
   featureCards: {
     width: '100%',
+    marginTop: 8,
   },
   featureCardsRow: {
     flexDirection: 'row',
