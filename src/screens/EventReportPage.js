@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
+import ScreenGradient from '../components/ScreenGradient';
 import { DatabaseService } from '../services/database';
 import { formatDateNZ } from '../utils/dateUtils';
 import { canUseServerPdf, generatePdfUrlFromHtml, openPrintDialogWithHtml } from '../utils/pdfFromHtml';
@@ -182,6 +183,7 @@ const EventReportPage = () => {
   return (
     <ProtectedRoute requiredRole="admin">
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -283,6 +285,7 @@ const EventReportPage = () => {
             </View>
           </View>
         </ScrollView>
+        </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );

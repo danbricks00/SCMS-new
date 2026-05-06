@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import ScreenGradient from '../components/ScreenGradient';
 import { auth } from '../config/firebase';
 
 export default function SignUpPage() {
@@ -34,6 +35,7 @@ export default function SignUpPage() {
   };
 
   return (
+    <ScreenGradient>
     <View style={styles.container}>
       {/* App Logo */}
       <View style={styles.header}>
@@ -80,6 +82,7 @@ export default function SignUpPage() {
         <Text style={styles.link}>Already have an account? Log in</Text>
       </TouchableOpacity>
     </View>
+    </ScreenGradient>
   );
 }
 
@@ -87,7 +90,6 @@ export default function SignUpPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     paddingHorizontal: 25,
   },

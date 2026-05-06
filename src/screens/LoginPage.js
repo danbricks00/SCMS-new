@@ -1,15 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimeDisplay from '../components/DateTimeDisplay';
 import ResponsiveScreen from '../components/ResponsiveScreen';
 import { isFirebaseConfigured } from '../config/firebase';
 import { fetchDemoUsersByRole, loginWithAppUser } from '../services/appUsersAuth';
 import { useAuth } from '../contexts/AuthContext';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const LoginPage = () => {
+  const { isMobile, isTablet } = useResponsiveLayout();
+  const headerIconSize = isMobile ? 56 : isTablet ? 64 : 72;
+  const headerFontSize = isMobile ? 20 : isTablet ? 26 : 30;
+  const headerLineHeight = isMobile ? 26 : isTablet ? 32 : 36;
+  const headerIconGap = isMobile ? 18 : 24;
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -116,13 +122,16 @@ const LoginPage = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <DateTimeDisplay />
-      <ResponsiveScreen>
+      <LinearGradient colors={['#ffffff', '#edf2f8', '#d9e2ef']} style={styles.gradientBg}>
+        <ResponsiveScreen>
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Ionicons name="school" size={72} color="#4a90e2" style={styles.headerIcon} />
-          <Text style={styles.title}>School Class Management System</Text>
-          <Text style={styles.subtitle}>Please login to continue</Text>
+        <View style={[styles.header, { paddingTop: isMobile ? 38 : 54 }]}>
+          <View style={[styles.headerTitleRow, { gap: headerIconGap }]}>
+            <Ionicons name="school" size={headerIconSize} color="#4a90e2" />
+            <Text style={[styles.title, { fontSize: headerFontSize, lineHeight: headerLineHeight }]}>
+              School Class{'\n'}Management System
+            </Text>
+          </View>
           {!isFirebaseConfigured && (
             <Text style={styles.configWarning}>
               Firebase is not configured. Set EXPO_PUBLIC_FIREBASE_* in your environment before signing in.
@@ -131,6 +140,8 @@ const LoginPage = () => {
         </View>
 
         <View style={styles.form}>
+          <Text style={styles.formSubtitle}>Please login to continue</Text>
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email or account id</Text>
             <TextInput
@@ -264,6 +275,7 @@ const LoginPage = () => {
         </View>
       </View>
       </ResponsiveScreen>
+      </LinearGradient>
     </SafeAreaView>
   );
 };
@@ -271,11 +283,14 @@ const LoginPage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#ffffff',
+  },
+  gradientBg: {
+    flex: 1,
   },
   content: {
     flex: 1,
-    paddingVertical: 20,
+    paddingVertical: 16,
     justifyContent: 'center',
     width: '100%',
     maxWidth: 520,
@@ -284,19 +299,28 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 40,
+    width: '100%',
+    paddingHorizontal: 12,
   },
-  headerIcon: {
-    marginBottom: 14,
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 8,
   },
   title: {
-    fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
+    textAlign: 'left',
+    flexShrink: 0,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
   },
   configWarning: {
     marginTop: 12,
@@ -315,6 +339,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  formSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   inputGroup: {
     marginBottom: 20,

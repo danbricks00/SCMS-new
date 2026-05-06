@@ -5,6 +5,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
 import ResponsiveScreen from '../components/ResponsiveScreen';
+import ScreenGradient from '../components/ScreenGradient';
 import { DatabaseService } from '../services/database';
 
 const DAY_TO_INDEX = {
@@ -129,7 +130,7 @@ const TeacherClassHistoryPage = () => {
       const today = new Date().toISOString().split('T')[0];
       const cards = await Promise.all(
         teacherClasses.map(async (cls) => {
-          const classTitle = String(cls.name || '');
+          const classTitle = String(cls.name || cls.className || '').trim() || 'Unknown Class';
           const [students, todayRows, historyRows] = await Promise.all([
             DatabaseService.getStudentsByClass(classTitle),
             DatabaseService.getClassAttendance(classTitle, today),
@@ -139,6 +140,7 @@ const TeacherClassHistoryPage = () => {
           const slots = parseScheduleSlots(cls.schedule);
           if (!slots.length) {
             return [{
+              cardId: `${String(cls.id || cls.classId || classTitle)}::no-timeslot`,
               className: classTitle,
               subject: cls.subject || 'General',
               schedule: cls.schedule || 'Time TBA',
@@ -190,6 +192,7 @@ const TeacherClassHistoryPage = () => {
               : null;
 
             return {
+              cardId: `${String(cls.id || cls.classId || classTitle)}::${sessionActivityLabel}`,
               className: classTitle,
               subject: cls.subject || 'General',
               totalStudents,
@@ -237,6 +240,7 @@ const TeacherClassHistoryPage = () => {
   return (
     <ProtectedRoute requiredRole="teacher">
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
         <ResponsiveScreen>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -262,14 +266,14 @@ const TeacherClassHistoryPage = () => {
               {classCards.length === 0 ? (
                 <Text style={styles.emptyText}>No history yet for this class/session.</Text>
               ) : (
-                classCards.map((card) => (
-                  <View key={card.className} style={styles.historyCard}>
+                classCards.map((card, index) => (
+                  <View key={card.cardId || `${card.className}-${card.sessionLabel}-${index}`} style={styles.historyCard}>
                     <View style={styles.historyHeader}>
-                      <View>
+                      <View style={styles.historyHeadingLeft}>
                         <Text style={styles.historyClassTitle}>Class {card.className}</Text>
                         <Text style={styles.sessionText}>{card.sessionLabel}</Text>
                         {!!card.sessionDate && (
-                          <Text style={styles.activityText}>
+                          <Text style={styles.sessionDateText}>
                             Session date: {new Date(card.sessionDate).toLocaleDateString()} {new Date(card.sessionDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </Text>
                         )}
@@ -296,6 +300,7 @@ const TeacherClassHistoryPage = () => {
             </View>
           </ScrollView>
         </ResponsiveScreen>
+        </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -334,10 +339,12 @@ const styles = StyleSheet.create({
   historyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'flex-start'
   },
-  historyClassTitle: { fontSize: 24, fontWeight: '700', color: '#2d3748' },
+  historyHeadingLeft: { flex: 1, marginRight: 10 },
+  historyClassTitle: { fontSize: 18, fontWeight: '700', color: '#2d3748' },
   historyClassStudents: { fontSize: 13, color: '#555', fontWeight: '600' },
+  sessionDateText: { marginTop: 4, color: '#666', fontSize: 13 },
   historyAttendancePanel: {
     marginTop: 10,
     backgroundColor: '#e3f2fd',

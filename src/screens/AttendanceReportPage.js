@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
+import ScreenGradient from '../components/ScreenGradient';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { formatDateTimeNZ } from '../utils/dateUtils';
@@ -174,6 +175,7 @@ const AttendanceReportPage = () => {
   return (
     <ProtectedRoute requiredRole="admin">
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -290,6 +292,7 @@ const AttendanceReportPage = () => {
             </View>
           </View>
         </ScrollView>
+        </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );

@@ -14,43 +14,27 @@ const DateTimeDisplay = ({ style, textStyle, showIcon = true }) => {
 
   const updateDateTime = () => {
     const now = new Date();
-    
-    // Format: "Monday 13 October 2025, at 10:11am NZDT"
+
     const options = {
       timeZone: 'Pacific/Auckland',
-      weekday: 'long',
       year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
       minute: '2-digit',
       hour12: true
     };
-    
+
     const formatter = new Intl.DateTimeFormat('en-NZ', options);
-    const formattedDate = formatter.format(now);
-    
-    // Get timezone abbreviation (NZST or NZDT)
-    const timezoneFormatter = new Intl.DateTimeFormat('en-NZ', {
-      timeZone: 'Pacific/Auckland',
-      timeZoneName: 'short'
-    });
-    const parts = timezoneFormatter.formatToParts(now);
-    const timeZoneName = parts.find(part => part.type === 'timeZoneName');
-    const timezone = timeZoneName ? timeZoneName.value : 'NZT';
-    
-    // Reformat to match desired format: "Monday 13 October 2025, at 10:11am NZDT"
-    const dateRegex = /(\w+),?\s+(\d+)\s+(\w+)\s+(\d+),?\s+(\d+):(\d+)\s*([ap]m)/i;
-    const match = formattedDate.match(dateRegex);
-    
-    if (match) {
-      const [, weekday, day, month, year, hour, minute, ampm] = match;
-      const formatted = `${weekday} ${day} ${month} ${year}, at ${hour}:${minute}${ampm.toLowerCase()} ${timezone}`;
-      setCurrentDateTime(formatted);
-    } else {
-      // Fallback format
-      setCurrentDateTime(`${formattedDate} ${timezone}`);
-    }
+    const parts = formatter.formatToParts(now);
+    const day = parts.find((part) => part.type === 'day')?.value || '01';
+    const month = parts.find((part) => part.type === 'month')?.value || '01';
+    const year = parts.find((part) => part.type === 'year')?.value || '1970';
+    const hour = parts.find((part) => part.type === 'hour')?.value || '00';
+    const minute = parts.find((part) => part.type === 'minute')?.value || '00';
+    const dayPeriod = (parts.find((part) => part.type === 'dayPeriod')?.value || 'am').toLowerCase();
+
+    setCurrentDateTime(`${day}/${month}/${year} ${hour}:${minute} ${dayPeriod}`);
   };
 
   return (

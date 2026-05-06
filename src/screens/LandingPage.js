@@ -1,111 +1,128 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimeDisplay from '../components/DateTimeDisplay';
-import ResponsiveScreen from '../components/ResponsiveScreen';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
-const LandingPage = ({ navigation }) => {
-  const [menuOpen, setMenuOpen] = useState(false);
+const LandingPage = () => {
   const { isMobile, isTablet, isDesktop } = useResponsiveLayout();
-  const showInlineNav = !isMobile;
-
-  useEffect(() => {
-    return () => {};
-  }, []);
-
-  const toggleMenu = () => {
-    setMenuOpen(!menuOpen);
-  };
+  const headerIconSize = isMobile ? 48 : isTablet ? 58 : 70;
+  const headerFontSize = isMobile ? 20 : isTablet ? 28 : 32;
+  const headerLineHeight = isMobile ? 25 : isTablet ? 32 : 36;
+  const headerIconGap = isMobile ? 24 : 30;
+  const dateLeftOffset = headerIconSize + headerIconGap;
+  const heroTitleSize = isMobile ? 26 : isTablet ? 66 : 78;
+  const heroSubtitleSize = isMobile ? 18 : isTablet ? 45 : 54;
+  const heroLoginIconSize = isMobile ? 22 : isTablet ? 28 : 32;
+  const heroLoginFontSize = isMobile ? 18 : isTablet ? 24 : 28;
+  const heroLoginPaddingVertical = isMobile ? 14 : isTablet ? 18 : 22;
+  const heroLoginPaddingHorizontal = isMobile ? 30 : isTablet ? 44 : 56;
+  const sectionGap = 56;
+  const heroSectionTop = sectionGap;
+  const heroTitleBottom = isMobile ? 8 : 16;
+  const heroSubtitleBottom = isMobile ? 20 : 40;
 
   const navigateToLogin = () => {
-    setMenuOpen(false);
     router.push('/login');
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ResponsiveScreen>
-        <View style={[styles.header, showInlineNav && styles.headerDesktop]}>
-          {!showInlineNav ? (
-            <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
-              <Ionicons name="menu" size={32} color="#333" />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.headerBrand}>
-              <Ionicons name="school" size={28} color="#4a90e2" />
-            </View>
-          )}
-          <Text
-            style={[styles.headerTitle, showInlineNav && styles.headerTitleDesktop]}
-            numberOfLines={showInlineNav ? 1 : 2}
-          >
-            School Class Management System
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        <View style={styles.dateTimeContainer}>
-          <DateTimeDisplay />
-        </View>
-
-        {menuOpen && !showInlineNav && (
-          <View style={styles.sideMenu}>
-            <TouchableOpacity style={styles.closeButton} onPress={toggleMenu}>
-              <Ionicons name="close" size={32} color="#fff" />
-            </TouchableOpacity>
-            <View style={styles.menuItems}>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={navigateToLogin}
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
+      <LinearGradient colors={['#ffffff', '#edf2f8', '#d9e2ef']} style={styles.gradientBg}>
+        <View style={styles.fullWidthContent}>
+          <View style={[styles.headerCenterBlock, !isMobile && styles.headerCornerBlock]}>
+            <View style={[styles.headerTitleRow, { gap: headerIconGap }, !isMobile && styles.headerTitleRowLeft]}>
+              <Ionicons name="school" size={headerIconSize} color="#4a90e2" />
+              <Text
+                style={[
+                  styles.headerTitle,
+                  { fontSize: headerFontSize, lineHeight: headerLineHeight },
+                  !isMobile && styles.headerTitleLeft
+                ]}
               >
-                <Ionicons name="log-in-outline" size={24} color="#fff" />
-                <Text style={styles.menuText}>Login</Text>
-              </TouchableOpacity>
+                School Class{'\n'}Management System
+              </Text>
             </View>
+            <DateTimeDisplay
+              style={[styles.dateTimeInline, { alignSelf: 'flex-start', marginLeft: dateLeftOffset }]}
+              textStyle={styles.dateTimeInlineText}
+              showIcon={false}
+            />
           </View>
-        )}
 
-        <View style={styles.content}>
-          <View style={styles.heroSection}>
-            <Text style={[styles.heroTitle, isDesktop && styles.heroTitleLarge]}>Welcome to Our School</Text>
-            <Text style={[styles.heroSubtitle, isTablet && styles.heroSubtitleLarge]}>
-              Attendance Management System
-            </Text>
-            <TouchableOpacity style={styles.heroLoginButton} onPress={navigateToLogin}>
-              <Ionicons name="log-in-outline" size={20} color="#fff" />
-              <Text style={styles.heroLoginButtonText}>Login</Text>
-            </TouchableOpacity>
-
+          <View style={[styles.content, !isMobile && styles.contentCenteredDesktop]}>
             <View
               style={[
-                styles.featureCards,
-                !isMobile && styles.featureCardsRow,
+                styles.heroSection,
+                { paddingTop: heroSectionTop },
+                isMobile && styles.heroSectionMobileCentered,
+                !isMobile && styles.heroSectionDesktopCentered
               ]}
             >
-              <View style={[styles.card, !isMobile && styles.cardGrid]}>
-                <Ionicons name="calendar" size={40} color="#4a90e2" />
-                <Text style={styles.cardTitle}>Attendance Tracking</Text>
-                <Text style={styles.cardDescription}>Real-time attendance monitoring for students</Text>
-              </View>
+              <Text
+                style={[
+                  styles.heroTitle,
+                  { fontSize: heroTitleSize, lineHeight: isMobile ? 32 : isTablet ? 74 : 86, marginBottom: heroTitleBottom }
+                ]}
+              >
+                Welcome to Our School
+              </Text>
+              <Text
+                style={[
+                  styles.heroSubtitle,
+                  { fontSize: heroSubtitleSize, lineHeight: isMobile ? 24 : isTablet ? 56 : 64, marginBottom: heroSubtitleBottom }
+                ]}
+              >
+                Attendance Management System
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.heroLoginButton,
+                  {
+                    marginBottom: sectionGap,
+                    paddingVertical: heroLoginPaddingVertical,
+                    paddingHorizontal: heroLoginPaddingHorizontal,
+                  }
+                ]}
+                onPress={navigateToLogin}
+              >
+                <Ionicons name="log-in-outline" size={heroLoginIconSize} color="#fff" />
+                <Text style={[styles.heroLoginButtonText, { fontSize: heroLoginFontSize }]}>Login</Text>
+              </TouchableOpacity>
 
-              <View style={[styles.card, !isMobile && styles.cardGrid]}>
-                <Ionicons name="stats-chart" size={40} color="#4a90e2" />
-                <Text style={styles.cardTitle}>Performance Analytics</Text>
-                <Text style={styles.cardDescription}>Detailed reports and analytics</Text>
-              </View>
+              <View
+                style={[
+                  styles.featureCards,
+                  isMobile && styles.featureCardsMobileInset,
+                  !isMobile && styles.featureCardsRow,
+                ]}
+              >
+                <View style={[styles.card, isMobile && styles.cardMobile, !isMobile && styles.cardGrid]}>
+                  <Ionicons name="calendar" size={40} color="#4a90e2" />
+                  <Text style={styles.cardTitle}>Attendance Tracking</Text>
+                  <Text style={styles.cardDescription}>Real-time attendance monitoring for students</Text>
+                </View>
 
-              <View style={[styles.card, !isMobile && styles.cardGrid]}>
-                <Ionicons name="notifications" size={40} color="#4a90e2" />
-                <Text style={styles.cardTitle}>Instant Notifications</Text>
-                <Text style={styles.cardDescription}>Get alerts for absences and events</Text>
+                <View style={[styles.card, isMobile && styles.cardMobile, !isMobile && styles.cardGrid]}>
+                  <Ionicons name="stats-chart" size={40} color="#4a90e2" />
+                  <Text style={styles.cardTitle}>Performance Analytics</Text>
+                  <Text style={styles.cardDescription}>Detailed reports and analytics</Text>
+                </View>
+
+                <View style={[styles.card, isMobile && styles.cardMobile, !isMobile && styles.cardGrid]}>
+                  <Ionicons name="notifications" size={40} color="#4a90e2" />
+                  <Text style={styles.cardTitle}>Instant Notifications</Text>
+                  <Text style={styles.cardDescription}>Get alerts for absences and events</Text>
+                </View>
               </View>
             </View>
           </View>
         </View>
-      </ResponsiveScreen>
+      </LinearGradient>
     </SafeAreaView>
   );
 };
@@ -113,109 +130,96 @@ const LandingPage = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#ffffff',
   },
-  header: {
+  gradientBg: {
+    flex: 1,
+  },
+  fullWidthContent: {
+    flex: 1,
+    width: '100%',
+  },
+  headerCenterBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 22,
+    paddingBottom: 4,
+    gap: 8,
+    width: '100%',
+    paddingHorizontal: 14,
+  },
+  headerCornerBlock: {
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    paddingTop: 24,
+  },
+  headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#fff',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    justifyContent: 'flex-start',
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
-  headerDesktop: {
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  headerBrand: {
-    marginRight: 8,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  menuButton: {
-    padding: 5,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
+  headerTitleRowLeft: {
+    alignSelf: 'flex-start',
+    justifyContent: 'flex-start',
+    maxWidth: 520,
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 15,
     color: '#333',
-  },
-  headerTitleDesktop: {
-    flexGrow: 1,
-    flexBasis: 120,
-    fontSize: 20,
-    marginLeft: 8,
-  },
-  dateTimeContainer: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  sideMenu: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    zIndex: 1000,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 1001,
-  },
-  menuItems: {
+    textAlign: 'left',
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexShrink: 1,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4a90e2',
-    padding: 15,
-    marginVertical: 10,
-    borderRadius: 10,
-    width: '80%',
+  headerTitleLeft: {
+    textAlign: 'left',
   },
-  menuText: {
-    color: '#fff',
-    fontSize: 18,
+  dateTimeInline: {
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  dateTimeInlineText: {
+    color: '#5b6470',
     fontWeight: '500',
-    marginLeft: 15,
+    fontSize: 12,
   },
   content: {
     flex: 1,
-    paddingVertical: 20,
+    paddingVertical: 10,
+  },
+  contentCenteredDesktop: {
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 0,
   },
   heroSection: {
-    flex: 1,
     alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingBottom: 32,
+    width: '100%',
+  },
+  heroSectionMobileCentered: {
+    minHeight: '68%',
     justifyContent: 'center',
-    paddingTop: 48,
-    paddingBottom: 24,
+    paddingTop: 56,
+  },
+  heroSectionDesktopCentered: {
+    justifyContent: 'center',
+    maxWidth: 980,
+    alignSelf: 'center',
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   heroTitle: {
     fontSize: 34,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 12,
   },
   heroTitleLarge: {
     fontSize: 44,
@@ -224,7 +228,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 40,
+    paddingHorizontal: 12,
   },
   heroSubtitleLarge: {
     fontSize: 28,
@@ -239,7 +243,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 28,
-    marginBottom: 28,
+    marginBottom: 0,
   },
   heroLoginButtonText: {
     color: '#fff',
@@ -248,7 +252,10 @@ const styles = StyleSheet.create({
   },
   featureCards: {
     width: '100%',
-    marginTop: 8,
+    marginTop: 0,
+  },
+  featureCardsMobileInset: {
+    paddingHorizontal: 12,
   },
   featureCardsRow: {
     flexDirection: 'row',
@@ -268,6 +275,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
   },
+  cardMobile: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+    borderRadius: 12,
+  },
   cardGrid: {
     width: '30%',
     minWidth: 220,
@@ -279,14 +292,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginTop: 15,
-    marginBottom: 10,
+    marginTop: 10,
+    marginBottom: 8,
   },
   cardDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
 });
 

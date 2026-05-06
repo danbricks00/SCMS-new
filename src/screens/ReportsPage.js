@@ -5,6 +5,7 @@ import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProtectedRoute from '../components/ProtectedRoute';
 import ResponsiveScreen from '../components/ResponsiveScreen';
+import ScreenGradient from '../components/ScreenGradient';
 import { useAuth } from '../contexts/AuthContext';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { DatabaseService } from '../services/database';
@@ -177,6 +178,7 @@ const ReportsPage = () => {
   return (
     <ProtectedRoute requiredRole="admin">
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
         <ResponsiveScreen>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -189,7 +191,8 @@ const ReportsPage = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content}>
+        <ScrollView style={[styles.content, Platform.OS === 'web' && styles.contentWebFullWidth]}>
+          <View style={styles.contentInner}>
           {/* Overview Statistics */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Overview</Text>
@@ -320,8 +323,10 @@ const ReportsPage = () => {
               </TouchableOpacity>
             </View>
           </View>
+          </View>
         </ScrollView>
         </ResponsiveScreen>
+        </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -371,6 +376,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 15,
+  },
+  contentWebFullWidth: {
+    width: '100vw',
+    maxWidth: '100vw',
+    alignSelf: 'center',
+  },
+  contentInner: {
+    width: '100%',
+    maxWidth: 1100,
+    alignSelf: 'center',
   },
   section: {
     marginBottom: 25,

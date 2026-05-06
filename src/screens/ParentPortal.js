@@ -5,8 +5,11 @@ import { Alert, Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, 
 import AbsenceRequestForm from '../components/AbsenceRequestForm';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import PortalHeader from '../components/PortalHeader';
+import PortalIdentity from '../components/PortalIdentity';
 import ProtectedRoute from '../components/ProtectedRoute';
 import ResponsiveScreen from '../components/ResponsiveScreen';
+import ScreenGradient from '../components/ScreenGradient';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 
@@ -192,17 +195,22 @@ const ParentPortal = () => {
   return (
     <ProtectedRoute requiredRole="parent">
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
+        <PortalHeader
+          actions={[
+            {
+              id: 'logout',
+              label: 'Logout',
+              icon: 'log-out',
+              onPress: logout,
+              iconColor: '#e74c3c',
+              borderColor: '#e74c3c',
+              backgroundColor: '#fff1ef',
+              accessibilityLabel: 'Logout'
+            }
+          ]}
+        />
         <ResponsiveScreen>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Parent Portal - {user?.name}</Text>
-          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-            <Ionicons name="log-out" size={20} color="#e74c3c" />
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
       
       {/* Announcements Banner */}
       <AnnouncementBanner 
@@ -211,9 +219,11 @@ const ParentPortal = () => {
       />
       
       <ScrollView
-        style={styles.content}
+        style={[styles.content, Platform.OS === 'web' && styles.contentWebFullWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        <View style={styles.contentInner}>
+        <PortalIdentity portalTitle="Parent Portal" userName={user?.name || 'Parent'} />
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Children</Text>
           <View style={styles.childList}>
@@ -343,6 +353,7 @@ const ParentPortal = () => {
             />
           </View>
         </View>
+        </View>
       </ScrollView>
         </ResponsiveScreen>
 
@@ -354,6 +365,7 @@ const ParentPortal = () => {
         parentName={user?.name}
         children={children}
       />
+      </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -409,6 +421,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+  },
+  contentWebFullWidth: {
+    width: '100vw',
+    maxWidth: '100vw',
+    alignSelf: 'center',
+  },
+  contentInner: {
+    width: '100%',
+    maxWidth: 1100,
+    alignSelf: 'center',
   },
   section: {
     marginBottom: 25,

@@ -6,8 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityScanner from '../components/ActivityScanner';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import EventManager from '../components/EventManager';
+import PortalHeader from '../components/PortalHeader';
+import PortalIdentity from '../components/PortalIdentity';
 import ProtectedRoute from '../components/ProtectedRoute';
 import ResponsiveScreen from '../components/ResponsiveScreen';
+import ScreenGradient from '../components/ScreenGradient';
 import QRScanner from '../components/QRScanner';
 import StudentCard from '../components/StudentCard';
 import TeacherAnnouncement from '../components/TeacherAnnouncement';
@@ -554,33 +557,42 @@ const TeacherPortal = () => {
   return (
     <ProtectedRoute requiredRole="teacher">
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
+        <PortalHeader
+          actions={[
+            {
+              id: 'announce',
+              label: 'Announce',
+              icon: 'megaphone',
+              onPress: () => setShowTeacherAnnouncement(true),
+              iconColor: '#2f80ed',
+              borderColor: '#2f80ed',
+              backgroundColor: '#eef5ff',
+              accessibilityLabel: 'Open announcements'
+            },
+            {
+              id: 'event',
+              label: 'Event',
+              icon: 'calendar',
+              onPress: () => setShowEventManager(true),
+              iconColor: '#27ae60',
+              borderColor: '#27ae60',
+              backgroundColor: '#edf9f1',
+              accessibilityLabel: 'Open event manager'
+            },
+            {
+              id: 'logout',
+              label: 'Logout',
+              icon: 'log-out',
+              onPress: logout,
+              iconColor: '#e74c3c',
+              borderColor: '#e74c3c',
+              backgroundColor: '#fff1ef',
+              accessibilityLabel: 'Logout'
+            }
+          ]}
+        />
         <ResponsiveScreen>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Teacher Portal - {user?.name}</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={styles.announcementButton}
-              onPress={() => setShowTeacherAnnouncement(true)}
-            >
-              <Ionicons name="megaphone" size={20} color="#4a90e2" />
-              <Text style={styles.announcementButtonText}>Announce</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.eventButton}
-              onPress={() => setShowEventManager(true)}
-            >
-              <Ionicons name="calendar" size={20} color="#4a90e2" />
-              <Text style={styles.eventButtonText}>Event</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-              <Ionicons name="log-out" size={20} color="#e74c3c" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       
       {/* Announcements Banner */}
       <AnnouncementBanner 
@@ -590,9 +602,11 @@ const TeacherPortal = () => {
       />
       
       <ScrollView
-        style={styles.content}
+        style={[styles.content, Platform.OS === 'web' && styles.contentWebFullWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        <View style={styles.contentInner}>
+        <PortalIdentity portalTitle="Teacher Portal" userName={user?.name || 'Teacher'} mobileTopGap={28} />
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Classes</Text>
           <View style={styles.classList}>
@@ -867,6 +881,7 @@ const TeacherPortal = () => {
             ))}
           </View>
         </View>
+        </View>
       </ScrollView>
         </ResponsiveScreen>
 
@@ -1065,6 +1080,7 @@ const TeacherPortal = () => {
         userRole="teacher"
         teacherClasses={teacherClasses}
       />
+      </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -1126,6 +1142,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  contentWebFullWidth: {
+    width: '100vw',
+    maxWidth: '100vw',
+    alignSelf: 'center',
+  },
+  contentInner: {
+    width: '100%',
+    maxWidth: 1100,
+    alignSelf: 'center',
   },
   section: {
     marginBottom: 24,
@@ -1220,8 +1246,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4a90e2',
   },
   classHeader: {
     flexDirection: 'row',

@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ActivityLog from '../components/ActivityLog';
 import ProtectedRoute from '../components/ProtectedRoute';
+import ScreenGradient from '../components/ScreenGradient';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 
@@ -57,6 +58,7 @@ const UpdatesPage = () => {
   return (
     <ProtectedRoute requiredRole={userRole}>
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color="#4a90e2" />
@@ -66,7 +68,8 @@ const UpdatesPage = () => {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={[styles.content, Platform.OS === 'web' && styles.contentWebFullWidth]} showsVerticalScrollIndicator={false}>
+          <View style={styles.contentInner}>
           <View style={styles.activityLogContainer}>
             <ActivityLog
               userRole={userRole}
@@ -75,7 +78,9 @@ const UpdatesPage = () => {
               linkedStudentNames={userRole === 'parent' ? parentActivityNames ?? [] : null}
             />
           </View>
+          </View>
         </ScrollView>
+        </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -117,6 +122,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+  },
+  contentWebFullWidth: {
+    width: '100vw',
+    maxWidth: '100vw',
+    alignSelf: 'center',
+  },
+  contentInner: {
+    width: '100%',
+    maxWidth: 1100,
+    alignSelf: 'center',
   },
   activityLogContainer: {
     backgroundColor: '#fff',

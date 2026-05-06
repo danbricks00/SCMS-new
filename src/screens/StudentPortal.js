@@ -5,8 +5,11 @@ import { Alert, Platform, RefreshControl, ScrollView, StyleSheet, Text, Touchabl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import PortalHeader from '../components/PortalHeader';
+import PortalIdentity from '../components/PortalIdentity';
 import ProtectedRoute from '../components/ProtectedRoute';
 import ResponsiveScreen from '../components/ResponsiveScreen';
+import ScreenGradient from '../components/ScreenGradient';
 import SimpleQRCode from '../components/SimpleQRCode';
 import * as Print from 'expo-print';
 import { useAuth } from '../contexts/AuthContext';
@@ -527,17 +530,22 @@ const StudentPortal = () => {
   return (
     <ProtectedRoute requiredRole="student">
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
+        <PortalHeader
+          actions={[
+            {
+              id: 'logout',
+              label: 'Logout',
+              icon: 'log-out',
+              onPress: logout,
+              iconColor: '#e74c3c',
+              borderColor: '#e74c3c',
+              backgroundColor: '#fff1ef',
+              accessibilityLabel: 'Logout'
+            }
+          ]}
+        />
         <ResponsiveScreen>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Student Portal - {user?.name}</Text>
-          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-            <Ionicons name="log-out" size={20} color="#e74c3c" />
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
       
       {/* Announcements Banner */}
       <AnnouncementBanner 
@@ -546,12 +554,13 @@ const StudentPortal = () => {
       />
       
       <ScrollView
-        style={styles.content}
+        style={[styles.content, Platform.OS === 'web' && styles.contentWebFullWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        <View style={styles.contentInner}>
+        <PortalIdentity portalTitle="Student Portal" userName={user?.name || 'Student'} />
         {/* Student QR Code Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My QR Code</Text>
           <View style={styles.qrCodeContainer}>
             <Text style={styles.qrCodeDescription}>
               Show this QR code to your teacher for attendance
@@ -724,8 +733,10 @@ const StudentPortal = () => {
             <Text style={styles.requestButtonText}>Submit Absence Request</Text>
           </TouchableOpacity>
         </View>
+        </View>
       </ScrollView>
         </ResponsiveScreen>
+        </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -781,6 +792,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+  },
+  contentWebFullWidth: {
+    width: '100vw',
+    maxWidth: '100vw',
+    alignSelf: 'center',
+  },
+  contentInner: {
+    width: '100%',
+    maxWidth: 1100,
+    alignSelf: 'center',
   },
   section: {
     marginBottom: 25,

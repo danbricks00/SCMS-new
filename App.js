@@ -54,7 +54,7 @@ export default function App() {
   
   return (
     <ErrorBoundary>
-      <StatusBar style="auto" />
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
     </ErrorBoundary>
   );
 }

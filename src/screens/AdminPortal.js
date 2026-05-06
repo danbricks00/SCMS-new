@@ -6,8 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityLog from '../components/ActivityLog';
 import AnnouncementBanner from '../components/AnnouncementBanner';
 import EventManager from '../components/EventManager';
+import PortalHeader from '../components/PortalHeader';
+import PortalIdentity from '../components/PortalIdentity';
 import ProtectedRoute from '../components/ProtectedRoute';
 import ResponsiveScreen from '../components/ResponsiveScreen';
+import ScreenGradient from '../components/ScreenGradient';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import QRCodeGenerator from '../components/QRCodeGenerator';
 import { useAuth } from '../contexts/AuthContext';
@@ -107,7 +110,6 @@ function getTeacherUnavailableSlots(teacherId, classRows) {
 const AdminPortal = () => {
   const { user, logout } = useAuth();
   const { statCardWidthPct, actionCardWidthPct } = useResponsiveLayout();
-  const [activeView, setActiveView] = useState('dashboard'); // dashboard, students, teachers, classes, reports, settings
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [showStudentList, setShowStudentList] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
@@ -980,38 +982,36 @@ const AdminPortal = () => {
     }
   };
 
-  const handleTabPress = (tabKey) => {
-    setActiveView(tabKey);
-    if (tabKey === 'students') setShowStudentList(true);
-    if (tabKey === 'teachers') setShowAddTeacher(true);
-    if (tabKey === 'classes') setShowAddClass(true);
-    if (tabKey === 'reports') router.push('/reports');
-    if (tabKey === 'settings') setShowAnnouncements(true);
-  };
-
   return (
     <ProtectedRoute requiredRole="admin">
       <SafeAreaView style={styles.container}>
+        <ScreenGradient>
+        <PortalHeader
+          actions={[
+            {
+              id: 'logout',
+              label: 'Logout',
+              icon: 'log-out',
+              onPress: logout,
+              iconColor: '#e74c3c',
+              borderColor: '#e74c3c',
+              backgroundColor: '#fff1ef',
+              accessibilityLabel: 'Logout'
+            }
+          ]}
+        />
         <ResponsiveScreen>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Admin Portal - {user?.name}</Text>
-          <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-            <Ionicons name="log-out" size={20} color="#e74c3c" />
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
       
       {/* Announcements Banner */}
       <AnnouncementBanner 
         userRole="admin" 
       />
       <ScrollView
-        style={styles.content}
+        style={[styles.content, Platform.OS === 'web' && styles.contentWebFullWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        <View style={styles.contentInner}>
+        <PortalIdentity portalTitle="Admin Portal" userName={user?.name || 'Admin'} />
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>School Overview</Text>
           <View style={styles.statsGrid}>
@@ -1118,33 +1118,9 @@ const AdminPortal = () => {
             <ActivityLog userRole="admin" maxItems={5} />
           </View>
         </View>
+        </View>
       </ScrollView>
 
-      <View style={styles.bottomTabBar}>
-        {[
-          { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
-          { key: 'students', label: 'Students', icon: 'people' },
-          { key: 'teachers', label: 'Teachers', icon: 'person' },
-          { key: 'classes', label: 'Classes', icon: 'school' },
-          { key: 'reports', label: 'Reports', icon: 'bar-chart' },
-          { key: 'settings', label: 'Settings', icon: 'settings' }
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.bottomTabItem, activeView === tab.key && styles.bottomTabItemActive]}
-            onPress={() => handleTabPress(tab.key)}
-          >
-            <Ionicons
-              name={tab.icon}
-              size={18}
-              color={activeView === tab.key ? '#4a90e2' : '#777'}
-            />
-            <Text style={[styles.bottomTabText, activeView === tab.key && styles.bottomTabTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
         </ResponsiveScreen>
 
       {/* Student List Modal */}
@@ -1939,6 +1915,7 @@ const AdminPortal = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      </ScreenGradient>
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -2019,32 +1996,15 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  bottomTabBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingVertical: 8,
+  contentWebFullWidth: {
+    width: '100vw',
+    maxWidth: '100vw',
+    alignSelf: 'center',
   },
-  bottomTabItem: {
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  bottomTabItemActive: {
-    backgroundColor: '#e8f2ff',
-  },
-  bottomTabText: {
-    marginTop: 4,
-    fontSize: 11,
-    color: '#777',
-  },
-  bottomTabTextActive: {
-    color: '#4a90e2',
-    fontWeight: '600',
+  contentInner: {
+    width: '100%',
+    maxWidth: 1100,
+    alignSelf: 'center',
   },
   sectionHeader: {
     flexDirection: 'row',
