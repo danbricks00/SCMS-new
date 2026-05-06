@@ -15,6 +15,95 @@ import { createManagedAppUserAccount, findParentAccountByEmail, linkStudentToExi
 import { DatabaseService } from '../services/database';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
 
+const SCHEDULE_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const SCHEDULE_HOURS = Array.from({ length: 10 }, (_, idx) => 8 + idx);
+
+const DAY_TOKEN_MAP = {
+  mon: 'Mon',
+  monday: 'Mon',
+  tue: 'Tue',
+  tues: 'Tue',
+  tuesday: 'Tue',
+  wed: 'Wed',
+  weds: 'Wed',
+  wednesday: 'Wed',
+  thu: 'Thu',
+  thur: 'Thu',
+  thurs: 'Thu',
+  thursday: 'Thu',
+  fri: 'Fri',
+  friday: 'Fri'
+};
+
+function normalizeDayToken(token) {
+  return DAY_TOKEN_MAP[String(token || '').trim().toLowerCase()] || null;
+}
+
+function expandDayExpression(dayExpr) {
+  const source = String(dayExpr || '').trim();
+  if (!source) return [];
+  return Array.from(
+    new Set(
+      source
+        .split(/[-,/ ]+/)
+        .map((t) => normalizeDayToken(t))
+        .filter(Boolean)
+    )
+  );
+}
+
+function scheduleStringToSlots(scheduleText) {
+  const text = String(scheduleText || '').trim();
+  if (!text) return [];
+  const slots = new Set();
+
+  const segments = text.split('|').map((s) => s.trim()).filter(Boolean);
+  segments.forEach((segment) => {
+    const segmentParts = segment.split(/\s+/);
+    const days = expandDayExpression(segmentParts[0] || '');
+    if (!days.length) return;
+    const ranges = segment.match(/\b(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\b/g) || [];
+    if (ranges.length > 0) {
+      ranges.forEach((rangeText) => {
+        const m = rangeText.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+        if (!m) return;
+        const startHour = Number(m[1]);
+        const endHour = Number(m[3]);
+        if (!Number.isFinite(startHour) || !Number.isFinite(endHour)) return;
+        for (let h = startHour; h < endHour; h += 1) {
+          if (h < SCHEDULE_HOURS[0] || h > SCHEDULE_HOURS[SCHEDULE_HOURS.length - 1]) continue;
+          days.forEach((day) => slots.add(`${day}-${String(h).padStart(2, '0')}:00`));
+        }
+      });
+      return;
+    }
+
+    // Legacy format support, e.g. "Mon-Wed-Fri 09:00" (single hour blocks).
+    const singleTimes = segment.match(/\b(\d{1,2}):(\d{2})\b/g) || [];
+    singleTimes.forEach((timeText) => {
+      const m = timeText.match(/(\d{1,2}):(\d{2})/);
+      if (!m) return;
+      const hour = Number(m[1]);
+      if (!Number.isFinite(hour)) return;
+      if (hour < SCHEDULE_HOURS[0] || hour > SCHEDULE_HOURS[SCHEDULE_HOURS.length - 1]) return;
+      days.forEach((day) => slots.add(`${day}-${String(hour).padStart(2, '0')}:00`));
+    });
+  });
+
+  return Array.from(slots);
+}
+
+function getTeacherUnavailableSlots(teacherId, classRows) {
+  const tid = String(teacherId || '').trim();
+  if (!tid) return [];
+  const slots = new Set();
+  (classRows || []).forEach((cls) => {
+    if (String(cls.teacherId || '').trim() !== tid) return;
+    scheduleStringToSlots(cls.schedule).forEach((slot) => slots.add(slot));
+  });
+  return Array.from(slots);
+}
+
 const AdminPortal = () => {
   const { user, logout } = useAuth();
   const { statCardWidthPct, actionCardWidthPct } = useResponsiveLayout();
@@ -55,6 +144,7 @@ const AdminPortal = () => {
     confirmPassword: ''
   });
   const [newTeacher, setNewTeacher] = useState({
+    teacherId: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -75,6 +165,10 @@ const AdminPortal = () => {
     schedule: '',
     studentIds: []
   });
+  const [classTeacherSearch, setClassTeacherSearch] = useState('');
+  const [classStudentSearch, setClassStudentSearch] = useState('');
+  const [classStudentYearFilter, setClassStudentYearFilter] = useState('all');
+  const [classScheduleSlots, setClassScheduleSlots] = useState([]);
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
     message: '',
@@ -117,6 +211,32 @@ const AdminPortal = () => {
     const sid = String(studentId || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
     if (!first || !last || !sid) return '';
     return `${first}.${last}.${sid}@student.scms.school.nz`;
+  };
+
+  const generateTeacherId = (firstName, lastName) => {
+    const first = String(firstName || '').trim().charAt(0).toUpperCase();
+    const last = String(lastName || '').trim().charAt(0).toUpperCase();
+    const suffix = Date.now().toString().slice(-4);
+    return `T${first || 'X'}${last || 'X'}${suffix}`;
+  };
+
+  const generateTeacherEmail = (firstName, lastName) => {
+    const first = String(firstName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const last = String(lastName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!first || !last) return '';
+    return `${first}.${last}@teacher.scms.school.nz`;
+  };
+
+  const generateFallbackTeacherEmail = (firstName, lastName, teacherId) => {
+    const first = String(firstName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const last = String(lastName || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const tid = String(teacherId || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!first || !last || !tid) return '';
+    return `${first}.${last}.${tid}@teacher.scms.school.nz`;
+  };
+
+  const generateTeacherPassword = (teacherId) => {
+    return `Tch-${String(teacherId || '').toUpperCase()}`;
   };
 
   useEffect(() => {
@@ -513,47 +633,86 @@ const AdminPortal = () => {
   };
 
   const handleAddTeacher = async () => {
-    if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.email || !newTeacher.subject || !newTeacher.password || !newTeacher.confirmPassword) {
-      Alert.alert('Error', 'Please fill in all required fields (First Name, Last Name, Email, Subject, Password)');
-      return;
-    }
-
-    if (newTeacher.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
-
-    if (newTeacher.password !== newTeacher.confirmPassword) {
-      Alert.alert('Error', 'Teacher passwords do not match');
+    if (!newTeacher.firstName || !newTeacher.lastName || !newTeacher.subject) {
+      showPopup('Error', 'Please fill in all required fields (First Name, Last Name, Subject)');
       return;
     }
 
     try {
-      const generatedTeacherId = newTeacher.teacherId || `TCH${Date.now().toString().slice(-6)}`;
+      const generatedTeacherId = newTeacher.teacherId || generateTeacherId(newTeacher.firstName, newTeacher.lastName);
       const fullName = `${newTeacher.firstName} ${newTeacher.lastName}`;
+      const generatedTeacherPassword = generateTeacherPassword(generatedTeacherId);
+      const primaryTeacherEmail = newTeacher.email || generateTeacherEmail(newTeacher.firstName, newTeacher.lastName);
+      const fallbackTeacherEmail = generateFallbackTeacherEmail(
+        newTeacher.firstName,
+        newTeacher.lastName,
+        generatedTeacherId
+      );
+      if (!primaryTeacherEmail) {
+        showPopup('Error', 'Could not generate teacher email from name. Please check teacher details.');
+        return;
+      }
 
-      await createManagedAppUserAccount({
-        email: newTeacher.email,
-        password: newTeacher.password,
-        role: 'teacher',
-        name: fullName,
-        username: generatedTeacherId,
-        profileId: generatedTeacherId
-      });
+      let generatedTeacherEmail = primaryTeacherEmail;
+
+      try {
+        await createManagedAppUserAccount({
+          email: generatedTeacherEmail,
+          password: generatedTeacherPassword,
+          role: 'teacher',
+          name: fullName,
+          username: generatedTeacherId,
+          profileId: generatedTeacherId,
+          extraProfileData: {
+            subject: newTeacher.subject,
+            department: newTeacher.department || '',
+            phone: newTeacher.phone || '',
+            password: generatedTeacherPassword
+          }
+        });
+      } catch (teacherAuthError) {
+        const code = String(teacherAuthError?.code || teacherAuthError?.message || '');
+        const isEmailInUse = code.includes('auth/email-already-in-use');
+        if (!isEmailInUse || !fallbackTeacherEmail) {
+          throw teacherAuthError;
+        }
+
+        generatedTeacherEmail = fallbackTeacherEmail;
+        await createManagedAppUserAccount({
+          email: generatedTeacherEmail,
+          password: generatedTeacherPassword,
+          role: 'teacher',
+          name: fullName,
+          username: generatedTeacherId,
+          profileId: generatedTeacherId,
+          extraProfileData: {
+            subject: newTeacher.subject,
+            department: newTeacher.department || '',
+            phone: newTeacher.phone || '',
+            password: generatedTeacherPassword
+          }
+        });
+      }
 
       const teacherData = {
         ...newTeacher,
         teacherId: generatedTeacherId,
-        name: fullName
+        name: fullName,
+        email: generatedTeacherEmail
       };
       delete teacherData.password;
       delete teacherData.confirmPassword;
 
       await DatabaseService.addTeacher(teacherData);
-      Alert.alert('Success', 'Teacher added successfully');
+      showPopup('Success', 'Teacher added successfully');
+      showPopup(
+        'Teacher login created',
+        `Teacher ID: ${generatedTeacherId}\nEmail: ${generatedTeacherEmail}\nDefault password: ${generatedTeacherPassword}`
+      );
       
       // Reset form
       setNewTeacher({
+        teacherId: '',
         firstName: '',
         lastName: '',
         email: '',
@@ -571,19 +730,36 @@ const AdminPortal = () => {
       loadDashboardStats(); // Refresh dashboard stats
     } catch (error) {
       console.error('Error adding teacher:', error);
-      Alert.alert('Error', 'Failed to add teacher');
+      const errorMessage = String(error?.message || error || 'Failed to add teacher');
+      showPopup('Error adding teacher', errorMessage);
     }
   };
 
   const handleAddClass = async () => {
     if (!newClass.name || !newClass.teacherId || !newClass.subject) {
-      Alert.alert('Error', 'Please fill in all required fields (Class Name, Teacher, Subject)');
+      showPopup('Error', 'Please fill in all required fields (Class Name, Teacher, Subject)');
       return;
     }
 
     try {
-      await DatabaseService.addClass(newClass);
-      Alert.alert('Success', 'Class created successfully');
+      const normalizedClassName = String(newClass.name || '').trim();
+      const normalizedClassId = `CLS${normalizedClassName.replace(/\s+/g, '').toUpperCase()}`;
+      const classPayload = {
+        ...newClass,
+        name: normalizedClassName,
+        classId: normalizedClassId,
+        schedule: formatScheduleFromSlots(classScheduleSlots) || newClass.schedule,
+        studentIds: Array.from(new Set((newClass.studentIds || []).map((id) => String(id || '').trim().toUpperCase()).filter(Boolean)))
+      };
+
+      await DatabaseService.addClass(classPayload);
+      if (classPayload.studentIds.length > 0) {
+        await DatabaseService.assignStudentsToClass(classPayload.studentIds, {
+          className: normalizedClassName,
+          classId: normalizedClassId
+        });
+      }
+      showPopup('Success', 'Class created successfully');
       
       // Reset form
       setNewClass({
@@ -595,14 +771,117 @@ const AdminPortal = () => {
         schedule: '',
         studentIds: []
       });
+      setClassTeacherSearch('');
+      setClassStudentSearch('');
+      setClassStudentYearFilter('all');
+      setClassScheduleSlots([]);
       
       setShowAddClass(false);
-      loadClasses();
+      await Promise.all([loadClasses(), loadStudents(), loadTeachers()]);
       loadDashboardStats(); // Refresh dashboard stats
     } catch (error) {
       console.error('Error adding class:', error);
-      Alert.alert('Error', 'Failed to create class');
+      showPopup('Error', String(error?.message || 'Failed to create class'));
     }
+  };
+
+  const filteredTeachersForClass = teachers.filter((teacher) => {
+    const q = classTeacherSearch.trim().toLowerCase();
+    if (!q) return true;
+    const name = String(teacher.name || `${teacher.firstName || ''} ${teacher.lastName || ''}`).toLowerCase();
+    const subject = String(teacher.subject || '').toLowerCase();
+    const teacherId = String(teacher.teacherId || teacher.id || '').toLowerCase();
+    return name.includes(q) || subject.includes(q) || teacherId.includes(q);
+  });
+
+  const availableYearFilters = Array.from(
+    new Set(
+      students
+        .map((student) => {
+          const explicitYear = Number(student.yearLevel);
+          if (Number.isFinite(explicitYear) && explicitYear > 0) return String(explicitYear);
+          const cls = String(student.class || '');
+          const m = cls.match(/\d+/);
+          return m ? m[0] : '';
+        })
+        .filter(Boolean)
+    )
+  ).sort((a, b) => Number(a) - Number(b));
+
+  const filteredStudentsForClass = students.filter((student) => {
+    const search = classStudentSearch.trim().toLowerCase();
+    const studentId = String(student.studentId || student.id || '').toUpperCase();
+    const fullName = String(student.name || `${student.firstName || ''} ${student.lastName || ''}`).trim();
+    const className = String(student.class || '');
+    const yearFromClass = className.match(/\d+/)?.[0] || '';
+    const yearLevel = String(student.yearLevel || yearFromClass || '');
+
+    if (classStudentYearFilter !== 'all' && yearLevel !== classStudentYearFilter) return false;
+    if (!search) return true;
+    return (
+      studentId.toLowerCase().includes(search) ||
+      fullName.toLowerCase().includes(search) ||
+      className.toLowerCase().includes(search) ||
+      yearLevel.toLowerCase().includes(search)
+    );
+  });
+
+  const toggleStudentInClassSelection = (studentId) => {
+    const sid = String(studentId || '').trim().toUpperCase();
+    if (!sid) return;
+    setNewClass((prev) => {
+      const has = (prev.studentIds || []).includes(sid);
+      return {
+        ...prev,
+        studentIds: has
+          ? prev.studentIds.filter((id) => id !== sid)
+          : [...(prev.studentIds || []), sid]
+      };
+    });
+  };
+
+  const toggleScheduleSlot = (day, hour) => {
+    const slotKey = `${day}-${String(hour).padStart(2, '0')}:00`;
+    setClassScheduleSlots((prev) =>
+      prev.includes(slotKey) ? prev.filter((s) => s !== slotKey) : [...prev, slotKey]
+    );
+  };
+
+  const teacherUnavailableSlots = getTeacherUnavailableSlots(newClass.teacherId, classes);
+
+  const formatScheduleFromSlots = (slots) => {
+    if (!slots.length) return '';
+    const grouped = {};
+    slots.forEach((slot) => {
+      const [day, time] = slot.split('-');
+      const hour = Number(String(time || '').split(':')[0]);
+      if (!grouped[day]) grouped[day] = [];
+      if (Number.isFinite(hour)) grouped[day].push(hour);
+    });
+
+    const parts = [];
+    SCHEDULE_DAYS.forEach((day) => {
+      const hours = (grouped[day] || []).sort((a, b) => a - b);
+      if (!hours.length) return;
+      const ranges = [];
+      let start = hours[0];
+      let end = hours[0];
+      for (let i = 1; i < hours.length; i += 1) {
+        if (hours[i] === end + 1) end = hours[i];
+        else {
+          ranges.push([start, end]);
+          start = hours[i];
+          end = hours[i];
+        }
+      }
+      ranges.push([start, end]);
+      const dayText = ranges
+        .map(([s, e]) => `${String(s).padStart(2, '0')}:00-${String(e + 1).padStart(2, '0')}:00`)
+        .join(', ');
+      parts.push(`${day} ${dayText}`);
+    });
+
+    return parts.join(' | ');
   };
 
   const handleGenerateQR = (student) => {
@@ -1124,7 +1403,15 @@ const AdminPortal = () => {
               <TextInput
                 style={styles.input}
                 value={newTeacher.firstName}
-                onChangeText={(text) => setNewTeacher({...newTeacher, firstName: text})}
+                onChangeText={(text) => {
+                  setNewTeacher((prev) => {
+                    const next = { ...prev, firstName: text };
+                    if (!prev.teacherId && text.trim() && String(prev.lastName || '').trim()) {
+                      next.teacherId = generateTeacherId(text, prev.lastName);
+                    }
+                    return next;
+                  });
+                }}
                 placeholder="Enter first name"
               />
             </View>
@@ -1134,7 +1421,15 @@ const AdminPortal = () => {
               <TextInput
                 style={styles.input}
                 value={newTeacher.lastName}
-                onChangeText={(text) => setNewTeacher({...newTeacher, lastName: text})}
+                onChangeText={(text) => {
+                  setNewTeacher((prev) => {
+                    const next = { ...prev, lastName: text };
+                    if (!prev.teacherId && text.trim() && String(prev.firstName || '').trim()) {
+                      next.teacherId = generateTeacherId(prev.firstName, text);
+                    }
+                    return next;
+                  });
+                }}
                 placeholder="Enter last name"
               />
             </View>
@@ -1145,30 +1440,9 @@ const AdminPortal = () => {
                 style={styles.input}
                 value={newTeacher.email}
                 onChangeText={(text) => setNewTeacher({...newTeacher, email: text})}
-                placeholder="teacher@school.edu"
+                placeholder="Optional - leave blank to auto-generate"
                 keyboardType="email-address"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Teacher Login Password *</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.password}
-                onChangeText={(text) => setNewTeacher({...newTeacher, password: text})}
-                placeholder="Minimum 6 characters"
-                secureTextEntry
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Confirm Password *</Text>
-              <TextInput
-                style={styles.input}
-                value={newTeacher.confirmPassword}
-                onChangeText={(text) => setNewTeacher({...newTeacher, confirmPassword: text})}
-                placeholder="Re-enter password"
-                secureTextEntry
+                autoCapitalize="none"
               />
             </View>
             
@@ -1201,6 +1475,32 @@ const AdminPortal = () => {
                 onChangeText={(text) => setNewTeacher({...newTeacher, department: text})}
                 placeholder="e.g., Mathematics Department"
               />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Teacher Login (Auto-generated)</Text>
+              <View style={styles.readonlyBox}>
+                <Text style={styles.readonlyText}>
+                  ID: {newTeacher.teacherId
+                    ? newTeacher.teacherId
+                    : (newTeacher.firstName && newTeacher.lastName
+                      ? 'Will be generated when name is entered'
+                      : 'Will be generated after entering teacher name')}
+                </Text>
+                <Text style={styles.readonlyText}>
+                  Email: {newTeacher.email
+                    ? newTeacher.email
+                    : (newTeacher.firstName && newTeacher.lastName
+                      ? generateTeacherEmail(newTeacher.firstName, newTeacher.lastName)
+                      : 'Will be auto-generated from teacher name')}
+                </Text>
+                <Text style={styles.readonlyText}>
+                  Password: {newTeacher.teacherId
+                    ? generateTeacherPassword(newTeacher.teacherId)
+                    : 'Will be generated after entering teacher name'}
+                    
+                </Text>
+              </View>
             </View>
             
             <TouchableOpacity
@@ -1261,43 +1561,169 @@ const AdminPortal = () => {
             </View>
             
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Schedule</Text>
-              <TextInput
-                style={styles.input}
-                value={newClass.schedule}
-                onChangeText={(text) => setNewClass({...newClass, schedule: text})}
-                placeholder="e.g., Mon, Wed, Fri 9:00-10:00 AM"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Assign Teacher *</Text>
-              <Text style={styles.helperText}>Select from existing teachers or enter teacher ID</Text>
               <TextInput
                 style={styles.input}
-                value={newClass.teacherId}
-                onChangeText={(text) => setNewClass({...newClass, teacherId: text})}
-                placeholder="e.g., TCH123456"
+                value={classTeacherSearch}
+                onChangeText={setClassTeacherSearch}
+                placeholder="Filter teachers by name, subject, or id"
               />
-              <TextInput
-                style={[styles.input, styles.marginTop]}
-                value={newClass.teacherName}
-                onChangeText={(text) => setNewClass({...newClass, teacherName: text})}
-                placeholder="Teacher Name (optional)"
-              />
+              <View style={styles.selectionListBox}>
+                <ScrollView nestedScrollEnabled>
+                  {filteredTeachersForClass.map((teacher) => {
+                    const teacherId = String(teacher.teacherId || teacher.id || '');
+                    const teacherName = teacher.name || `${teacher.firstName || ''} ${teacher.lastName || ''}`.trim();
+                    const selected = newClass.teacherId === teacherId;
+                    return (
+                      <TouchableOpacity
+                        key={teacherId}
+                        style={[styles.selectionRow, selected && styles.selectionRowSelected]}
+                        onPress={() => {
+                          setNewClass({
+                            ...newClass,
+                            teacherId,
+                            teacherName
+                          });
+                          const unavailable = getTeacherUnavailableSlots(teacherId, classes);
+                          if (unavailable.length > 0) {
+                            setClassScheduleSlots((prev) => prev.filter((slot) => !unavailable.includes(slot)));
+                          }
+                        }}
+                      >
+                        <Ionicons
+                          name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={18}
+                          color={selected ? '#4CAF50' : '#888'}
+                        />
+                        <View style={styles.selectionRowTextWrap}>
+                          <Text style={styles.selectionRowTitle}>{teacherName}</Text>
+                          <Text style={styles.selectionRowSubtitle}>
+                            {teacherId} • {teacher.subject || 'Subject not set'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Schedule (Calendar blocks)</Text>
+              <Text style={styles.helperText}>
+                {newClass.teacherId
+                  ? 'Gray blocks are unavailable for the selected teacher.'
+                  : 'Select a teacher first to see unavailable blocks.'}
+              </Text>
+              <View style={styles.scheduleLegendRow}>
+                <View style={styles.scheduleLegendItem}>
+                  <View style={styles.scheduleLegendSwatchAvailable} />
+                  <Text style={styles.scheduleLegendText}>Available</Text>
+                </View>
+                <View style={styles.scheduleLegendItem}>
+                  <View style={styles.scheduleLegendSwatchSelected} />
+                  <Text style={styles.scheduleLegendText}>Selected</Text>
+                </View>
+                <View style={styles.scheduleLegendItem}>
+                  <View style={styles.scheduleLegendSwatchUnavailable} />
+                  <Text style={styles.scheduleLegendText}>Unavailable</Text>
+                </View>
+              </View>
+              <View style={styles.scheduleGridWrap}>
+                <View style={styles.scheduleHeaderRow}>
+                  <View style={styles.scheduleTimeCellHeader} />
+                  {SCHEDULE_DAYS.map((day) => (
+                    <Text key={day} style={styles.scheduleDayHeader}>{day}</Text>
+                  ))}
+                </View>
+                <ScrollView style={styles.scheduleGridScroll} nestedScrollEnabled>
+                  {SCHEDULE_HOURS.map((hour) => (
+                    <View key={hour} style={styles.scheduleRow}>
+                      <Text style={styles.scheduleTimeCell}>{`${String(hour).padStart(2, '0')}:00`}</Text>
+                      {SCHEDULE_DAYS.map((day) => {
+                        const slotKey = `${day}-${String(hour).padStart(2, '0')}:00`;
+                        const selected = classScheduleSlots.includes(slotKey);
+                        const unavailable = teacherUnavailableSlots.includes(slotKey);
+                        return (
+                          <TouchableOpacity
+                            key={slotKey}
+                            disabled={unavailable}
+                            style={[
+                              styles.scheduleBlock,
+                              selected && styles.scheduleBlockSelected,
+                              unavailable && styles.scheduleBlockUnavailable
+                            ]}
+                            onPress={() => toggleScheduleSlot(day, hour)}
+                          />
+                        );
+                      })}
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+              <Text style={styles.helperText}>
+                Selected: {formatScheduleFromSlots(classScheduleSlots) || 'No blocks selected'}
+              </Text>
             </View>
             
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Student IDs (Optional)</Text>
-              <Text style={styles.helperText}>Comma-separated list of student IDs to assign to this class</Text>
+              <Text style={styles.inputLabel}>Assign Students (Optional)</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
-                value={newClass.studentIds.join(', ')}
-                onChangeText={(text) => setNewClass({...newClass, studentIds: text.split(',').map(id => id.trim()).filter(id => id)})}
-                placeholder="STU10AJ1234, STU10BS5678, STU10CW9012"
-                multiline
-                numberOfLines={3}
+                style={styles.input}
+                value={classStudentSearch}
+                onChangeText={setClassStudentSearch}
+                placeholder="Filter students by ID, name, class"
               />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearFilterRow}>
+                <TouchableOpacity
+                  style={[styles.yearFilterChip, classStudentYearFilter === 'all' && styles.yearFilterChipActive]}
+                  onPress={() => setClassStudentYearFilter('all')}
+                >
+                  <Text style={[styles.yearFilterChipText, classStudentYearFilter === 'all' && styles.yearFilterChipTextActive]}>
+                    All years
+                  </Text>
+                </TouchableOpacity>
+                {availableYearFilters.map((year) => (
+                  <TouchableOpacity
+                    key={year}
+                    style={[styles.yearFilterChip, classStudentYearFilter === year && styles.yearFilterChipActive]}
+                    onPress={() => setClassStudentYearFilter(year)}
+                  >
+                    <Text style={[styles.yearFilterChipText, classStudentYearFilter === year && styles.yearFilterChipTextActive]}>
+                      Year {year}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={styles.selectionListBoxLarge}>
+                <ScrollView nestedScrollEnabled>
+                  {filteredStudentsForClass.map((student) => {
+                    const studentId = String(student.studentId || student.id || '').toUpperCase();
+                    const studentName = student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim();
+                    const selected = (newClass.studentIds || []).includes(studentId);
+                    return (
+                      <TouchableOpacity
+                        key={studentId}
+                        style={[styles.selectionRow, selected && styles.selectionRowSelected]}
+                        onPress={() => toggleStudentInClassSelection(studentId)}
+                      >
+                        <Ionicons
+                          name={selected ? 'checkbox' : 'square-outline'}
+                          size={18}
+                          color={selected ? '#4CAF50' : '#888'}
+                        />
+                        <View style={styles.selectionRowTextWrap}>
+                          <Text style={styles.selectionRowTitle}>{studentId} - {studentName || 'Unnamed student'}</Text>
+                          <Text style={styles.selectionRowSubtitle}>Current class: {student.class || 'Unassigned'}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+              <Text style={styles.helperText}>
+                Selected students: {(newClass.studentIds || []).length}
+              </Text>
             </View>
             
             <TouchableOpacity
@@ -2172,6 +2598,9 @@ const styles = StyleSheet.create({
   formContainer: {
     flex: 1,
     padding: 20,
+    width: '100%',
+    maxWidth: 860,
+    alignSelf: 'center',
   },
   inputGroup: {
     marginBottom: 20,
@@ -2245,6 +2674,176 @@ const styles = StyleSheet.create({
   },
   marginTop: {
     marginTop: 8,
+  },
+  selectionListBox: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    maxHeight: 180,
+    backgroundColor: '#fff',
+    marginTop: 8,
+  },
+  selectionListBoxLarge: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    maxHeight: 260,
+    backgroundColor: '#fff',
+    marginTop: 8,
+  },
+  selectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  selectionRowSelected: {
+    backgroundColor: '#f1f9f1',
+  },
+  selectionRowTextWrap: {
+    flex: 1,
+  },
+  selectionRowTitle: {
+    fontSize: 14,
+    color: '#222',
+    fontWeight: '600',
+  },
+  selectionRowSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#666',
+  },
+  yearFilterRow: {
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  yearFilterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: '#f1f1f1',
+    marginRight: 8,
+  },
+  yearFilterChipActive: {
+    backgroundColor: '#4a90e2',
+  },
+  yearFilterChipText: {
+    fontSize: 12,
+    color: '#555',
+    fontWeight: '600',
+  },
+  yearFilterChipTextActive: {
+    color: '#fff',
+  },
+  scheduleGridWrap: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    marginTop: 8,
+    maxWidth: 760,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  scheduleHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f7f9fc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e6e8eb',
+    paddingVertical: 8,
+  },
+  scheduleTimeCellHeader: {
+    width: 58,
+  },
+  scheduleDayHeader: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#555',
+  },
+  scheduleGridScroll: {
+    maxHeight: 300,
+  },
+  scheduleLegendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  scheduleLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  scheduleLegendText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '600',
+  },
+  scheduleLegendSwatchAvailable: {
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#d8dce2',
+    backgroundColor: '#fff',
+  },
+  scheduleLegendSwatchSelected: {
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    backgroundColor: '#4CAF50',
+  },
+  scheduleLegendSwatchUnavailable: {
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#bfc5cd',
+    backgroundColor: '#d7dbe1',
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f1f1',
+    minHeight: 34,
+  },
+  scheduleTimeCell: {
+    width: 58,
+    textAlign: 'center',
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '600',
+  },
+  scheduleBlock: {
+    flex: 1,
+    marginHorizontal: 4,
+    marginVertical: 4,
+    borderRadius: 4,
+    minHeight: 24,
+    borderWidth: 1,
+    borderColor: '#d8dce2',
+    backgroundColor: '#fff',
+  },
+  scheduleBlockSelected: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  scheduleBlockUnavailable: {
+    backgroundColor: '#d7dbe1',
+    borderColor: '#bfc5cd',
+    opacity: 0.9,
   },
   addButton: {
     flexDirection: 'row',

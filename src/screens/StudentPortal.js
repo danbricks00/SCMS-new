@@ -13,6 +13,23 @@ import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
 
+const DAY_TO_INDEX = {
+  mon: 1,
+  monday: 1,
+  tue: 2,
+  tues: 2,
+  tuesday: 2,
+  wed: 3,
+  weds: 3,
+  wednesday: 3,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  thursday: 4,
+  fri: 5,
+  friday: 5
+};
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s)
@@ -41,6 +58,7 @@ const StudentPortal = () => {
   const [events, setEvents] = useState([]);
   const [recentAttendance, setRecentAttendance] = useState([]);
   const [attendanceMetrics, setAttendanceMetrics] = useState({ presentRate: 0, absences: 0, lateCount: 0 });
+  const [upcomingClasses, setUpcomingClasses] = useState([]);
   const [qrImageDataUrlForPrint, setQrImageDataUrlForPrint] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -65,7 +83,7 @@ const StudentPortal = () => {
   // Load student data and QR code from database
   useEffect(() => {
     const loadStudentData = async () => {
-      if (!user?.username || studentQRCode) {
+      if (!user?.username) {
         return;
       }
 
@@ -97,6 +115,10 @@ const StudentPortal = () => {
         if (student) {
           applyStudent(student);
           loadAttendance(String(student.studentId || user.username || '').toUpperCase());
+          loadUpcomingClasses({
+            className: student.class || user.class || '10A',
+            classId: student.classId || ''
+          });
         } else {
           const fallbackData = {
             studentId: String(user.username || '').toUpperCase(),
@@ -108,6 +130,10 @@ const StudentPortal = () => {
           setStudentQRCode(QRCodeUtils.generateStudentQR(fallbackData));
           loadEvents(fallbackData.class);
           loadAttendance(fallbackData.studentId);
+          loadUpcomingClasses({
+            className: fallbackData.class,
+            classId: fallbackData.classId || ''
+          });
         }
       } catch (error) {
         console.error('Error loading student data:', error);
@@ -121,11 +147,15 @@ const StudentPortal = () => {
         setStudentQRCode(QRCodeUtils.generateStudentQR(fallbackData));
         loadEvents(fallbackData.class);
         loadAttendance(fallbackData.studentId);
+        loadUpcomingClasses({
+          className: fallbackData.class,
+          classId: fallbackData.classId || ''
+        });
       }
     };
 
     loadStudentData();
-  }, [user?.username, user?.name, user?.class, studentQRCode]);
+  }, [user?.username, user?.name, user?.class]);
 
   useEffect(() => {
     const studentId = String(studentData?.studentId || user?.username || '').toUpperCase();
@@ -144,6 +174,123 @@ const StudentPortal = () => {
       setEvents(userEvents);
     } catch (error) {
       console.error('Error loading events:', error);
+    }
+  };
+
+  const parseDayIndexes = (dayExpr) => {
+    const source = String(dayExpr || '').trim();
+    if (!source) return [];
+    return Array.from(
+      new Set(
+        source
+          .split(/[-,/ ]+/)
+          .map((token) => DAY_TO_INDEX[String(token || '').trim().toLowerCase()])
+          .filter((v) => Number.isInteger(v))
+      )
+    );
+  };
+
+  const extractSlotsFromSchedule = (schedule) => {
+    const text = String(schedule || '').trim();
+    if (!text) return [];
+    const slots = [];
+    const segments = text.split('|').map((s) => s.trim()).filter(Boolean);
+
+    segments.forEach((segment) => {
+      const firstToken = segment.split(/\s+/)[0] || '';
+      const dayIndexes = parseDayIndexes(firstToken);
+      if (!dayIndexes.length) return;
+
+      const ranges = segment.match(/\b(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\b/g) || [];
+      if (ranges.length > 0) {
+        ranges.forEach((rangeText) => {
+          const m = rangeText.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+          if (!m) return;
+          const startHour = Number(m[1]);
+          const startMinute = Number(m[2]);
+          const endHour = Number(m[3]);
+          const endMinute = Number(m[4]);
+          dayIndexes.forEach((dayIndex) => {
+            slots.push({ dayIndex, startHour, startMinute, endHour, endMinute });
+          });
+        });
+        return;
+      }
+
+      const singleTimes = segment.match(/\b(\d{1,2}):(\d{2})\b/g) || [];
+      singleTimes.forEach((timeText) => {
+        const m = timeText.match(/(\d{1,2}):(\d{2})/);
+        if (!m) return;
+        const hour = Number(m[1]);
+        const minute = Number(m[2]);
+        dayIndexes.forEach((dayIndex) => {
+          slots.push({ dayIndex, startHour: hour, startMinute: minute, endHour: hour + 1, endMinute: minute });
+        });
+      });
+    });
+
+    return slots;
+  };
+
+  const nextOccurrenceForSlot = (slot, fromDate = new Date()) => {
+    const now = new Date(fromDate);
+    const start = new Date(now);
+    const dayOffset = (slot.dayIndex - now.getDay() + 7) % 7;
+    start.setDate(now.getDate() + dayOffset);
+    start.setHours(slot.startHour, slot.startMinute, 0, 0);
+    if (start <= now) start.setDate(start.getDate() + 7);
+
+    const end = new Date(start);
+    end.setHours(slot.endHour, slot.endMinute, 0, 0);
+    if (end <= start) end.setHours(end.getHours() + 1);
+    return { start, end };
+  };
+
+  const buildUpcomingClasses = (classRows, limit = 12) => {
+    const seed = [];
+    classRows.forEach((cls) => {
+      extractSlotsFromSchedule(cls.schedule).forEach((slot) => {
+        const { start, end } = nextOccurrenceForSlot(slot);
+        seed.push({
+          className: cls.name || 'Class',
+          subject: cls.subject || 'General',
+          room: cls.room || 'TBA',
+          teacherName: cls.teacherName || cls.teacherId || 'Teacher',
+          start,
+          end
+        });
+      });
+    });
+
+    const result = [];
+    const pool = [...seed];
+    while (pool.length > 0 && result.length < limit) {
+      pool.sort((a, b) => a.start - b.start);
+      const next = pool.shift();
+      result.push(next);
+      const nextStart = new Date(next.start);
+      const nextEnd = new Date(next.end);
+      nextStart.setDate(nextStart.getDate() + 7);
+      nextEnd.setDate(nextEnd.getDate() + 7);
+      pool.push({ ...next, start: nextStart, end: nextEnd });
+    }
+    return result;
+  };
+
+  const loadUpcomingClasses = async (classInfo) => {
+    try {
+      const normalizedClassName = String(classInfo?.className || classInfo || '').trim().toLowerCase();
+      const normalizedClassId = String(classInfo?.classId || '').trim().toUpperCase();
+      const classes = await DatabaseService.getAllClasses();
+      const matching = classes.filter(
+        (cls) =>
+          String(cls.name || '').trim().toLowerCase() === normalizedClassName ||
+          (normalizedClassId && String(cls.classId || '').trim().toUpperCase() === normalizedClassId)
+      );
+      setUpcomingClasses(buildUpcomingClasses(matching));
+    } catch (error) {
+      console.error('Error loading upcoming classes:', error);
+      setUpcomingClasses([]);
     }
   };
 
@@ -200,11 +347,13 @@ const StudentPortal = () => {
   const handleRefresh = async () => {
     const studentId = String(studentData?.studentId || user?.username || '').toUpperCase();
     const userClass = studentData?.class || user?.class || '10A';
+    const userClassId = String(studentData?.classId || '').trim().toUpperCase();
     setRefreshing(true);
     try {
       await Promise.all([
         loadEvents(userClass),
-        loadAttendance(studentId)
+        loadAttendance(studentId),
+        loadUpcomingClasses({ className: userClass, classId: userClassId })
       ]);
     } finally {
       setRefreshing(false);
@@ -439,6 +588,42 @@ const StudentPortal = () => {
               <Text style={styles.printButtonText}>Print QR Code</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Upcoming Classes</Text>
+          {upcomingClasses.length === 0 ? (
+            <View style={styles.attendanceList}>
+              <Text style={styles.dayText}>No scheduled classes found yet.</Text>
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.upcomingCardsRow}
+            >
+              {upcomingClasses.map((entry, index) => {
+                const roomLabel = String(entry.room || 'TBA').trim();
+                const displayRoom = /^room\b/i.test(roomLabel) ? roomLabel : `Room ${roomLabel}`;
+                return (
+                  <View key={`${entry.className}-${entry.start.toISOString()}-${index}`} style={styles.upcomingClassCard}>
+                    <Text style={styles.upcomingClassTitle}>{entry.subject}</Text>
+                    <Text style={styles.upcomingClassSubtitle}>{entry.className}</Text>
+                    <Text style={styles.eventCardDetailText}>
+                      {entry.start.toLocaleDateString()}
+                    </Text>
+                    <Text style={styles.eventCardDetailText}>
+                      {entry.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {' - '}
+                      {entry.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    <Text style={styles.eventCardDetailText}>{entry.teacherName}</Text>
+                    <Text style={styles.eventCardDetailText}>{displayRoom}</Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Attendance Overview</Text>
@@ -748,6 +933,36 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 5,
     textAlign: 'center',
+  },
+  studentInfoBlock: {
+    flex: 1,
+  },
+  upcomingCardsRow: {
+    gap: 12,
+    paddingBottom: 4,
+  },
+  upcomingClassCard: {
+    width: 240,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  upcomingClassTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  upcomingClassSubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4a90e2',
+    marginBottom: 8,
   },
   printButton: {
     backgroundColor: '#4a90e2',

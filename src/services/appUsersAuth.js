@@ -504,24 +504,33 @@ export async function fetchDemoUsersByRole() {
     byRole[parsed.role] = parsed.entry;
   };
 
-  try {
-    const qDemo = query(collection(db, 'users'), where('isDemo', '==', true));
-    const demoSnap = await getDocs(qDemo);
-    demoSnap.forEach(assignFromDoc);
-  } catch (e) {
-    console.warn('[fetchDemoUsersByRole] isDemo query failed', e);
+  const qDemo = query(collection(db, 'users'), where('isDemo', '==', true));
+  const roleQueries = ALLOWED_ROLES.map((role) => ({
+    role,
+    q: query(collection(db, 'users'), where('role', '==', role), limit(1))
+  }));
+
+  // Run independent Firestore reads concurrently to reduce login-page wait time.
+  const [demoResult, ...roleResults] = await Promise.allSettled([
+    getDocs(qDemo),
+    ...roleQueries.map(({ q }) => getDocs(q))
+  ]);
+
+  if (demoResult.status === 'fulfilled') {
+    demoResult.value.forEach(assignFromDoc);
+  } else {
+    console.warn('[fetchDemoUsersByRole] isDemo query failed', demoResult.reason);
   }
 
-  for (const role of ALLOWED_ROLES) {
-    if (byRole[role]) continue;
-    try {
-      const q = query(collection(db, 'users'), where('role', '==', role), limit(1));
-      const s = await getDocs(q);
-      if (!s.empty) assignFromDoc(s.docs[0]);
-    } catch (e) {
-      console.warn(`[fetchDemoUsersByRole] role=${role}`, e);
+  roleResults.forEach((result, idx) => {
+    const { role } = roleQueries[idx];
+    if (result.status !== 'fulfilled') {
+      console.warn(`[fetchDemoUsersByRole] role=${role}`, result.reason);
+      return;
     }
-  }
+    if (byRole[role]) return;
+    if (!result.value.empty) assignFromDoc(result.value.docs[0]);
+  });
 
   try {
     const parentForAc0611 = await fetchParentDemoEntryLinkedToStudentProfileId(
@@ -618,7 +627,7 @@ export async function createManagedAppUserAccount({
       updatedAt: new Date().toISOString()
     };
 
-    // Keep canonical user doc path as U_<profileId>.
+    // Keep canonical login alias path as U_<profileId> (same model used for students).
     await setDoc(doc(db, 'users', userAliasDocId), basePayload, { merge: true });
 
     await cleanupSecondaryApp();

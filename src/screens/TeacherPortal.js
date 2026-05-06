@@ -15,6 +15,110 @@ import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { QR_SCAN_RESULTS, QRCodeUtils } from '../utils/qrCodeUtils';
 
+const DAY_TO_INDEX = {
+  mon: 1,
+  monday: 1,
+  tue: 2,
+  tues: 2,
+  tuesday: 2,
+  wed: 3,
+  weds: 3,
+  wednesday: 3,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  thursday: 4,
+  fri: 5,
+  friday: 5
+};
+
+function parseDayIndexes(dayExpr) {
+  const source = String(dayExpr || '').trim();
+  if (!source) return [];
+  return Array.from(
+    new Set(
+      source
+        .split(/[-,/ ]+/)
+        .map((token) => DAY_TO_INDEX[String(token || '').trim().toLowerCase()])
+        .filter((v) => Number.isInteger(v))
+    )
+  );
+}
+
+function parseScheduleSlots(schedule) {
+  const text = String(schedule || '').trim();
+  if (!text) return [];
+  const slots = [];
+  const segments = text.split('|').map((s) => s.trim()).filter(Boolean);
+
+  segments.forEach((segment) => {
+    const firstToken = segment.split(/\s+/)[0] || '';
+    const dayIndexes = parseDayIndexes(firstToken);
+    if (!dayIndexes.length) return;
+
+    const ranges = segment.match(/\b(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\b/g) || [];
+    if (ranges.length > 0) {
+      ranges.forEach((rangeText) => {
+        const m = rangeText.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+        if (!m) return;
+        const startHour = Number(m[1]);
+        const startMinute = Number(m[2]);
+        const endHour = Number(m[3]);
+        const endMinute = Number(m[4]);
+        dayIndexes.forEach((dayIndex) =>
+          slots.push({ dayIndex, startHour, startMinute, endHour, endMinute })
+        );
+      });
+      return;
+    }
+
+    const singleTimes = segment.match(/\b(\d{1,2}):(\d{2})\b/g) || [];
+    singleTimes.forEach((timeText) => {
+      const m = timeText.match(/(\d{1,2}):(\d{2})/);
+      if (!m) return;
+      const hour = Number(m[1]);
+      const minute = Number(m[2]);
+      dayIndexes.forEach((dayIndex) =>
+        slots.push({ dayIndex, startHour: hour, startMinute: minute, endHour: hour + 1, endMinute: minute })
+      );
+    });
+  });
+  return slots;
+}
+
+function nextOccurrenceForSlot(slot, fromDate = new Date()) {
+  const now = new Date(fromDate);
+  const start = new Date(now);
+  const dayOffset = (slot.dayIndex - now.getDay() + 7) % 7;
+  start.setDate(now.getDate() + dayOffset);
+  start.setHours(slot.startHour, slot.startMinute, 0, 0);
+  if (start <= now) start.setDate(start.getDate() + 7);
+  return start;
+}
+
+function dayLabelFromIndex(dayIndex) {
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayIndex] || 'Day';
+}
+
+function buildTodayScheduleEntries(classRows, now = new Date()) {
+  const todayIndex = now.getDay();
+  const entries = [];
+  (classRows || []).forEach((cls) => {
+    const slots = parseScheduleSlots(cls.schedule);
+    slots
+      .filter((slot) => slot.dayIndex === todayIndex)
+      .forEach((slot) => {
+        const timeLabel = `${String(slot.startHour).padStart(2, '0')}:${String(slot.startMinute || 0).padStart(2, '0')}-${String(slot.endHour).padStart(2, '0')}:${String(slot.endMinute || 0).padStart(2, '0')}`;
+        entries.push({
+          className: cls.name || 'Class',
+          timeLabel
+        });
+      });
+  });
+  entries.sort((a, b) => a.timeLabel.localeCompare(b.timeLabel));
+  return entries;
+}
+
 const TeacherPortal = () => {
   const { user, logout } = useAuth();
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -27,6 +131,7 @@ const TeacherPortal = () => {
   const [events, setEvents] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [classesData, setClassesData] = useState([]);
+  const [classSessions, setClassSessions] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState({
     totalStudents: 0,
     presentStudents: 0,
@@ -34,12 +139,16 @@ const TeacherPortal = () => {
     lateStudents: 0
   });
   const [currentClass, setCurrentClass] = useState('');
+  const [selectedSessionId, setSelectedSessionId] = useState('');
   const [teacherClasses, setTeacherClasses] = useState([]);
   const [showStudentList, setShowStudentList] = useState(false);
   const [classStudents, setClassStudents] = useState([]);
   const [studentAttendanceStatus, setStudentAttendanceStatus] = useState({});
   const [studentListFilter, setStudentListFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [forceEnableSessionControls, setForceEnableSessionControls] = useState(false);
+  const [nowMs, setNowMs] = useState(Date.now());
+  const selectedSession = classSessions.find((session) => session.id === selectedSessionId) || null;
 
   const showPopup = (title, message, onOk) => {
     if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
@@ -67,7 +176,7 @@ const TeacherPortal = () => {
     loadClassStudents();
     loadEvents();
     loadAnnouncements();
-  }, [currentClass]);
+  }, [currentClass, selectedSessionId]);
 
   useEffect(() => {
     // Refresh when student list modal opens
@@ -77,6 +186,68 @@ const TeacherPortal = () => {
     }
   }, [showStudentList]);
 
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getCountdownText = (targetDate) => {
+    if (!targetDate) return '';
+    const diffMs = Math.max(0, new Date(targetDate).getTime() - nowMs);
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    return `${hours}h ${minutes}m ${seconds}s`;
+  };
+
+  const sessionStartsAt = selectedSession?.nextStart ? new Date(selectedSession.nextStart) : null;
+  const sessionAvailableAt = sessionStartsAt ? new Date(sessionStartsAt.getTime() - 15 * 60 * 1000) : null;
+  const sessionControlsLocked =
+    !forceEnableSessionControls &&
+    !!sessionAvailableAt &&
+    nowMs < sessionAvailableAt.getTime();
+
+  useEffect(() => {
+    if (!selectedSession || !currentClass) return;
+
+    const maybeAutoCheckout = async () => {
+      try {
+        const timeLabel = String(selectedSession.timeLabel || '');
+        const [startPart = '', endPart = ''] = timeLabel.split('-');
+        if (!endPart || !selectedSession.nextStart) return;
+        const [endHour, endMinute] = endPart.split(':').map((v) => Number(v));
+        if (!Number.isFinite(endHour) || !Number.isFinite(endMinute)) return;
+
+        const endDate = new Date(selectedSession.nextStart);
+        endDate.setHours(endHour, endMinute, 0, 0);
+        if (Date.now() < endDate.getTime()) return;
+
+        const created = await DatabaseService.autoCheckoutClassSession({
+          className: currentClass,
+          activityLabel: selectedSession.activityLabel,
+          scheduledStartTime: startPart || null,
+          scheduledEndTime: endPart,
+          teacherId: user?.profileId || user?.username || '',
+          teacherName: user?.name || ''
+        });
+
+        if (created > 0) {
+          loadAttendanceSummary();
+          loadClassStudents();
+        }
+      } catch (error) {
+        console.warn('Auto-checkout run failed:', error);
+      }
+    };
+
+    maybeAutoCheckout();
+    const timer = setInterval(maybeAutoCheckout, 60000);
+    return () => clearInterval(timer);
+  }, [selectedSessionId, currentClass, user?.profileId, user?.username, user?.name]);
+
   const loadAttendanceSummary = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -84,10 +255,14 @@ const TeacherPortal = () => {
         DatabaseService.getStudentsByClass(currentClass),
         DatabaseService.getClassAttendance(currentClass, today)
       ]);
+      const selectedActivity = selectedSession?.activityLabel;
+      const filteredRecords = selectedActivity
+        ? attendanceRecords.filter((record) => (record.activity || 'Class Attendance') === selectedActivity)
+        : attendanceRecords;
 
       const totalStudents = students.length;
       const statusMap = {};
-      [...attendanceRecords]
+      [...filteredRecords]
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
         .forEach(record => {
         const normalizedStudentId = String(record.studentId || '').toUpperCase();
@@ -134,22 +309,73 @@ const TeacherPortal = () => {
   const loadTeacherClasses = async () => {
     try {
       const allClasses = await DatabaseService.getAllClasses();
+      const getNextClassStart = (cls) => {
+        const slots = parseScheduleSlots(cls.schedule);
+        if (!slots.length) return null;
+        const starts = slots.map((slot) => nextOccurrenceForSlot(slot)).filter(Boolean);
+        if (!starts.length) return null;
+        starts.sort((a, b) => a - b);
+        return starts[0];
+      };
+
       const mine = allClasses.filter((cls) => {
         return (
           (user?.profileId && cls.teacherId === user.profileId) ||
           (user?.name && cls.teacherName === user.name)
         );
       });
-      const classNames = mine.map((cls) => cls.name);
-      setClassesData(mine);
+
+      const sortedMine = [...mine].sort((a, b) => {
+        const nextA = getNextClassStart(a);
+        const nextB = getNextClassStart(b);
+        if (nextA && nextB) return nextA - nextB;
+        if (nextA) return -1;
+        if (nextB) return 1;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+
+      const classNames = sortedMine.map((cls) => cls.name);
+      setClassesData(sortedMine);
       setTeacherClasses(classNames);
-      if (classNames.length > 0 && !classNames.includes(currentClass)) {
+      const sessions = [];
+      sortedMine.forEach((cls) => {
+        const slots = parseScheduleSlots(cls.schedule);
+        slots.forEach((slot, idx) => {
+          const start = nextOccurrenceForSlot(slot);
+          const timeLabel = `${String(slot.startHour).padStart(2, '0')}:${String(slot.startMinute || 0).padStart(2, '0')}-${String(slot.endHour).padStart(2, '0')}:${String(slot.endMinute || 0).padStart(2, '0')}`;
+          const dayLabel = dayLabelFromIndex(slot.dayIndex);
+          sessions.push({
+            id: `${cls.classId || cls.name}-${slot.dayIndex}-${slot.startHour}-${slot.startMinute}-${idx}`,
+            className: cls.name,
+            schedule: cls.schedule,
+            subject: cls.subject || 'General',
+            dayLabel,
+            timeLabel,
+            nextStart: start,
+            sessionLabel: `${dayLabel} ${timeLabel}`,
+            activityLabel: `${cls.name} ${dayLabel} ${timeLabel}`
+          });
+        });
+      });
+      sessions.sort((a, b) => a.nextStart - b.nextStart);
+      setClassSessions(sessions);
+
+      if (sessions.length > 0) {
+        const sessionStillExists = sessions.some((s) => s.id === selectedSessionId);
+        const nextSession = sessionStillExists
+          ? sessions.find((s) => s.id === selectedSessionId)
+          : sessions[0];
+        setSelectedSessionId(nextSession.id);
+        setCurrentClass(nextSession.className);
+      } else if (classNames.length > 0 && !classNames.includes(currentClass)) {
         setCurrentClass(classNames[0]);
       }
     } catch (error) {
       console.error('Error loading teacher classes:', error);
       setClassesData([]);
       setTeacherClasses([]);
+      setClassSessions([]);
+      setSelectedSessionId('');
       setCurrentClass('');
     }
   };
@@ -244,11 +470,14 @@ const TeacherPortal = () => {
         ).toUpperCase(),
         studentName: studentData.name || `${studentData.firstName || ''} ${studentData.lastName || ''}`.trim(),
         studentDocId: studentData.firestoreDocId || null,
-        class: studentData.class || currentClass,
+        class: currentClass || studentData.class,
         teacherId: user?.profileId || user?.username || 'TEACHER',
         teacherName: user?.name || 'Teacher',
         type: type,
         status: status, // 'present', 'late', 'absent', 'checkout'
+        activity: selectedSession?.activityLabel || `${currentClass} Session`,
+        scheduledStartTime: selectedSession?.timeLabel?.split('-')?.[0] || null,
+        scheduledEndTime: selectedSession?.timeLabel?.split('-')?.[1] || null,
         location: 'Classroom A',
         notes: statusNotes[status] || 'Attendance marked'
       };
@@ -369,7 +598,12 @@ const TeacherPortal = () => {
           <View style={styles.classList}>
             {currentClass ? <View style={styles.classCard}>
               <View style={styles.classHeader}>
-                <Text style={styles.className}>Class {currentClass}</Text>
+                <View>
+                  <Text style={styles.className}>Class {currentClass}</Text>
+                  {!!selectedSession && (
+                    <Text style={styles.classInfo}>{selectedSession.dayLabel} {selectedSession.timeLabel}</Text>
+                  )}
+                </View>
                 <Text style={styles.classInfo}>{classStudents.length || attendanceSummary.totalStudents} Students</Text>
               </View>
               
@@ -383,8 +617,7 @@ const TeacherPortal = () => {
                   <Text style={styles.absentText}>Absent: {attendanceSummary.absentStudents}</Text>
                 </View>
               </View>
-
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.viewStudentListButton}
                 onPress={() => {
                   setShowStudentList(true);
@@ -394,55 +627,148 @@ const TeacherPortal = () => {
                 <Text style={styles.viewStudentListText}>View All Students</Text>
               </TouchableOpacity>
 
-              <View style={styles.qrScanButtons}>
-                <TouchableOpacity 
-                  style={[styles.scanButton, styles.checkInButton]}
-                  onPress={() => openQRScanner('login')}
-                >
-                  <Ionicons name="log-in" size={18} color="#fff" />
-                  <Text style={styles.scanButtonText}>Check In</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.scanButton, styles.absentButton]}
-                  onPress={() => openQRScanner('absent')}
-                >
-                  <Ionicons name="close-circle" size={18} color="#fff" />
-                  <Text style={styles.scanButtonText}>Mark Absent</Text>
-                </TouchableOpacity>
+              <View style={styles.classActionArea}>
+                {selectedSession && (
+                  <TouchableOpacity
+                    style={[styles.sessionOverrideButtonInline, forceEnableSessionControls && styles.sessionOverrideButtonActive]}
+                    onPress={() => setForceEnableSessionControls((v) => !v)}
+                  >
+                    <Ionicons name={forceEnableSessionControls ? 'flask' : 'flask-outline'} size={12} color="#1565c0" />
+                    <Text style={styles.sessionOverrideButtonText}>
+                      {forceEnableSessionControls ? 'Override ON' : 'Testing override'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {sessionControlsLocked && (
+                  <View style={styles.classActionLockedPanel}>
+                    <Ionicons name="lock-closed" size={20} color="#fff" style={styles.classActionOverlayIcon} />
+                    <Text style={styles.classActionOverlayTitle}>Attendance controls locked</Text>
+                    <Text style={styles.classActionOverlayText}>
+                      Available from {sessionAvailableAt?.toLocaleString([], { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    <Text style={styles.classActionOverlayText}>
+                      Countdown: {getCountdownText(sessionAvailableAt)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.qrScanButtons}>
+                  <TouchableOpacity
+                    style={[
+                      styles.scanButton,
+                      styles.checkInButton,
+                      sessionControlsLocked && styles.scanButtonDisabled
+                    ]}
+                    onPress={() => openQRScanner('login')}
+                    disabled={sessionControlsLocked}
+                  >
+                    <Ionicons name="log-in" size={18} color="#fff" />
+                    <Text style={styles.scanButtonText}>Check In</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={[styles.scanButton, styles.checkOutButton]}
-                  onPress={() => openQRScanner('logout')}
-                >
-                  <Ionicons name="log-out" size={18} color="#fff" />
-                  <Text style={styles.scanButtonText}>Check Out</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.scanButton,
+                      styles.absentButton,
+                      sessionControlsLocked && styles.scanButtonDisabled
+                    ]}
+                    onPress={() => openQRScanner('absent')}
+                    disabled={sessionControlsLocked}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#fff" />
+                    <Text style={styles.scanButtonText}>Mark Absent</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.scanButton,
+                      styles.checkOutButton,
+                      sessionControlsLocked && styles.scanButtonDisabled
+                    ]}
+                    onPress={() => openQRScanner('logout')}
+                    disabled={sessionControlsLocked}
+                  >
+                    <Ionicons name="log-out" size={18} color="#fff" />
+                    <Text style={styles.scanButtonText}>Check Out</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View> : (
               <Text style={styles.classInfo}>No classes found for this teacher yet.</Text>
             )}
 
-            {teacherClasses.length > 1 && (
-              <View style={styles.classSwitchRow}>
-                {teacherClasses.map((className) => (
-                  <TouchableOpacity
-                    key={className}
-                    style={[
-                      styles.classSwitchChip,
-                      currentClass === className && styles.classSwitchChipActive
-                    ]}
-                    onPress={() => setCurrentClass(className)}
-                  >
-                    <Text style={[
-                      styles.classSwitchChipText,
-                      currentClass === className && styles.classSwitchChipTextActive
-                    ]}>
-                      {className}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            {classSessions.length > 0 && (
+              <>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.classSwitchRow}
+                >
+                  {classSessions.map((session) => {
+                    const isActive = selectedSessionId === session.id;
+                    return (
+                      <TouchableOpacity
+                        key={session.id}
+                        style={[
+                          styles.classSwitchCard,
+                          isActive && styles.classSwitchCardActive
+                        ]}
+                        onPress={() => {
+                          setSelectedSessionId(session.id);
+                          setCurrentClass(session.className);
+                        }}
+                      >
+                        <View style={styles.classSwitchCardHeader}>
+                          <Text style={[
+                            styles.classSwitchCardBadge,
+                            isActive && styles.classSwitchCardBadgeActive
+                          ]}>
+                            Next session
+                          </Text>
+                        </View>
+                        <Text style={[
+                          styles.classSwitchCardTitle,
+                          isActive && styles.classSwitchCardTitleActive
+                        ]}>
+                          {session.className}
+                        </Text>
+                        <Text style={[
+                          styles.classSwitchCardSubtitle,
+                          isActive && styles.classSwitchCardSubtitleActive
+                        ]}>
+                          {session.sessionLabel}
+                        </Text>
+                        <Text style={[
+                          styles.classSwitchCardMeta,
+                          isActive && styles.classSwitchCardMetaActive
+                        ]}>
+                          Timeslot attendance session
+                        </Text>
+                        <Text style={[
+                          styles.classSwitchCardMeta,
+                          isActive && styles.classSwitchCardMetaActive
+                        ]}>
+                          Starts {session.nextStart.toLocaleDateString()} {session.nextStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.classHistoryButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/teacher-class-history',
+                      params: {
+                        teacherId: user?.profileId || user?.username || '',
+                        teacherName: user?.name || ''
+                      }
+                    })
+                  }
+                >
+                  <Ionicons name="time-outline" size={18} color="#4a90e2" />
+                  <Text style={styles.classHistoryButtonText}>Class History</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
@@ -475,7 +801,10 @@ const TeacherPortal = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Today&apos;s Schedule</Text>
           <View style={styles.scheduleList}>
-            {(classesData.length ? classesData.map((cls) => `${cls.schedule || 'Time TBA'}: Class ${cls.name}`) : ['No schedule data available']).map((session, index) => (
+            {(buildTodayScheduleEntries(classesData).length
+              ? buildTodayScheduleEntries(classesData).map((entry) => `${entry.timeLabel}: Class ${entry.className}`)
+              : ['No classes scheduled for today']
+            ).map((session, index) => (
               <View key={index} style={styles.scheduleItem}>
                 <Ionicons name="time" size={24} color="#4a90e2" />
                 <Text style={styles.scheduleText}>{session}</Text>
@@ -820,26 +1149,71 @@ const styles = StyleSheet.create({
   },
   classSwitchRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 12,
+    paddingRight: 8,
+    paddingBottom: 4,
   },
-  classSwitchChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f1f1f1',
+  classSwitchCard: {
+    minWidth: 290,
+    maxWidth: 340,
+    minHeight: 130,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#f3f5f8',
+    borderWidth: 1,
+    borderColor: '#dde3ea',
+    justifyContent: 'center',
   },
-  classSwitchChipActive: {
+  classSwitchCardActive: {
     backgroundColor: '#4a90e2',
+    borderColor: '#4a90e2',
   },
-  classSwitchChipText: {
-    color: '#555',
+  classSwitchCardHeader: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  classSwitchCardBadge: {
+    backgroundColor: '#e5ebf3',
+    color: '#4b5a70',
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    overflow: 'hidden',
+    textTransform: 'uppercase',
+  },
+  classSwitchCardBadgeActive: {
+    backgroundColor: '#eaf3ff',
+    color: '#2f6db2',
+  },
+  classSwitchCardTitle: {
+    color: '#2d3748',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  classSwitchCardTitleActive: {
+    color: '#fff',
+  },
+  classSwitchCardSubtitle: {
+    marginTop: 5,
+    color: '#556070',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  classSwitchCardSubtitleActive: {
+    color: '#eaf3ff',
+  },
+  classSwitchCardMeta: {
+    marginTop: 4,
+    color: '#5f6c80',
     fontSize: 12,
     fontWeight: '600',
   },
-  classSwitchChipTextActive: {
-    color: '#fff',
+  classSwitchCardMetaActive: {
+    color: '#eaf3ff',
   },
   classCard: {
     backgroundColor: '#f9f9f9',
@@ -912,10 +1286,79 @@ const styles = StyleSheet.create({
     borderColor: '#4a90e2',
     gap: 6,
   },
+  classHistoryButton: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4a90e2',
+    gap: 6,
+  },
+  classHistoryButtonText: {
+    color: '#4a90e2',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   viewStudentListText: {
     color: '#4a90e2',
     fontSize: 14,
     fontWeight: '600',
+  },
+  classActionArea: {
+    marginTop: 12,
+    paddingTop: 4,
+  },
+  classActionLockedPanel: {
+    position: 'relative',
+    backgroundColor: 'rgba(15, 23, 42, 0.84)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#0f172a',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  classActionOverlayIcon: {
+    marginBottom: 8,
+  },
+  classActionOverlayTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 6,
+  },
+  classActionOverlayText: {
+    fontSize: 13,
+    color: '#f8fafc',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  sessionOverrideButtonInline: {
+    alignSelf: 'flex-end',
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#e3f2fd',
+    borderWidth: 1,
+    borderColor: '#90caf9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  sessionOverrideButtonActive: {
+    backgroundColor: '#d1f0d5',
+    borderColor: '#7fc88b',
+  },
+  sessionOverrideButtonText: {
+    color: '#1565c0',
+    fontSize: 12,
+    fontWeight: '700',
   },
   qrScanButtons: {
     flexDirection: 'row',
@@ -923,6 +1366,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     marginTop: 4,
+  },
+  scanButtonDisabled: {
+    opacity: 0.45,
   },
   scanButton: {
     flexGrow: 1,

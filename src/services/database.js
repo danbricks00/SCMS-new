@@ -209,13 +209,22 @@ export class DatabaseService {
       if (!teacherData.teacherId) {
         teacherData.teacherId = `TCH${Date.now().toString().slice(-6)}`;
       }
-      
+      const normalizedTeacherId = String(teacherData.teacherId || '').trim().toUpperCase();
+
+      teacherData.teacherId = normalizedTeacherId;
+      teacherData.id = normalizedTeacherId;
+      teacherData.subject = String(teacherData.subject || '').trim();
+      teacherData.department = String(teacherData.department || '').trim();
+      teacherData.email = String(teacherData.email || '').trim().toLowerCase();
+      teacherData.phone = String(teacherData.phone || '').trim();
+
       // Add creation timestamp
       teacherData.createdAt = new Date().toISOString();
       teacherData.updatedAt = new Date().toISOString();
       teacherData.isActive = true;
 
-      const docRef = await addDoc(collection(db, 'teachers'), teacherData);
+      const teacherDocId = normalizedTeacherId;
+      await setDoc(doc(db, 'teachers', teacherDocId), teacherData, { merge: true });
       
       // Log activity
       await this.logActivity({
@@ -228,8 +237,8 @@ export class DatabaseService {
         }
       });
       
-      console.log('Teacher added with ID:', docRef.id);
-      return docRef.id;
+      console.log('Teacher added with ID:', teacherDocId);
+      return teacherDocId;
     } catch (error) {
       console.error('Error adding teacher:', error);
       throw error;
@@ -295,6 +304,53 @@ export class DatabaseService {
       console.error('Error adding class:', error);
       throw error;
     }
+  }
+
+  /**
+   * Assign a set of students to a class and keep student class fields in sync.
+   * @param {Array<string>} studentIds - Student IDs to assign
+   * @param {Object} classInfo - { className, classId }
+   * @returns {Promise<number>} Number of students updated
+   */
+  static async assignStudentsToClass(studentIds = [], classInfo = {}) {
+    if (!hasFirestore()) return 0;
+    const normalizedIds = Array.isArray(studentIds)
+      ? Array.from(
+          new Set(
+            studentIds
+              .map((id) => String(id || '').trim().toUpperCase())
+              .filter(Boolean)
+          )
+        )
+      : [];
+    if (!normalizedIds.length) return 0;
+
+    const className = String(classInfo.className || '').trim();
+    const classId = String(classInfo.classId || '').trim().toUpperCase();
+    const classDigitsMatch = className.match(/\d+/);
+    const parsedYearLevel = classDigitsMatch ? Number(classDigitsMatch[0]) : null;
+
+    let updated = 0;
+    for (const sid of normalizedIds) {
+      try {
+        await setDoc(
+          doc(db, 'students', sid),
+          {
+            studentId: sid,
+            id: sid,
+            class: className,
+            classId: classId || (className ? `CLS${className.replace(/\s+/g, '').toUpperCase()}` : ''),
+            yearLevel: Number.isFinite(parsedYearLevel) ? parsedYearLevel : '',
+            updatedAt: new Date().toISOString()
+          },
+          { merge: true }
+        );
+        updated += 1;
+      } catch (error) {
+        console.warn(`Failed to assign student ${sid} to class ${className}:`, error);
+      }
+    }
+    return updated;
   }
 
   /**
@@ -1034,6 +1090,129 @@ export class DatabaseService {
     } catch (error) {
       console.error('Error getting class attendance:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get attendance history for a class across multiple days.
+   * @param {string} className - Class name
+   * @param {number} daysBack - Number of days to include (default 30)
+   * @returns {Promise<Array>} Array of attendance records
+   */
+  static async getClassAttendanceHistory(className, daysBack = 30) {
+    if (!hasFirestore()) return [];
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - Math.max(1, Number(daysBack) || 30));
+
+      const q = query(
+        collection(db, 'attendance'),
+        where('class', '==', className),
+        where('timestamp', '>=', startDate.toISOString()),
+        orderBy('timestamp', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      const attendance = [];
+      querySnapshot.forEach((doc) => {
+        attendance.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      return attendance;
+    } catch (error) {
+      console.warn('Error getting class attendance history, using fallback:', error);
+      try {
+        const fallbackQuery = query(
+          collection(db, 'attendance'),
+          where('class', '==', className)
+        );
+        const fallbackSnapshot = await getDocs(fallbackQuery);
+        const attendance = [];
+        fallbackSnapshot.forEach((doc) => {
+          const data = doc.data() || {};
+          const ts = new Date(data.timestamp || 0);
+          attendance.push({
+            id: doc.id,
+            ...data,
+            _ts: ts
+          });
+        });
+        attendance.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        return attendance.filter((r) => {
+          const ts = new Date(r.timestamp || 0);
+          return ts >= startDate;
+        });
+      } catch (fallbackError) {
+        console.error('Fallback class attendance history failed:', fallbackError);
+        return [];
+      }
+    }
+  }
+
+  /**
+   * Auto-check out any students still checked in for a class session.
+   * Idempotent: students with existing logout for the same activity are skipped.
+   */
+  static async autoCheckoutClassSession({
+    className,
+    activityLabel,
+    scheduledStartTime,
+    scheduledEndTime,
+    teacherId = '',
+    teacherName = ''
+  }) {
+    if (!hasFirestore()) return 0;
+    if (!className || !activityLabel || !scheduledEndTime) return 0;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const rows = await this.getClassAttendance(className, today);
+
+      const loginsByStudent = new Map();
+      const hasLogout = new Set();
+      rows.forEach((row) => {
+        const sid = String(row.studentId || '').toUpperCase();
+        if (!sid) return;
+        const sameActivity = String(row.activity || 'Class Attendance') === String(activityLabel);
+        if (!sameActivity) return;
+        if (row.type === 'login') loginsByStudent.set(sid, row);
+        if (row.type === 'logout') hasLogout.add(sid);
+      });
+
+      const pending = Array.from(loginsByStudent.entries()).filter(([sid, loginRow]) => {
+        if (hasLogout.has(sid)) return false;
+        const status = String(loginRow?.status || 'present').toLowerCase();
+        // Absent students should not be auto-checked out.
+        if (status === 'absent') return false;
+        return true;
+      });
+      let created = 0;
+      for (const [, loginRow] of pending) {
+        await this.recordAttendance(
+          {
+            studentId: loginRow.studentId,
+            studentName: loginRow.studentName || '',
+            studentDocId: loginRow.studentDocId || null,
+            class: className,
+            teacherId: teacherId || loginRow.teacherId || '',
+            teacherName: teacherName || loginRow.teacherName || '',
+            type: 'logout',
+            status: 'checkout',
+            activity: activityLabel,
+            scheduledStartTime: scheduledStartTime || loginRow.scheduledStartTime || null,
+            scheduledEndTime,
+            notes: `Auto-checkout at session end (${scheduledEndTime})`
+          },
+          { skipFraudCheck: true }
+        );
+        created += 1;
+      }
+
+      return created;
+    } catch (error) {
+      console.warn('Auto-checkout failed:', error);
+      return 0;
     }
   }
 
