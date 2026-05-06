@@ -10,6 +10,7 @@ function hasFirestore() {
 
 // Demo/testing IDs that should bypass fraud rules to avoid scan warnings during demos.
 const FRAUD_CHECK_BYPASS_STUDENT_IDS = new Set(['AC0611']);
+const STUDENT_ATTENDANCE_WARNED_INDEX_LABELS = new Set();
 
 // Database service for managing students and attendance
 export class DatabaseService {
@@ -986,7 +987,11 @@ export class DatabaseService {
         try {
           return await getDocs(queryRef);
         } catch (queryError) {
-          console.warn(`getStudentAttendance query failed (${label}); falling back to client-side filter.`, queryError);
+          // Keep one warning per label to avoid log spam while index is building.
+          if (!STUDENT_ATTENDANCE_WARNED_INDEX_LABELS.has(label)) {
+            STUDENT_ATTENDANCE_WARNED_INDEX_LABELS.add(label);
+            console.warn(`getStudentAttendance query failed (${label}); falling back to client-side filter.`, queryError);
+          }
           return null;
         }
       };
