@@ -108,10 +108,10 @@ export async function checkQRScanRateLimit(userId) {
 
 // ============================================================
 // 2) AUTH / LOGIN RATE LIMITING
-// Limit: 5 attempts per 15 minutes per email
+// Limit: 10 attempts per 15 minutes per email
 // ============================================================
 
-const AUTH_MAX_ATTEMPTS = 5;
+const AUTH_MAX_ATTEMPTS = 10;
 const AUTH_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
