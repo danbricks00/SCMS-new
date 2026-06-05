@@ -4,13 +4,9 @@ import QRCode from 'react-native-qrcode-svg';
 import QrRasterImage from './QrRasterImage';
 import { qrPayloadToDataUrl } from '../utils/qrRaster';
 
-/** Web dark mode can make SVG strokes read as white on white; opt this block out of that. */
+/** White backing for QR block; dark-mode isolation is via className + web/index.html CSS. */
 const QR_LIGHT_ENCLAVE = Platform.select({
-  web: {
-    backgroundColor: '#FFFFFF',
-    colorScheme: 'light',
-    forcedColorAdjust: 'none',
-  },
+  web: { backgroundColor: '#FFFFFF' },
   default: {},
 });
 

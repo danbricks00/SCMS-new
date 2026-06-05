@@ -18,13 +18,9 @@ import {
 const WRAPPER_PADDING = 10;
 const CONTAINER_PADDING = 20;
 
-/** Blink/WebKit: opt QR block out of OS dark-mode SVG stroke inversion. */
+/** White backing for QR block; dark-mode isolation is via className + web/index.html CSS. */
 const QR_LIGHT_ENCLAVE = Platform.select({
-  web: {
-    backgroundColor: QR_BACKGROUND,
-    colorScheme: 'light',
-    forcedColorAdjust: 'none',
-  },
+  web: { backgroundColor: QR_BACKGROUND },
   default: {},
 });
 
