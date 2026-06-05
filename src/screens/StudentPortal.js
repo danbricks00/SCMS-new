@@ -15,6 +15,8 @@ import * as Print from 'expo-print';
 import { useAuth } from '../contexts/AuthContext';
 import { DatabaseService } from '../services/database';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
+import { qrPayloadToDataUrl, qrPrintCssRules, qrPrintImgTag } from '../utils/qrRaster';
+import { openPrintDialogWithHtml } from '../utils/pdfFromHtml';
 
 const DAY_TO_INDEX = {
   mon: 1,
@@ -42,17 +44,7 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-/** Same options as SimpleQRCode web raster — print must match on-screen QR. */
-async function qrPayloadToDataUrl(qrPayload, size = 200) {
-  const mod = await import('qrcode');
-  const QRCodeLib = mod.default ?? mod;
-  return QRCodeLib.toDataURL(qrPayload, {
-    width: size,
-    margin: 1,
-    color: { dark: '#000000', light: '#ffffff' },
-    errorCorrectionLevel: 'M',
-  });
-}
+const PRINT_QR_SIZE = 200;
 
 const StudentPortal = () => {
   const { user, logout } = useAuth();
@@ -414,7 +406,7 @@ const StudentPortal = () => {
     let qrImageDataUrl = qrImageDataUrlForPrint;
     try {
       if (!qrImageDataUrl) {
-        qrImageDataUrl = await qrPayloadToDataUrl(qrDataForPrint, 200);
+        qrImageDataUrl = await qrPayloadToDataUrl(qrDataForPrint, PRINT_QR_SIZE);
       }
     } catch (e) {
       console.error('[QR Print] Failed to build QR image:', e);
@@ -459,10 +451,10 @@ const StudentPortal = () => {
           .student-name { font-size: 20px; font-weight: bold; color: #4a90e2; margin-bottom: 5px; }
           .student-id { font-size: 16px; color: #666; margin-bottom: 20px; }
           .qr-code-container { margin: 20px 0; padding: 15px; border: 2px solid #e0e0e0; border-radius: 10px; background: #ffffff; display: flex; justify-content: center; align-items: center; }
-          .qr-code-container img { width: 200px; height: 200px; display: block; margin: 0 auto; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
           .instructions { font-size: 14px; color: #666; margin-top: 15px; line-height: 1.4; }
           .footer { margin-top: 20px; font-size: 12px; color: #999; }
-          @media print { body { margin: 0; } .print-container { border: none; } }
+          ${qrPrintCssRules(PRINT_QR_SIZE)}
+          @media print { body { margin: 0; background: #ffffff !important; } .print-container { border: none; } }
         </style>
       </head>
       <body>
@@ -482,8 +474,8 @@ const StudentPortal = () => {
               <div class="student-id">Student ID: ${safeId}</div>
             </div>
           </div>
-          <div class="qr-code-container">
-            <img src="${qrImageDataUrl}" alt="Student QR Code" width="200" height="200" />
+          <div class="qr-code-container scms-print-qr">
+            ${qrPrintImgTag(qrImageDataUrl, PRINT_QR_SIZE)}
           </div>
           <div class="instructions">
             <strong>Instructions:</strong><br>
@@ -499,23 +491,7 @@ const StudentPortal = () => {
     `;
 
     if (Platform.OS === 'web') {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.focus();
-        const triggerPrint = () => {
-          try {
-            printWindow.print();
-          } catch (e) {
-            console.warn('[QR Print] print() failed:', e);
-          }
-        };
-        printWindow.addEventListener('load', () => setTimeout(triggerPrint, 150));
-        setTimeout(triggerPrint, 500);
-      } else {
-        alert('Please allow pop-ups to print the QR code.');
-      }
+      openPrintDialogWithHtml(printContent);
       return;
     }
 

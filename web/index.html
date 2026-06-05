@@ -64,6 +64,28 @@
     .scms-qr-light svg rect[fill] {
       fill: #ffffff !important;
     }
+    .scms-qr-light img,
+    .scms-qr-printable {
+      display: block !important;
+      background-color: #ffffff !important;
+      color-scheme: light !important;
+      forced-color-adjust: none !important;
+      print-color-adjust: exact !important;
+      -webkit-print-color-adjust: exact !important;
+    }
+    @media print {
+      .scms-qr-light,
+      .scms-qr-light img,
+      .scms-qr-printable,
+      .scms-print-qr,
+      .scms-print-qr-img {
+        visibility: visible !important;
+        opacity: 1 !important;
+        background-color: #ffffff !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+      }
+    }
   </style>
   <script>
     // Platform detection with iPad Safari fix

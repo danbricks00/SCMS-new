@@ -43,5 +43,39 @@ export function openPrintDialogWithHtml(html) {
   w.document.write(html);
   w.document.close();
   w.focus();
-  w.print();
+
+  const triggerPrint = () => {
+    try {
+      w.print();
+    } catch (e) {
+      console.warn('[openPrintDialogWithHtml] print() failed:', e);
+    }
+  };
+
+  const schedulePrint = () => {
+    const imgs = w.document.querySelectorAll('img');
+    if (!imgs.length) {
+      setTimeout(triggerPrint, 150);
+      return;
+    }
+    let pending = imgs.length;
+    const onImageReady = () => {
+      pending -= 1;
+      if (pending <= 0) {
+        setTimeout(triggerPrint, 100);
+      }
+    };
+    imgs.forEach((img) => {
+      if (img.complete && img.naturalWidth > 0) {
+        onImageReady();
+      } else {
+        img.addEventListener('load', onImageReady, { once: true });
+        img.addEventListener('error', onImageReady, { once: true });
+      }
+    });
+    setTimeout(triggerPrint, 2000);
+  };
+
+  w.addEventListener('load', () => setTimeout(schedulePrint, 50));
+  setTimeout(schedulePrint, 400);
 }

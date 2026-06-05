@@ -1,26 +1,77 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform, ActivityIndicator } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import QrRasterImage from './QrRasterImage';
 import { QRCodeUtils } from '../utils/qrCodeUtils';
 import { canUseServerPdf, generatePdfUrlFromHtml, openPrintDialogWithHtml } from '../utils/pdfFromHtml';
+import {
+  QR_BACKGROUND,
+  QR_FOREGROUND,
+  qrPayloadToDataUrl,
+  qrPrintCssRules,
+  qrPrintImgTag,
+} from '../utils/qrRaster';
+const WRAPPER_PADDING = 10;
+const CONTAINER_PADDING = 20;
+
+/** Blink/WebKit: opt QR block out of OS dark-mode SVG stroke inversion. */
+const QR_LIGHT_ENCLAVE = Platform.select({
+  web: {
+    backgroundColor: QR_BACKGROUND,
+    colorScheme: 'light',
+    forcedColorAdjust: 'none',
+  },
+  default: {},
+});
 
 const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
   const [qrSize, setQrSize] = useState(200);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [webRasterUri, setWebRasterUri] = useState(null);
+
+  const qrData = studentData ? QRCodeUtils.generateStudentQR(studentData) : '';
+  const qrPixelSize = Math.round(qrSize);
+  const wrapperSize = qrPixelSize + WRAPPER_PADDING * 2;
+  const containerSize = wrapperSize + CONTAINER_PADDING * 2;
+  const webQrClass = Platform.OS === 'web' ? 'scms-qr-light' : undefined;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !studentData || !qrData) {
+      setWebRasterUri(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const dataUrl = await qrPayloadToDataUrl(qrData, qrPixelSize);
+        if (!cancelled) {
+          setWebRasterUri(dataUrl);
+        }
+      } catch (e) {
+        console.warn('[QRCodeGenerator] Web QR raster failed:', e?.message || e);
+        if (!cancelled) setWebRasterUri(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [studentData, qrData, qrPixelSize]);
 
   if (!studentData) return null;
-
-  const qrData = QRCodeUtils.generateStudentQR(studentData);
 
   const handlePrint = async () => {
     setIsGenerating(true);
     
     try {
-      const html = generatePrintableHTML(studentData, qrData);
+      let qrImageDataUrl = webRasterUri;
+      if (!qrImageDataUrl) {
+        qrImageDataUrl = await qrPayloadToDataUrl(qrData, qrPixelSize);
+      }
+      const html = generatePrintableHTML(studentData, qrImageDataUrl, qrPixelSize);
 
       if (Platform.OS === 'web' && canUseServerPdf()) {
         try {
@@ -66,9 +117,10 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
     }
   };
 
-  const generatePrintableHTML = (student, qrData) => {
+  const generatePrintableHTML = (student, qrImageDataUrl, printSize) => {
     const photoUrl = student.photo || '';
     const hasPhoto = photoUrl && photoUrl.trim() !== '';
+    const printPixelSize = Math.round(printSize || qrPixelSize);
     
     return `
       <!DOCTYPE html>
@@ -77,9 +129,11 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
         <meta charset="utf-8">
         <title>Student QR Code - ${student.name}</title>
         <style>
+          ${qrPrintCssRules(printPixelSize)}
           @media print {
-            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; background: #ffffff !important; }
             .no-print { display: none; }
+            .container { border: none; }
           }
           body {
             font-family: Arial, sans-serif;
@@ -317,14 +371,8 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
             <!-- QR Code Section -->
             <div class="qr-section">
               <div class="qr-title">📱 Scan for Attendance</div>
-              <div class="qr-code">
-                <div style="width: 180px; height: 180px; background: #f0f0f0; border: 2px dashed #4a90e2; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
-                  <div style="text-align: center; color: #999;">
-                    <div style="font-size: 40px; margin-bottom: 5px;">📷</div>
-                    <div style="font-size: 14px; font-weight: bold;">QR CODE</div>
-                    <div style="font-size: 11px; margin-top: 5px;">${student.studentId}</div>
-                  </div>
-                </div>
+              <div class="qr-code scms-print-qr">
+                ${qrPrintImgTag(qrImageDataUrl, printPixelSize)}
               </div>
             </div>
 
@@ -379,17 +427,57 @@ const QRCodeGenerator = ({ studentData, onClose, onPrint }) => {
         {/* QR Code Display */}
         <View style={styles.qrContainer}>
           <Text style={styles.qrTitle}>Student QR Code</Text>
-          <View style={styles.qrCodeContainer}>
-            <View style={styles.qrCodeWrapper}>
-              <QRCode
-                value={qrData}
-                size={qrSize}
-                color="#000000"
-                backgroundColor="#FFFFFF"
-                logoSize={30}
-                logoMargin={2}
-                logoBorderRadius={15}
-              />
+          <View
+            style={[
+              styles.qrCodeContainer,
+              { width: containerSize, height: containerSize },
+            ]}
+          >
+            <View
+              className={webQrClass}
+              style={[
+                styles.qrCodeWrapper,
+                QR_LIGHT_ENCLAVE,
+                { width: wrapperSize, height: wrapperSize },
+              ]}
+            >
+              <View
+                style={{
+                  width: qrPixelSize,
+                  height: qrPixelSize,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: QR_BACKGROUND,
+                }}
+              >
+                {Platform.OS === 'web' ? (
+                  webRasterUri ? (
+                    <QrRasterImage dataUrl={webRasterUri} pixelSize={qrPixelSize} />
+                  ) : (
+                    <View
+                      style={{
+                        width: qrPixelSize,
+                        height: qrPixelSize,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: QR_BACKGROUND,
+                      }}
+                    >
+                      <ActivityIndicator size="large" color={QR_FOREGROUND} />
+                    </View>
+                  )
+                ) : (
+                  <QRCode
+                    value={qrData}
+                    size={qrPixelSize}
+                    color={QR_FOREGROUND}
+                    backgroundColor={QR_BACKGROUND}
+                    logoSize={30}
+                    logoMargin={2}
+                    logoBorderRadius={15}
+                  />
+                )}
+              </View>
             </View>
           </View>
           <Text style={styles.qrNote}>
@@ -520,19 +608,22 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   qrCodeContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: '#FFFFFF',
+    padding: CONTAINER_PADDING,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#ddd',
     marginBottom: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   qrCodeWrapper: {
     backgroundColor: '#FFFFFF',
-    padding: 10,
+    padding: WRAPPER_PADDING,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   qrNote: {
     fontSize: 12,

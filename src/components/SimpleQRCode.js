@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import QrRasterImage from './QrRasterImage';
+import { qrPayloadToDataUrl } from '../utils/qrRaster';
 
 /** Web dark mode can make SVG strokes read as white on white; opt this block out of that. */
 const QR_LIGHT_ENCLAVE = Platform.select({
@@ -14,6 +16,8 @@ const QR_LIGHT_ENCLAVE = Platform.select({
 
 const SimpleQRCode = ({ studentData, qrCode, size = 200, onQrImageDataUrl }) => {
   const qrRef = useRef(null);
+  const qrPixelSize = Math.round(size);
+  const wrapperSize = qrPixelSize + 20;
   /**
    * On web, always render QR via `qrcode` (PNG data URL). SVG QR is unreliable under
    * prefers-color-scheme: dark / Chrome; RN's useColorScheme also stays "light" until
@@ -29,14 +33,7 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200, onQrImageDataUrl }) => 
     let cancelled = false;
     (async () => {
       try {
-        const mod = await import('qrcode');
-        const QRCodeLib = mod.default ?? mod;
-        const dataUrl = await QRCodeLib.toDataURL(qrCode, {
-          width: size,
-          margin: 1,
-          color: { dark: '#000000', light: '#ffffff' },
-          errorCorrectionLevel: 'M',
-        });
+        const dataUrl = await qrPayloadToDataUrl(qrCode, qrPixelSize);
         if (!cancelled) {
           setWebRasterUri(dataUrl);
         }
@@ -48,7 +45,7 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200, onQrImageDataUrl }) => 
     return () => {
       cancelled = true;
     };
-  }, [qrCode, size]);
+  }, [qrCode, qrPixelSize]);
 
   // Pass PNG to parent for print
   useEffect(() => {
@@ -75,7 +72,7 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200, onQrImageDataUrl }) => 
     } catch (e) {
       // Print can fall back to web-only logic in StudentPortal.
     }
-  }, [webRasterUri, onQrImageDataUrl, studentData, qrCode, size]);
+  }, [webRasterUri, onQrImageDataUrl, studentData, qrCode, qrPixelSize]);
 
   const webQrClass = Platform.OS === 'web' ? 'scms-qr-light' : undefined;
 
@@ -91,33 +88,36 @@ const SimpleQRCode = ({ studentData, qrCode, size = 200, onQrImageDataUrl }) => 
 
   return (
     <View style={styles.container}>
-      <View className={webQrClass} style={[styles.qrWrapper, QR_LIGHT_ENCLAVE]}>
+      <View
+        className={webQrClass}
+        style={[
+          styles.qrWrapper,
+          QR_LIGHT_ENCLAVE,
+          { width: wrapperSize, height: wrapperSize },
+        ]}
+      >
         <View
           style={{
             position: 'relative',
-            width: size,
-            height: size,
+            width: qrPixelSize,
+            height: qrPixelSize,
             alignItems: 'center',
             justifyContent: 'center',
+            backgroundColor: '#FFFFFF',
           }}
         >
           {Platform.OS === 'web' ? (
             webRasterUri ? (
-              <Image
-                accessibilityLabel="Student QR code"
-                source={{ uri: webRasterUri }}
-                style={{ width: size, height: size }}
-                resizeMode="contain"
-              />
+              <QrRasterImage dataUrl={webRasterUri} pixelSize={qrPixelSize} />
             ) : (
-              <View style={[styles.darkLoading, { width: size, height: size }]}>
-                <ActivityIndicator size="large" color="#333" />
+              <View style={[styles.darkLoading, { width: qrPixelSize, height: qrPixelSize }]}>
+                <ActivityIndicator size="large" color="#000000" />
               </View>
             )
           ) : (
             <QRCode
               value={qrCode || ''}
-              size={size}
+              size={qrPixelSize}
               color="#000000"
               backgroundColor="#FFFFFF"
               getRef={(c) => {
